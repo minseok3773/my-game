@@ -1,0 +1,228 @@
+import re
+# 저장소 맨 위에서 실행: python3 src/3d/assemble3d.py  (2D 파일의 게임 규칙 + 3D 모듈 → raft-village-3d.html)
+import os
+HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(os.path.dirname(HERE))
+src = open(os.path.join(ROOT, 'raft-village-2d.html'), encoding='utf-8').read()
+B = lambda n: open(os.path.join(HERE, n), encoding='utf-8').read()
+a = src.index("<script>\n(() => {"); b = src.rindex("})();\n</script>")
+head, body, tail = src[:a], src[a + len("<script>\n(() => {\n"):b], src[b:]
+lines = body.split('\n')
+# 최상위 블록 단위로 나누기
+starts = [i for i, L in enumerate(lines) if L and not L[0].isspace() and L[0] not in '})]']
+chunks = []
+for k, st in enumerate(starts):
+    en = starts[k + 1] if k + 1 < len(starts) else len(lines)
+    chunks.append('\n'.join(lines[st:en]))
+pre = '\n'.join(lines[:starts[0]])
+
+DROP = ['function box(', 'function drawPile(', 'function drawPerson(', 'function drawKid(', 'function drawStation(', 'function drawCash(',
+        'function drawTent(', 'function drawSolar(', 'function drawLighthouse(', 'function swimShape(', 'function drawDolphinJump(',
+        'function drawFrontJumpers(', 'function drawSea(', 'function slabSides(', 'function drawDocks(', 'function drawRaftShadow(',
+        'function line(', 'function drawRaft(', 'function drawZone(', 'function drawPad(', 'function drawBase(', 'function drawTower(',
+        'function drawBoarder(', 'function soldierDraw(', 'function drawEnemy(', 'function drawShots(', 'function render(', 'function frame(',
+        'function post(', 'function resize(', "window.addEventListener('resize'", 'function S(', 'function inputDir(',
+        'const bloomCv', 'const cv = ', '// 후가공:']
+def keep(c):
+    return not any(c.startswith(d) for d in DROP)
+
+# 2D 렌더에서 오버레이로 재사용할 부분 추출
+def seg(text, start, end):
+    i = text.index(start); j = text.index(end, i); return text[i:j]
+r2d = src[src.index('function render() {'):]
+guide = seg(r2d, "  // 안내: 목표 지점의 파동", "  return obj;\n}")
+guide = '\n'.join(L for L in guide.split('\n') if 'list.sort(' not in L).replace('  drawShots();', '  drawBooms();')
+p2d = src[src.index('function post() {'):]
+raidfx = seg(p2d, "  // 습격 중 화면 테두리 붉은 맥박", "  ctx.restore();\n}")
+d2d = src[src.index('function drawShots() {'):]
+booms = seg(d2d, "  for (const b of booms) {", "\n}\n") + "\n"
+pad2d = src[src.index('function drawPad(p, full) {'):]
+badge = seg(pad2d, "  // 멀리 있는 칸은 작은 아이콘만", "\n}\n") + "\n"
+cust = seg(src[src.index('function render() {'):], "      const stage = c.emote ? 0", "      list.push(")
+
+overlay = """
+/* ---------- 화면 위 2D 오버레이: 간판·가격표·말풍선·효과 ---------- */
+const lights = [];
+// 체력 막대 + 레벨 배지
+function hpBar(x, y, z, ratio, color, w = 26, lvl) {
+  const p = S(x, y, z), wd = w * Z, h = 5.5 * Z, x0 = p.x - wd / 2;
+  ctx.fillStyle = 'rgba(10,12,20,.75)'; ctx.beginPath(); ctx.roundRect(x0 - 1, p.y - 1, wd + 2, h + 2, 3 * Z); ctx.fill();
+  const g = ctx.createLinearGradient(0, p.y, 0, p.y + h); g.addColorStop(0, '#ffffff'); g.addColorStop(0.25, color); g.addColorStop(1, color);
+  ctx.fillStyle = g; ctx.beginPath(); ctx.roundRect(x0, p.y, wd * Math.max(0, Math.min(1, ratio)), h, 2.5 * Z); ctx.fill();
+  if (lvl) {
+    const r = 8 * Z, bx0 = x0 - r * 2 - 2;
+    ctx.fillStyle = '#2b2350'; ctx.strokeStyle = '#f2d16b'; ctx.lineWidth = 1.5 * Z; ctx.beginPath(); ctx.roundRect(bx0, p.y + h / 2 - r, r * 2, r * 2, 4 * Z); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.font = `${11 * Z}px "Do Hyeon", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(lvl, bx0 + r, p.y + h / 2 + 1);
+  }
+}
+function drawBooms() {
+""" + booms + """}
+function padBadge(p, full) {
+  const x = p.x, y = p.y, paid = G.paid[p.id] || 0, left = p.cost - paid, afford = G.money >= left;
+""" + badge + """}
+function overlayWorld() {
+  const n = nightAmt();
+  if (n > 0) {
+    const pts = [];
+    for (const id of STATION_IDS) if (unlocked.has(id) && DEFS[id].type === 'shop') pts.push([S(DEFS[id].x, DEFS[id].y, 55), 70]);
+    if (unlocked.has('grill')) pts.push([S(DEFS.grill.x, DEFS.grill.y, 26), 90]);
+    if (unlocked.has('lighthouse')) pts.push([S(DEFS.lighthouse.x, DEFS.lighthouse.y, 142), 170]);
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (const [l, r] of pts) {
+      const g = ctx.createRadialGradient(l.x, l.y, 0, l.x, l.y, r * Z);
+      g.addColorStop(0, `rgba(255,200,120,${0.38 * n})`); g.addColorStop(1, 'rgba(255,200,120,0)');
+      ctx.fillStyle = g; ctx.fillRect(l.x - r * Z, l.y - r * Z, r * 2 * Z, r * 2 * Z);
+    }
+    ctx.restore();
+  }
+  for (const id of unlocked) {
+    const d = DEFS[id]; if (!d || d.x === undefined) continue;
+    const up = dropOff(id);
+    if (d.type === 'shop') {
+      sign(`${ICON[d.item]} $${priceOf(d)}${slv(id) > 1 ? ' ★' + slv(id) : ''}`, d.x, d.y, 80 + up);
+      const c = G.st[id].cash;
+      if (c > 0) sign(`$${fmt(c)}`, d.cx, d.cy, 40 + Math.ceil(Math.min(9, Math.ceil(c / 8)) / 3) * 5, 'rgba(225,255,232,.9)', '#2f7d32', 24);
+    } else if ((d.type === 'producer' || d.type === 'converter') && slv(id) > 1) sign(`★${slv(id)}`, d.x, d.y, 70 + up, '#ffd84d');
+    else if (d.type === 'base') {
+      sign(`⚓ 해군 기지 ★${blv()}`, d.x, d.y, 70 + up);
+      const b = G.st.base;
+      if (b.food >= 3 && G.soldiers < soldierCap()) { const p = S(d.x, d.y, 54), wd = 60 * Z; ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.fillRect(p.x - wd / 2, p.y, wd, 6 * Z); ctx.fillStyle = '#4fd8f0'; ctx.fillRect(p.x - wd / 2, p.y, wd * Math.min(1, trainT / 5), 6 * Z); }
+    }
+  }
+  const vp = visiblePads();
+  const badges = vp.map(p => [dist(player.x, player.y, p.x, p.y), p]).filter(a => a[0] < 5).sort((a, b) => a[0] - b[0]).slice(0, 3).map(a => a[1]);
+  for (const p of vp) padBadge(p, badges.includes(p));
+  const k = Z;
+  for (const id of STATION_IDS) {
+    if (!unlocked.has(id) || DEFS[id].type !== 'shop') continue;
+    for (const c of [...runtime[id].queue, ...runtime[id].leaving]) {
+""" + cust + """      if (emote && c.alpha > 0.3) { const p = S(c.x, c.y, 76); bubble(p.x, p.y + Math.sin(G.t * 3 + (c.ph || 0)) * 1.5 * k, emote, k, emote === '😡' ? '#ffd9d4' : '#ffffff', emote === '😡' ? 1.2 : 0); }
+    }
+  }
+  for (const w of workers) { const em = w.job && w.job.cash ? '💵' : w.idle ? '💤' : null; if (em) { const p = S(w.x, w.y, 82); bubble(p.x, p.y, em, k); } }
+  if (G.stack.length >= cap) { const p = S(player.x, player.y, 92); bubble(p.x, p.y, '🎒', k); }
+  for (const w of workers) if ((w.hp ?? CREW_HP) < CREW_HP) hpBar(w.x, w.y, 76, w.hp / CREW_HP, '#5fd16b', 24, slv(w.tent));
+  for (const s of soldiers) if ((s.hp ?? 12) < 12) hpBar(s.x, s.y, 76, s.hp / 12, '#5fd16b', 24, blv());
+  for (const e of enemies) {
+    if (!alive(e)) continue;
+    if (e.kind === 'boarder') hpBar(e.x, e.y, 74, e.hp / e.max, '#ff4d3d', 26, G.wave);
+    else hpBar(e.x, e.y, e.big ? 120 : 90, e.hp / e.max, '#ff4d3d', e.big ? 50 : 36, G.wave);
+  }
+}
+function render(dt) {
+  sync3D(dt);
+  renderScene();
+  ctx.clearRect(0, 0, W, H);
+  overlayWorld();
+  const obj = objective();
+""" + guide + raidfx.replace('  ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);\n', '') + """  return obj;
+}
+let last = performance.now(), paused = false, saveT = 0;
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000); last = now; frameDt = dt;
+  if (!paused) { update(dt); saveT += dt; if (saveT > 2.5) { saveT = 0; save(); } }
+  const obj = render(dt);
+  hud(obj);
+  requestAnimationFrame(frame);
+}
+"""
+newS = """const _sp = new THREE.Vector3();
+// 세계 좌표(x, y는 바닥 평면, z는 2D 버전의 높이 단위)를 화면 좌표로
+function S(x, y, z = 0) { _sp.set(x, raftY + z / 40, y).project(camera); return { x: (_sp.x * 0.5 + 0.5) * W, y: (-_sp.y * 0.5 + 0.5) * H }; }
+"""
+newInput = """function inputDir() {
+  let dx = 0, dy = 0;
+  if (keys.has('arrowleft') || keys.has('a')) dx -= 1;
+  if (keys.has('arrowright') || keys.has('d')) dx += 1;
+  if (keys.has('arrowup') || keys.has('w')) dy -= 1;
+  if (keys.has('arrowdown') || keys.has('s')) dy += 1;
+  let mag = Math.hypot(dx, dy) ? 1 : 0;
+  if (!mag && joy.on) { const m = Math.hypot(joy.dx, joy.dy); if (m > 8) { dx = joy.dx; dy = joy.dy; mag = Math.min(1, m / 50); } }
+  if (!mag) return null;
+  // 카메라가 남쪽 위에서 내려다보므로 화면 방향이 곧 세계 방향
+  const l = Math.hypot(dx, dy); return { x: dx / l * mag, y: dy / l * mag };
+}
+"""
+out = []
+for c in chunks:
+    if c.startswith("const $ = id =>"):
+        out.append("const cv = document.getElementById('game'), ctx = cv.getContext('2d'); // 화면 효과용 2D 오버레이\n")
+        out.append(c)
+        continue
+    if c.startswith("let W = 0, H = 0, Z = 1;"):
+        out.append(c); out.append(B('w3d_setup.js')); continue
+    if c.startswith("function S("): out.append(newS); continue
+    if c.startswith("function inputDir("): out.append(newInput); continue
+    if c.startswith("/* ---------- HUD ---------- */"):
+        out.append(B('w3d_world.js')); out.append(B('w3d_chars.js')); out.append(B('w3d_game.js')); out.append(B('w3d_fx.js')); out.append(overlay); out.append(c); continue
+    if c.startswith("/* ---------- 루프 ---------- */") or c.startswith("let last = performance.now()"):
+        continue
+    if keep(c): out.append(c)
+js = pre + '\n' + '\n'.join(out)
+js = js.replace("const KEY = 'raft-village-v1';", "const KEY = 'raft-village-3d-v1';")
+# 언제나 낮: 밤·노을 없앰
+js = re.sub(r"const phaseInfo = \(\) => \{[^\n]*\n", "const phaseInfo = () => '☀️ 낮';\n", js)
+js = re.sub(r"function nightAmt\(\) \{[^\n]*\n", "function nightAmt() { return 0; }\n", js)
+js = re.sub(r"function duskAmt\(\) \{[^\n]*\n", "function duskAmt() { return 0; }\n", js)
+# 3D 전용: 30초마다 습격, 습격할 때마다 해적 레벨업(체력·공격력 10%씩 복리 상승)
+R3 = [
+    ("G.raidT = G.raidT ?? 60;", "G.raidT = G.raidT ?? 30;"),
+    ("G.raidT = rnd(55, 80);", "G.raidT = 30;"),
+    ("if (id === 'expand1') G.raidT = 90;", "if (id === 'expand1') G.raidT = Math.min(G.raidT, 30);"),
+    ("function spawnBoarder(ship) {", "const pirMul = () => Math.pow(1.1, Math.max(0, G.wave - 1)); // 해적 레벨 배율\nfunction spawnBoarder(ship) {"),
+    ("hp = (ship.big ? 1.6 : 1) * (6 + G.wave * 2);", "hp = Math.round((ship.big ? 1.6 : 1) * (6 + G.wave * 2) * pirMul());"),
+    ("moveTo(e, tgt.x, tgt.y, 1.7, dt, null, true)", "moveTo(e, tgt.x, tgt.y, 1.7 * Math.min(1.5, 1 + 0.03 * (G.wave - 1)), dt, null, true)"),
+    ("foe.hp = (foe.hp ?? 12) - 2.5;", "foe.hp = (foe.hp ?? 12) - 2.5 * pirMul();"),
+    ("hitVillage({ dmg: 3, x1: e.x, y1: e.y })", "hitVillage({ dmg: 3 * pirMul(), x1: e.x, y1: e.y })"),
+    ("const hp = (big ? 3 : 1) * (12 + G.wave * 5);", "const hp = Math.round((big ? 3 : 1) * (12 + G.wave * 5) * pirMul());"),
+    ("'enemy', e.big ? 10 : 5, 1.0", "'enemy', (e.big ? 10 : 5) * pirMul(), 1.0"),
+    ("toast(`⚠️ 해적 습격 경보 · 제${G.wave}파 ${n}척`);", "toast(G.wave > 1 ? `⚠️ 제${G.wave}파 ${n}척 · 해골 해적 Lv.${G.wave} (힘 +${Math.round((pirMul() - 1) * 100)}%)` : `⚠️ 해적 습격 경보 · 제${G.wave}파 ${n}척`);"),
+]
+for a_, b_ in R3:
+    assert js.count(a_) == 1, a_
+    js = js.replace(a_, b_)
+# 3D 전용: 강화 카드 · 해적 종류 · 보스 연결
+R4 = [
+    ("const CREW_HP = 15;", "const CREW_HP_BASE = 15; // 실제 최대 체력은 crewHpMax()"),
+    ("const priceOf = d => Math.round(", "const priceOf = d => Math.round((1 + 0.2 * ck('price')) * "),
+    ("dir.x * 3.8 :", "dir.x * 3.8 * (1 + 0.15 * ck('speed')) :"),
+    ("dir.y * 3.8 :", "dir.y * 3.8 * (1 + 0.15 * ck('speed')) :"),
+    ("const hpMax = () => 100 + (blv() - 1) * 25;", "const hpMax = () => 100 + (blv() - 1) * 25 + 50 * ck('villageHp');"),
+    ("G.hp = Math.min(hpMax(), G.hp + 1 * dt);", "G.hp = Math.min(hpMax(), G.hp + (1 + 2 * ck('regen')) * dt);"),
+    ("cap = BASE_CAP; workers = [];", "cap = BASE_CAP + 5 * ck('bag'); workers = [];"),
+    ("cap = Math.max(cap, d.cap);", "cap = Math.max(cap, d.cap + 5 * ck('bag'));"),
+    ("shoot(d, tgt, 'ball', 12 * mult, 0.8, 50, 40);", "shoot(d, tgt, 'ball', 12 * mult * (1 + 0.3 * ck('towerDmg')), 0.8, 50, 40); if (ck('towerDouble')) { const t2 = nearestEnemy(tgt.x, tgt.y, 3) || tgt; shoot(d, t2, 'ball', 12 * mult * (1 + 0.3 * ck('towerDmg')), 0.95, 56, 40); }"),
+    ("st.cd = 1.8 / (1 + 0.2 * (bl - 1));", "st.cd = 1.8 / (1 + 0.2 * (bl - 1)) / (1 + 0.25 * ck('towerRate'));"),
+    ("shoot(s, tgt, 'water', 4.5 * mult, 0.25, 4, 34);", "shoot(s, tgt, 'water', 4.5 * mult * crewMul(), 0.25, 4, 34);"),
+    ("shoot(w, tgt, 'water', 3 * (1 + 0.1 * (lv() - 1)), 0.25, 4, 34);", "shoot(w, tgt, 'water', 3 * (1 + 0.1 * (lv() - 1)) * crewMul(), 0.25, 4, 34);"),
+    ("const pt = nearestEnemy(player.x, player.y, 3.5);", "const pt = nearestEnemy(player.x, player.y, 3.5 + ck('playerGun'));"),
+    ("shoot(player, pt, 'water', 1, 0.3, 4, 24);", "shoot(player, pt, 'water', 1 + 2 * ck('playerGun'), 0.3, 4, 24);"),
+    ("const reward = 6 + G.wave * 2;", "const reward = Math.round((6 + G.wave * 2) * lootMul());\n  if (e.loot) { G.money += e.loot; floatText(e.x, e.y - 0.6, `💰 되찾음 +$${fmt(e.loot)}`, '#9fffb0'); e.loot = 0; }"),
+    ("const reward = (e.big ? 3 : 1) * (12 + G.wave * 4);", "const reward = Math.round((e.boss ? 25 : e.big ? 3 : 1) * (12 + G.wave * 4) * lootMul());\n  if (e.boss) toast('☠️ 보스 격침! 큰 현상금을 받았습니다');"),
+    ("function updateBoarder(e, dt) {", "function updateBoarderBase(e, dt) {"),
+    ("dust(p.x, p.y, 8); floatText(p.x, p.y, '해적 상륙!', '#ffb0a0');", "setupBoarder(enemies[enemies.length - 1]); dust(p.x, p.y, 8); floatText(p.x, p.y, '해적 상륙!', '#ffb0a0');"),
+    ("if (e.kind === 'boarder') { updateBoarder(e, dt); continue; }", "if (e.kind === 'boarder') { updateBoarder(e, dt); continue; }\n    if (e.boss && e.state === 'attack') bossTick(e, dt);"),
+    ("  raidIntro = { t: 0, n };", "  if (G.wave % 5 === 0) spawnBoss();\n  raidIntro = { t: 0, n };"),
+    ("G.raidT = 30; if (!looted) toast('해적을 격퇴했습니다'); looted = false;", "G.raidT = 30; if (!looted) { toast('해적을 격퇴했습니다'); offerCards(); } looted = false;"),
+    ("e.hp / e.max, '#ff4d3d', 26, G.wave);", "e.hp / e.max, ({ bomber: '#ff9a2e', thief: '#c9a2ff', sniper: '#5ec8ff' })[e.type] || '#ff4d3d', 26, G.wave);"),
+    ("else hpBar(e.x, e.y, e.big ? 120 : 90,", "else if (!e.boss) hpBar(e.x, e.y, e.big ? 120 : 90,"),
+]
+for a_, b_ in R4:
+    if a_ == "function updateBoarder(e, dt) {":
+        assert js.count(a_) == 2; js = js.replace(a_, b_, 1); continue
+    assert js.count(a_) == 1, a_
+    js = js.replace(a_, b_)
+js = js.replace('CREW_HP', 'crewHpMax()').replace('crewHpMax()_BASE', 'CREW_HP_BASE')
+old = "const a = S(d.x, d.y), c = S(tgt.x, tgt.y); st.ang = Math.atan2(c.y - a.y, c.x - a.x);"
+assert js.count(old) == 1; js = js.replace(old, "st.yaw = Math.atan2(tgt.x - d.x, tgt.y - d.y);")
+# 안내창 링크·제목·캔버스
+h = head.replace("<title>표류 뗏목 마을</title>", "<meta charset=\"utf-8\">\n<title>표류 뗏목 마을 3D</title>")
+h = h.replace('<canvas id="game"', '<div id="world"></div>\n<canvas id="game"')
+# 3D 전용: 왼쪽 위 생존 일차 카드 숨김
+h = h.replace('</style>', '#dayCard{display:none!important}\n</style>', 1)
+h = h.replace("#game{position:fixed;inset:0;width:100%;height:100%;display:block}", "#world,#world canvas{position:fixed;inset:0;width:100%;height:100%;display:block}\n#game{position:fixed;inset:0;width:100%;height:100%;display:block}\n.panel a{color:#e2c27a}")
+h = h.replace('<div class="row"><button id="startBtn">출항하기</button></div>', '<p><a href="https://claude.ai/artifact/U1UfocAvdezpwGo3rWH2ek" target="_blank" rel="noopener">2D 버전으로 하기 ↗</a></p>\n    <div class="row"><button id="startBtn">출항하기</button></div>')
+h = h + '<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>\n' + ''.join(f'<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/{f}"></script>\n' for f in ['shaders/CopyShader.js', 'shaders/LuminosityHighPassShader.js', 'postprocessing/EffectComposer.js', 'postprocessing/RenderPass.js', 'postprocessing/ShaderPass.js', 'postprocessing/UnrealBloomPass.js', 'loaders/GLTFLoader.js', 'utils/SkeletonUtils.js'])
+res = h + "<script>\n(() => {\n" + js + tail
+open(os.path.join(ROOT, 'raft-village-3d.html'), 'w', encoding='utf-8').write(res)
+print('chunks', len(chunks), 'size', len(res))
+for k in ['#game{', 'id="world"', 'three.min.js', 'function sync3D', 'function render(dt)']: print(k, res.count(k))

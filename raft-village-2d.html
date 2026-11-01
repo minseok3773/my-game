@@ -102,6 +102,15 @@ body{background:var(--deep);color:var(--paper);font-family:var(--body);touch-act
 #quest.done{animation:qpop .5s ease-out}
 @keyframes qpop{0%{transform:scale(1)}35%{transform:scale(1.1);box-shadow:0 0 24px rgba(240,210,120,.8)}100%{transform:scale(1)}}
 @media (prefers-reduced-motion:reduce){#quest.done{animation:none}}
+/* 알림과 퀘스트는 캐릭터 위가 아니라 가방 옆 글자로 */
+#quest{bottom:calc(14px + env(safe-area-inset-bottom,0px));left:calc(150px + env(safe-area-inset-left,0px));right:calc(66px + env(safe-area-inset-right,0px));max-width:none;padding:6px 12px 7px}
+#qTitle{display:none}
+#qText{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#qBar{margin-top:3px;height:4px}
+#toast{top:auto;bottom:calc(62px + env(safe-area-inset-bottom,0px));left:calc(12px + env(safe-area-inset-left,0px));transform:none;font-size:15px;padding:6px 12px;border-radius:12px;
+  background:rgba(16,24,32,.62);text-shadow:0 1px 2px rgba(0,0,0,.5);max-width:calc(100% - 210px);white-space:normal;word-break:keep-all}
+#toast.show{transform:none}
+#defense{bottom:calc(62px + env(safe-area-inset-bottom,0px));left:auto;right:calc(12px + env(safe-area-inset-right,0px));transform:none;max-width:calc(52% - 12px)}
 /* 성인 톤: 어두운 유리 */
 #dayCard,#money,#level,#bag,#defense,#menuBtn{background:rgba(16,24,32,.48);border-color:rgba(255,255,255,.16)}
 #dayCard b em{background:linear-gradient(#e2c27a,#b98b3e);color:#2a1a0e}
@@ -134,8 +143,8 @@ body{background:var(--deep);color:var(--paper);font-family:var(--body);touch-act
       <li>건설 칸에 서 있으면 자금이 투입되고, 다 채우면 완공됩니다</li>
       <li>일꾼 텐트를 지으면 선원 2명이 합류하고, 텐트를 증축할 때마다 2명씩 더 들어옵니다</li>
       <li>손님은 15초 넘게 기다리면 그냥 떠납니다</li>
-      <li>일꾼 텐트를 세우면 해적의 습격이 시작됩니다. 뗏목 가장자리에 🗼 망루 포탑을 세워 막으세요. 해적선에 다가가면 주인공도 자동으로 사격합니다</li>
-      <li>해군 기지에 식량(생선구이·물·토마토)을 보내 해군을 훈련하세요. 해군은 총을 들고 해적마다 나뉘어 맞섭니다</li>
+      <li>1차 뗏목 확장 뒤부터 해적의 습격이 시작됩니다. 뗏목 가장자리에 🗼 망루 포탑을 세워 막으세요. 해적선에 다가가면 주인공도 자동으로 사격합니다</li>
+      <li>해적이 오면 선원들이 일을 멈추고 총을 들어 해적마다 나뉘어 싸웁니다. 선원도 체력이 다 떨어지면 쓰러지고, 45초 뒤 텐트에서 새 선원이 옵니다</li>
       <li>해적선이 붙으면 해적이 뗏목에 상륙합니다. 해군과 포탑이 맞서 싸웁니다</li>
       <li>마을 체력이 0이 되면 함락됩니다. 자금 절반 약탈, 해군 이탈, 시설 하나 파손</li>
     </ul>
@@ -213,7 +222,7 @@ const PADS = [
   { id: 'bag1',       cost: 10,   x: 3.4,  y: 1.0,  icon: '🎒', after: [] },
   { id: 'grill',      cost: 25,   x: 4.5,  y: 4.5,  icon: '🔥', after: [] },
   { id: 'diner',      cost: 40,   x: 1.8,  y: 6.5,  icon: '🍽️', after: ['grill'] },
-  { id: 'tent1',      cost: 80,  x: 6.6,  y: 6.2,  icon: '⛺', after: ['diner'] },
+  { id: 'tent1',      cost: 15,  x: 6.6,  y: 6.2,  icon: '⛺', after: [] },
   { id: 'expand1',    cost: 100,  x: 7.3,  y: 3.6,  icon: '🪵', after: ['diner'] },
   { id: 'water',      cost: 80,   x: 10.5, y: 1.5,  icon: '💧', after: ['expand1'] },
   { id: 'waterShop',  cost: 120,  x: 12.2, y: 4.0,  icon: '🥤', after: ['water'] },
@@ -226,13 +235,12 @@ const PADS = [
   { id: 'veggieShop', cost: 350,  x: 6.5,  y: 11.2, icon: '🥗', after: ['garden'] },
   { id: 'lighthouse', cost: 1000, x: 2.5,  y: 11.0, icon: '🗼', after: ['veggieShop'] },
   { id: 'expand3',    cost: 1200, x: 13.2, y: 12.3, icon: '⚓', after: ['veggieShop'] },
-  { id: 'base',       cost: 2000, x: 17.5, y: 8.6,  icon: '🏰', after: ['expand3'] },
-  { id: 'tower1',     cost: 800,  x: 13.3, y: 0.7,  icon: '💣', after: ['base'] },
-  { id: 'tower2',     cost: 1200, x: 0.7,  y: 12.3, icon: '💣', after: ['base'] },
-  { id: 'tower3',     cost: 1600, x: 19.2, y: 12.2, icon: '💣', after: ['base'] },
+  { id: 'tower1',     cost: 800,  x: 13.3, y: 0.7,  icon: '💣', after: ['expand3'] },
+  { id: 'tower2',     cost: 1200, x: 0.7,  y: 12.3, icon: '💣', after: ['expand3'] },
+  { id: 'tower3',     cost: 1600, x: 19.2, y: 12.2, icon: '💣', after: ['expand3'] },
   // 해적이 오기 시작하면(일꾼 텐트) 가장자리에 세울 수 있는 망루 포탑
-  { id: 'towerA',     cost: 80,   x: 0.5,  y: 4.4,  icon: '🗼', after: ['tent1'] },
-  { id: 'towerB',     cost: 120,  x: 7.6,  y: 0.5,  icon: '🗼', after: ['tent1'] },
+  { id: 'towerA',     cost: 80,   x: 0.5,  y: 4.4,  icon: '🗼', after: ['expand1'] },
+  { id: 'towerB',     cost: 120,  x: 7.6,  y: 0.5,  icon: '🗼', after: ['expand1'] },
   { id: 'towerC',     cost: 180,  x: 13.4, y: 7.4,  icon: '🗼', after: ['tent1', 'expand1'] },
   { id: 'towerD',     cost: 240,  x: 4.5,  y: 12.4, icon: '🗼', after: ['tent1', 'expand2'] },
 ];
@@ -338,9 +346,10 @@ function settle(e, dt) {
   } else if (sy < -0.25) e.back = true; else if (sy > 0.25) e.back = false;
 }
 function stopMove(e, dt) { e.vx = (e.vx || 0) * 0.75; e.vy = (e.vy || 0) * 0.75; settle(e, dt); }
+const CREW_HP = 15;
 function spawnWorker(id, n = DEFS[id].workers) {
   const d = DEFS[id];
-  for (let i = 0; i < n; i++) workers.push({ x: d.x + 0.9 + i * 0.3, y: d.y + 0.9, job: null, carry: [], timer: 0, bob: 0, moving: false, look: FRIENDS[workers.length % FRIENDS.length], ph: rnd(0, 6) });
+  for (let i = 0; i < n; i++) workers.push({ x: d.x + 0.9 + i * 0.3, y: d.y + 0.9, job: null, carry: [], timer: 0, bob: 0, moving: false, look: FRIENDS[workers.length % FRIENDS.length], ph: rnd(0, 6), tent: id, hp: CREW_HP });
 }
 function build(data) {
   G = data;
@@ -351,7 +360,7 @@ function build(data) {
   G.soldiers = G.soldiers || 0; G.wave = G.wave || 0; G.raidT = G.raidT ?? 60; G.hp = G.hp ?? 100;
   soldiers = []; enemies = []; shots = []; booms = []; raidOn = false; looted = false; trainT = 0;
   for (const t of TOWERS) towerSt[t] = { cd: 0, ang: 0 };
-  unlocked = new Set(G.unlocked);
+  unlocked = new Set(G.unlocked); unlocked.delete('base'); G.soldiers = 0; G.respawn = [];
   tiles = new Set(); addRect([0, 0, 10, 10]);
   cap = BASE_CAP; workers = [];
   for (const id of unlocked) applyUnlock(id);
@@ -372,14 +381,14 @@ const lv = () => G.level || 1;
 const levelNeed = n => Math.round(25 * Math.pow(n, 1.6));
 const slv = id => G.slv[id] || 1;
 const maxPile = id => MAXP + (lv() - 1) * 3 + (id ? (slv(id) - 1) * 5 : 0);
-const priceOf = d => Math.round(d.price * (1 + 0.15 * (lv() - 1)) * (1 + 0.3 * (slv(d.id) - 1)));
+const priceOf = d => Math.round(d.price * 2 * (1 + 0.15 * (lv() - 1)) * (1 + 0.3 * (slv(d.id) - 1)));
 const fishPerCatch = () => 1 + Math.floor((lv() - 1) / 2);
 function visiblePads() {
   const list = PADS.filter(p => !unlocked.has(p.id) && p.after.every(a => unlocked.has(a)));
   for (const id in UPG) {
-    const l = slv(id); if (!unlocked.has(UPG[id].req || id) || l >= 5) continue;
+    const isT = DEFS[id] && DEFS[id].type === 'tent', l = slv(id); if (!unlocked.has(UPG[id].req || id) || l >= (isT ? 10 : 5)) continue;
     const u = UPG[id];
-    list.push({ id: 'up:' + id, up: id, lv: l, cost: Math.round(u.base * Math.pow(2.2, l - 1)), x: u.x, y: u.y, icon: u.icon || '⬆️' });
+    list.push({ id: 'up:' + id, up: id, lv: l, cost: Math.round(u.base * Math.pow(isT ? 1.45 : 2.2, l - 1)), x: u.x, y: u.y, icon: u.icon || '⬆️' });
   }
   return list;
 }
@@ -808,10 +817,10 @@ function drawKid(x, y, L, o) {
 }
 
 /* ---------- 그리기: 시설 ---------- */
-function sign(text, wx, wy, z, bg = 'rgba(255,252,246,.8)', fg = '#4a3020') {
+function sign(text, wx, wy, z, bg = 'rgba(255,252,246,.8)', fg = '#4a3020', size = 14) {
   const s = S(wx, wy, z + Math.sin(G.t * 2 + wx) * 1.5);
-  ctx.font = `${14 * Z}px "Do Hyeon", sans-serif`;
-  const w = ctx.measureText(text).width + 18 * Z, h = 23 * Z, x0 = s.x - w / 2, y0 = s.y - h / 2;
+  ctx.font = `${size * Z}px "Do Hyeon", sans-serif`;
+  const w = ctx.measureText(text).width + (size + 4) * Z, h = (size + 9) * Z, x0 = s.x - w / 2, y0 = s.y - h / 2;
   ctx.save(); ctx.shadowColor = 'rgba(30,20,10,.3)'; ctx.shadowBlur = 8 * Z; ctx.shadowOffsetY = 3 * Z;
   ctx.fillStyle = bg; ctx.beginPath(); ctx.roundRect(x0, y0, w, h, h / 2); ctx.fill();
   ctx.beginPath(); ctx.moveTo(s.x - 5 * Z, y0 + h - 1); ctx.lineTo(s.x, y0 + h + 6 * Z); ctx.lineTo(s.x + 5 * Z, y0 + h - 1); ctx.fill();
@@ -885,13 +894,13 @@ function drawStation(id) {
   if (d.type !== 'shop' && slv(id) > 1) sign(`★${slv(id)}`, d.x, d.y, d.type === 'converter' ? 78 : 64, '#ffd84d');
 }
 function drawCash(id) {
-  const d = DEFS[id], c = G.st[id].cash, n = Math.min(18, Math.ceil(c / 6));
+  const d = DEFS[id], c = G.st[id].cash, n = Math.min(9, Math.ceil(c / 8));
   const base = S(d.cx, d.cy);
   for (let i = 0; i < n; i++) {
     const col = i % 3, row = Math.floor(i / 3);
-    drawItem('bill', base.x + (col - 1) * 13 * Z, base.y + (col % 2) * 3 * Z - row * 5 * Z, 1.1);
+    drawItem('bill', base.x + (col - 1) * 36 * Z, base.y + (col % 2) * 8 * Z - row * 13 * Z, 3);
   }
-  sign(`$${fmt(c)}`, d.cx, d.cy, 24 + Math.ceil(n / 3) * 5, 'rgba(225,255,232,.85)', '#2f7d32');
+  sign(`$${fmt(c)}`, d.cx, d.cy, 46 + Math.ceil(n / 3) * 12, 'rgba(225,255,232,.9)', '#2f7d32', 24);
 }
 function drawTent(d) {
   softShadow(S(d.x + 0.3, d.y + 0.3).x, S(d.x + 0.3, d.y + 0.3).y, 60 * Z, 26 * Z, 0.22);
@@ -1247,9 +1256,9 @@ function drawPad(p, full) {
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = `${12 * Z}px sans-serif`; ctx.fillText(p.icon, c.x, c.y + 1);
     return;
   }
-  const c = S(x, y, 30 + Math.sin(G.t * 2.5 + p.x) * 3);
-  ctx.font = `${15 * Z}px "Do Hyeon", sans-serif`;
-  const label = `$${fmt(left)}`, tw = ctx.measureText(label).width, w = tw + 42 * Z, h = 28 * Z, x0 = c.x - w / 2, y0 = c.y - h / 2;
+  const c = S(x, y, 34 + Math.sin(G.t * 2.5 + p.x) * 3);
+  ctx.font = `${23 * Z}px "Do Hyeon", sans-serif`;
+  const label = `$${fmt(left)}`, tw = ctx.measureText(label).width, w = tw + 56 * Z, h = 38 * Z, x0 = c.x - w / 2, y0 = c.y - h / 2;
   ctx.save(); ctx.shadowColor = 'rgba(20,50,70,.28)'; ctx.shadowBlur = 12 * Z; ctx.shadowOffsetY = 4 * Z;
   ctx.fillStyle = afford ? 'rgba(255,248,228,.8)' : 'rgba(255,255,255,.62)';
   ctx.beginPath(); ctx.roundRect(x0, y0, w, h, h / 2); ctx.fill();
@@ -1259,8 +1268,8 @@ function drawPad(p, full) {
   ctx.fillStyle = gl; ctx.beginPath(); ctx.roundRect(x0 + 2, y0 + 1.5, w - 4, h * 0.55, h / 3); ctx.fill();
   ctx.strokeStyle = afford ? '#f2c14e' : 'rgba(255,255,255,.95)'; ctx.lineWidth = 1.6 * Z; ctx.beginPath(); ctx.roundRect(x0, y0, w, h, h / 2); ctx.stroke();
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.font = `${15 * Z}px sans-serif`; ctx.fillText(p.icon, x0 + 15 * Z, c.y + 1);
-  ctx.font = `${15 * Z}px "Do Hyeon", sans-serif`; ctx.fillStyle = afford ? '#2f7d32' : '#3a2414'; ctx.fillText(label, x0 + 28 * Z + tw / 2, c.y + 1);
+  ctx.font = `${20 * Z}px sans-serif`; ctx.fillText(p.icon, x0 + 20 * Z, c.y + 1);
+  ctx.font = `${23 * Z}px "Do Hyeon", sans-serif`; ctx.fillStyle = afford ? '#2f7d32' : '#3a2414'; ctx.fillText(label, x0 + 38 * Z + tw / 2, c.y + 1);
   if (p.up) {
     const ly = S(x, y).y, txt = `★${p.lv} → ★${p.lv + 1}`;
     ctx.font = `${12 * Z}px "Do Hyeon", sans-serif`; ctx.lineWidth = 3 * Z; ctx.strokeStyle = 'rgba(60,35,20,.6)'; ctx.strokeText(txt, c.x, ly);
@@ -1319,7 +1328,7 @@ function updateShop(id, dt) {
   r.spawn -= dt;
   const qmax = Math.min(10, 6 + Math.floor(lv() / 3));
   if (r.spawn <= 0 && r.queue.length < qmax) {
-    r.spawn = rnd(1.8, 3.2) / (1 + 0.1 * (lv() - 1)) / (1 + 0.2 * (slv(id) - 1));
+    r.spawn = rnd(1.1, 2.0) / (1 + 0.1 * (lv() - 1)) / (1 + 0.2 * (slv(id) - 1));
     const sp = slotPos(d, 11);
     r.queue.push({ x: sp.x, y: sp.y, want: Math.floor(rnd(d.want[0], d.want[1] + 1)) + Math.floor(lv() / 3), got: 0, wait: 0, bob: 0, moving: true,
       shirt: SHIRTS[Math.floor(Math.random() * SHIRTS.length)], hair: HAIRS[Math.floor(Math.random() * HAIRS.length)], alpha: 0, ph: rnd(0, 6) });
@@ -1340,7 +1349,7 @@ function updateShop(id, dt) {
       r.serveT -= dt;
       if (r.serveT <= 0) {
         const pr = priceOf(d);
-        r.serveT = 0.32; s.stock--; f.got++; f.wait = 0; s.cash += pr; addXp(pr); earn(pr);
+        r.serveT = 0.22; s.stock--; f.got++; f.wait = 0; s.cash += pr; addXp(pr); earn(pr);
         G.stats.sold = (G.stats.sold || 0) + 1; G.stats['sold_' + d.item] = (G.stats['sold_' + d.item] || 0) + 1;
         floatText(f.x, f.y, `+$${pr}`, '#b8ffbf');
         if (f.got >= f.want) { r.queue.shift(); f.emote = '❤️'; f.target = slotPos(d, 11); r.leaving.push(f); }
@@ -1401,6 +1410,7 @@ function collectCash(w, dt) {
   w.job = null;
 }
 function updateWorker(w, dt) {
+  if (raidOn) return; // 습격 중에는 싸우러 감 (updateMilitary)
   if (!w.job) {
     const cid = w.carry.length ? null : pickCash(w);
     w.job = cid ? { cash: cid } : pickJob(w, w.carry[0]);
@@ -1466,7 +1476,7 @@ function spawnBoarder(ship) {
 }
 function updateBoarder(e, dt) {
   let foe = null, fd = 2.6;
-  for (const s of soldiers) { const d = dist(e.x, e.y, s.x, s.y); if (d < fd) { fd = d; foe = s; } }
+  for (const s of [...soldiers, ...workers]) { const d = dist(e.x, e.y, s.x, s.y); if (d < fd) { fd = d; foe = s; } }
   const tgt = foe || e.goal, d = dist(e.x, e.y, tgt.x, tgt.y);
   e.fighting = d <= 0.65;
   if (!e.fighting) { moveTo(e, tgt.x, tgt.y, 1.7, dt, null, true); return; }
@@ -1474,7 +1484,7 @@ function updateBoarder(e, dt) {
   e.atkT -= dt; if (e.atkT > 0) return; e.atkT = 1.0;
   if (foe) {
     foe.hp = (foe.hp ?? 12) - 2.5; booms.push({ x: foe.x, y: foe.y, t: 0.2, kind: 'water' });
-    if (foe.hp <= 0) killSoldier(foe);
+    if (foe.hp <= 0) killCrew(foe);
   } else hitVillage({ dmg: 3, x1: e.x, y1: e.y });
 }
 function killBoarder(e) {
@@ -1482,6 +1492,14 @@ function killBoarder(e) {
   const reward = 6 + G.wave * 2;
   G.money += reward; earn(reward); addXp(reward); setTimeout(bumpMoney, 300);
   floatText(e.x, e.y, `+$${reward}`, '#ffe680'); dust(e.x, e.y, 10);
+}
+// 선원이 쓰러지면 45초 뒤 같은 텐트에서 새 선원이 옴
+function killCrew(c) {
+  if (soldiers.includes(c)) return killSoldier(c);
+  const i = workers.indexOf(c); if (i < 0) return;
+  workers.splice(i, 1);
+  floatText(c.x, c.y, '선원 쓰러짐', '#ffb0a0'); dust(c.x, c.y, 10);
+  G.respawn.push({ tent: c.tent, t: G.t + 45 });
 }
 function killSoldier(s) {
   const i = soldiers.indexOf(s); if (i < 0) return;
@@ -1508,6 +1526,7 @@ function sinkEnemy(e) {
 }
 function hitVillage(s) {
   G.hp -= s.dmg; shake = 0.25;
+  for (const w of [...workers]) if (dist(w.x, w.y, s.x1, s.y1) < 1.1) { w.hp = (w.hp ?? CREW_HP) - 4; if (w.hp <= 0) killCrew(w); }
   booms.push({ x: s.x1, y: s.y1, t: 0, kind: 'fire' });
   if (G.hp > 0) return;
   const amt = Math.floor(G.money * 0.5), lost = G.soldiers;
@@ -1526,7 +1545,7 @@ function shoot(from, tgt, kind, dmg, dur, h, z0) {
 function updateMilitary(dt) {
   if (shake > 0) shake = Math.max(0, shake - dt);
   for (let i = booms.length - 1; i >= 0; i--) { booms[i].t += dt; if (booms[i].t > 0.6) booms.splice(i, 1); }
-  if (!unlocked.has('tent1')) return;
+  if (!unlocked.has('expand1')) return;
   const b = G.st.base, bl = blv(), mult = 1 + 0.25 * (bl - 1);
   // 식량 3개로 해군 1명 훈련
   if (unlocked.has('base') && b.food >= 3 && G.soldiers < soldierCap()) {
@@ -1598,6 +1617,20 @@ function updateMilitary(dt) {
     if (tgt) s.aimYaw = Math.atan2(tgt.x - s.x, tgt.y - s.y);
     if (tgt && s.cd <= 0) { s.cd = 0.7 / (1 + 0.15 * (bl - 1)); shoot(s, tgt, 'water', 4.5 * mult, 0.25, 4, 34); }
   });
+  // 선원: 습격이 오면 일을 멈추고 해적마다 나뉘어 함께 싸움
+  if (raidOn) workers.forEach(w => {
+    const foe = assignFoe(w);
+    let tx = w.x, ty = w.y;
+    if (foe && foe.kind === 'boarder') { const a = Math.atan2(w.y - foe.y, w.x - foe.x) + ((w.slot || 0) - 1) * 0.6; tx = foe.x + Math.cos(a) * 2; ty = foe.y + Math.sin(a) * 2; }
+    else if (foe) { const p = shorePoint(foe.x, foe.y), px = -(foe.y - p.y), py = foe.x - p.x, pl = Math.hypot(px, py) || 1, o = (((w.slot || 0) % 7) - 3) * 0.55; tx = p.x + px / pl * o; ty = p.y + py / pl * o; }
+    if (!walkable(tx, ty)) { tx = w.x; ty = w.y; }
+    if (dist(w.x, w.y, tx, ty) > 0.15) moveTo(w, tx, ty, workerSpeed() * 1.1, dt, workers, true); else stopMove(w, dt);
+    w.cd = (w.cd ?? rnd(0, 0.5)) - dt;
+    const tgt = foe && dist(w.x, w.y, foe.x, foe.y) <= 4.5 ? foe : nearestEnemy(w.x, w.y, 4.5);
+    if (tgt) w.aimYaw = Math.atan2(tgt.x - w.x, tgt.y - w.y);
+    if (tgt && w.cd <= 0) { w.cd = 0.8; shoot(w, tgt, 'water', 3 * (1 + 0.1 * (lv() - 1)), 0.25, 4, 34); }
+  });
+  else for (const w of workers) { w.hp = Math.min(CREW_HP, (w.hp ?? CREW_HP) + dt * 2); w.aimYaw = undefined; }
   // 포대
   for (const t of TOWERS) {
     if (!unlocked.has(t)) continue;
@@ -1670,6 +1703,9 @@ function drawBoarder(e) {
     ctx.fillStyle = '#ff4d3d'; ctx.fillRect(s.x - wd / 2, s.y - 52 * k, wd * Math.max(0, e.hp / e.max), 4 * k);
   }
   ctx.restore();
+}
+function crewBars2D() {
+  for (const w of workers) if ((w.hp ?? CREW_HP) < CREW_HP) { const p = S(w.x, w.y, 72), wd = 22 * Z; ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.fillRect(p.x - wd / 2, p.y, wd, 4 * Z); ctx.fillStyle = '#5fd16b'; ctx.fillRect(p.x - wd / 2, p.y, wd * Math.max(0, w.hp / CREW_HP), 4 * Z); }
 }
 function soldierDraw(s, i, o) {
   drawKid(s.x, s.y, SOLDIER_LOOKS[i % SOLDIER_LOOKS.length], o);
@@ -1759,7 +1795,7 @@ function unlock(id, pad) {
   const dd = DEFS[id];
   if (dd.type === 'expand') { const r = dd.rect; for (let i = r[0]; i < r[2]; i++) for (let j = r[1]; j < r[3]; j++) tileBorn[i + ',' + j] = G.t + dist(i, j, pad.x, pad.y) * 0.035; }
   else { anims[id] = { t: G.t, h: 140 }; landFx(dd.x ?? pad.x, dd.y ?? pad.y, 0.22); }
-  if (id === 'tent1') G.raidT = 90;
+  if (id === 'expand1') G.raidT = 90;
   unlocked.add(id); delete G.paid[id]; applyUnlock(id);
   const name = DEFS[id].name;
   toast(DEFS[id].type === 'tent' ? `${name} 완공 · 선원 ${DEFS[id].workers}명 합류` : `${name} 완공`);
@@ -1783,8 +1819,8 @@ const QUESTS = [
   { text: '해적선 3척 격침', stat: 'sunk', n: 3, reward: 320 },
   { text: '선원 장비 개량 1회', stat: 'crewUp', n: 1, reward: 260 },
   { text: '건물 하나를 ★3으로 개량', star: 3, reward: 450 },
-  { text: '해군 기지 건설', unlock: 'base', reward: 800 },
-  { text: '해군 6명 훈련', soldiers: 6, reward: 650 },
+  { text: '포대 건설', unlock: 'tower1', reward: 800 },
+  { text: '선원 12명 모으기', crew: 12, reward: 650 },
 ];
 function questDef(i) {
   if (i < QUESTS.length) return QUESTS[i];
@@ -1796,7 +1832,7 @@ function questInfo() {
   if (q.stat) return { ...q, cur: Math.max(0, (G.stats[q.stat] || 0) - (G.qBase[q.stat] || 0)) };
   if (q.unlock) return { ...q, n: 1, cur: unlocked.has(q.unlock) ? 1 : 0 };
   if (q.star) return { ...q, n: q.star, cur: Math.max(1, ...Object.values(G.slv)) };
-  return { ...q, n: q.soldiers, cur: G.soldiers };
+  return { ...q, n: q.crew, cur: workers.length };
 }
 function checkQuest() {
   const q = questInfo(); if (q.cur < q.n) return;
@@ -1818,6 +1854,7 @@ function update(dt) {
   const dayNow = 1 + Math.floor(G.t / 40);
   if (G.lastDay && dayNow > G.lastDay) payWages();
   G.lastDay = dayNow;
+  for (let i = G.respawn.length - 1; i >= 0; i--) if (G.t >= G.respawn[i].t) { const r = G.respawn.splice(i, 1)[0]; if (unlocked.has(r.tent)) { spawnWorker(r.tent, 1); toast('새 선원이 합류했습니다'); } }
   checkQuest();
   // 이동
   const dir = inputDir(), acc = Math.min(1, dt * (dir ? 12 : 9));
@@ -1981,7 +2018,7 @@ function render() {
     ctx.lineTo(-22 * Z, 8 * Z); ctx.lineTo(4 * Z, 10 * Z); ctx.lineTo(4 * Z, 22 * Z); ctx.closePath(); ctx.fill(); ctx.shadowBlur = 0; ctx.stroke();
     ctx.restore();
   }
-  list.sort((a, b) => a.d - b.d).forEach(o => o.f());
+  list.sort((a, b) => a.d - b.d).forEach(o => o.f()); crewBars2D();
   for (const c of catches) for (let i = 0; i < c.n; i++) {
     const k = (c.t - i * 0.06) / 0.5; if (k <= 0 || k >= 1) continue;
     const s = S(c.x0 + (c.x1 - c.x0) * k + i * 0.15, c.y0 + (c.y1 - c.y0) * k, 10 + Math.sin(k * Math.PI) * 70);
@@ -1991,7 +2028,7 @@ function render() {
   for (const f of floaters) {
     const e = 1 - Math.pow(1 - Math.min(1, f.t * 2.2), 3), pop = 1 + 0.6 * Math.max(0, 1 - f.t * 7);
     const s = S(f.x, f.y, 60 + e * 45);
-    ctx.globalAlpha = Math.min(1, (1 - f.t) * 2); ctx.font = `${16 * Z * pop}px "Do Hyeon", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.globalAlpha = Math.min(1, (1 - f.t) * 2); ctx.font = `${22 * Z * pop}px "Do Hyeon", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.lineWidth = 3.5 * Z; ctx.strokeStyle = 'rgba(20,40,25,.75)'; ctx.strokeText(f.text, s.x, s.y);
     ctx.fillStyle = f.color; ctx.fillText(f.text, s.x, s.y); ctx.globalAlpha = 1;
   }
@@ -2010,7 +2047,7 @@ function render() {
     ctx.fillStyle = '#ff5a48'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(-8, -10); ctx.lineTo(-8, 10); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.restore();
   }
-  for (const p of fx) { if (p.t < 0) continue; const k = p.t / p.dur, e = k * k * (3 - 2 * k); drawItem('bill', p.ax + (p.bx - p.ax) * e, p.ay + (p.by - p.ay) * e - Math.sin(k * Math.PI) * 60 * Z, 1.2); }
+  for (const p of fx) { if (p.t < 0) continue; const k = p.t / p.dur, e = k * k * (3 - 2 * k); drawItem('bill', p.ax + (p.bx - p.ax) * e, p.ay + (p.by - p.ay) * e - Math.sin(k * Math.PI) * 60 * Z, 2.6); }
   for (const q of tossed) { if (q.t < 0) continue; ctx.save(); ctx.globalAlpha = Math.max(0, 1 - q.t / 1.1); ctx.translate(q.x, q.y); ctx.rotate(q.a); drawItem(q.type, 0, 0, 1.1); ctx.restore(); }
   for (const c of confetti) { ctx.fillStyle = c.c; ctx.globalAlpha = Math.max(0, 1 - c.t / 1.4); ctx.fillRect(c.x, c.y, 6, 9); ctx.globalAlpha = 1; }
   if (joy.on && Math.hypot(joy.dx, joy.dy) > 8) {
@@ -2029,17 +2066,17 @@ function hud(obj) {
   const key = [Math.floor(G.money), day, Math.floor(km), G.stack.length, cap, obj.text, G.level, G.xp,
     unlocked.has('tent1'), Math.ceil(G.hp), G.soldiers, raidOn, Math.ceil(G.raidT), enemies.length, wages(), G.strike, phaseInfo(), G.qi, questInfo().cur, Math.round(incomePerMin() / 5)].join('|');
   const q = questInfo();
-  $('qText').innerHTML = `${q.text} <b>${Math.min(q.cur, q.n)}/${q.n}</b> · 보상 $${fmt(q.reward)}`;
+  $('qText').innerHTML = `${q.text} <b>${Math.min(q.cur, q.n)}/${q.n}</b> · $${fmt(q.reward)}`;
   $('qFill').style.width = Math.min(100, q.cur / q.n * 100) + '%';
   if (key === lastHud) return; lastHud = key;
   const def = $('defense');
-  def.hidden = !unlocked.has('tent1');
+  def.hidden = !unlocked.has('expand1');
   if (!def.hidden) {
     const hm = hpMax(), alive = enemies.filter(e => e.state === 'approach' || e.state === 'attack').length;
     $('defTop').textContent = `🛡️ 마을 체력 ${Math.ceil(G.hp)}/${hm}`;
     $('hpFill').style.width = Math.max(0, G.hp / hm * 100) + '%';
     $('hpBar').classList.toggle('low', G.hp < hm * 0.3);
-    $('defInfo').textContent = raidOn ? `⚠️ 해적선 ${alive}척 공격 중!` : `${unlocked.has('base') ? `⚓ 해군 ${G.soldiers}/${soldierCap()}` : '⚓ 해군 기지 없음'} · 다음 습격 ${Math.ceil(G.raidT)}초`;
+    $('defInfo').textContent = raidOn ? `⚠️ 해적선 ${alive}척 공격 중!` : `⚔️ 선원 ${workers.length}명 · 다음 습격 ${Math.ceil(G.raidT)}초`;
     def.classList.toggle('raid', raidOn);
   }
   $('lv').textContent = `Lv.${G.level}`;
