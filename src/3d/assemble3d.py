@@ -36,8 +36,6 @@ p2d = src[src.index('function post() {'):]
 raidfx = seg(p2d, "  // 습격 중 화면 테두리 붉은 맥박", "  ctx.restore();\n}")
 d2d = src[src.index('function drawShots() {'):]
 booms = seg(d2d, "  for (const b of booms) {", "\n}\n") + "\n"
-pad2d = src[src.index('function drawPad(p, full) {'):]
-badge = seg(pad2d, "  // 멀리 있는 칸은 작은 아이콘만", "\n}\n") + "\n"
 cust = seg(src[src.index('function render() {'):], "      const stage = c.emote ? 0", "      list.push(")
 
 overlay = """
@@ -58,8 +56,11 @@ function hpBar(x, y, z, ratio, color, w = 26, lvl) {
 function drawBooms() {
 """ + booms + """}
 function padBadge(p, full) {
-  const x = p.x, y = p.y, paid = G.paid[p.id] || 0, left = p.cost - paid, afford = G.money >= left;
-""" + badge + """}
+  if (!full || dist(player.x, player.y, p.x, p.y) > 1.1) return;
+  const paid = G.paid[p.id] || 0, left = p.cost - paid;
+  sign(`${p.icon} $${fmt(left)}`, p.x, p.y, 95, '#fffbee', '#35434a', 21);
+  if (paid > 0) hpBar(p.x, p.y, 10, paid / p.cost, '#67cf48', 46);
+}
 function overlayWorld() {
   const n = nightAmt();
   if (n > 0) {
@@ -79,7 +80,7 @@ function overlayWorld() {
     const d = DEFS[id]; if (!d || d.x === undefined) continue;
     const up = dropOff(id);
     if (d.type === 'shop' && !raidOn && dist(player.x, player.y, d.x, d.y) < 5) {
-      sign(`${ICON[d.item]} ${d.name} · $${priceOf(d)}${slv(id) > 1 ? ' ★' + slv(id) : ''}`, d.x, d.y, 80 + up);
+      sign(`${ICON[d.item]} $${priceOf(d)}${slv(id) > 1 ? ' ★' + slv(id) : ''}`, d.x, d.y, 83 + up, '#fffbee', '#35434a', 17);
       const c = G.st[id].cash;
       if (c > 0) sign(`$${fmt(c)}`, d.cx, d.cy, 40 + Math.ceil(Math.min(9, Math.ceil(c / 8)) / 3) * 5, 'rgba(225,255,232,.9)', '#2f7d32', 16);
     } else if ((d.type === 'producer' || d.type === 'converter') && !raidOn && dist(player.x, player.y, d.x, d.y) < 2.8) sign(`${d.name}${slv(id) > 1 ? ' ★' + slv(id) : ''}`, d.x, d.y, 70 + up, '#ffd84d');
@@ -95,8 +96,8 @@ function overlayWorld() {
   const k = Z;
   for (const id of STATION_IDS) {
     if (!unlocked.has(id) || DEFS[id].type !== 'shop') continue;
-    for (const c of [...runtime[id].queue, ...runtime[id].leaving]) {
-""" + cust + """      if (emote && c.alpha > 0.3) { const p = S(c.x, c.y, 76); bubble(p.x, p.y + Math.sin(G.t * 3 + (c.ph || 0)) * 1.5 * k, emote, k, emote === '😡' ? '#ffd9d4' : '#ffffff', emote === '😡' ? 1.2 : 0); }
+    for (const [index, c] of [...runtime[id].queue, ...runtime[id].leaving].entries()) {
+""" + cust + """      if (emote && c.alpha > 0.3 && (index < 2 || index === runtime[id].queue.length)) { const p = S(c.x, c.y, 82); bubble(p.x, p.y + Math.sin(G.t * 3 + (c.ph || 0)) * 1.5 * k, emote, k, emote === '😡' ? '#ffd9d4' : '#ffffff', emote === '😡' ? 1.2 : 0); }
     }
   }
   for (const w of workers) { const em = w.job && w.job.cash ? '💵' : w.idle ? '💤' : null; if (em) { const p = S(w.x, w.y, 82); bubble(p.x, p.y, em, k); } }
@@ -139,8 +140,9 @@ newInput = """function inputDir() {
   let mag = Math.hypot(dx, dy) ? 1 : 0;
   if (!mag && joy.on) { const m = Math.hypot(joy.dx, joy.dy); if (m > 8) { dx = joy.dx; dy = joy.dy; mag = Math.min(1, m / 50); } }
   if (!mag) return null;
-  // 카메라가 남쪽 위에서 내려다보므로 화면 방향이 곧 세계 방향
-  const l = Math.hypot(dx, dy); return { x: dx / l * mag, y: dy / l * mag };
+  // 대각선 카메라의 오른쪽/위쪽으로 이동하도록 화면 입력을 바닥 좌표로 회전.
+  const wx = dx + dy, wy = dy - dx, l = Math.hypot(wx, wy);
+  return { x: wx / l * mag, y: wy / l * mag };
 }
 """
 out = []
@@ -153,6 +155,14 @@ for c in chunks:
         out.append(c); out.append(B('w3d_setup.js')); continue
     if c.startswith("function S("): out.append(newS); continue
     if c.startswith("function inputDir("): out.append(newInput); continue
+    if c.startswith("function slotPos("):
+        out.append("""function slotPos(d, k) {
+  const row = k === 0 ? 0 : 1 + Math.floor((k - 1) / 2);
+  const a = 1.05 + row * 0.82, side = k === 0 ? 0 : k % 2 ? -0.36 : 0.36;
+  return { x: d.x + d.dir[0] * a - d.dir[1] * side, y: d.y + d.dir[1] * a + d.dir[0] * side };
+}"""); continue
+    if c.startswith("function dockRect("):
+        out.append(c.replace('a1 = 10;', 'a1 = 6.8;').replace('0 : 0.42', '0 : 0.8')); continue
     if c.startswith("/* ---------- HUD ---------- */"):
         out.append(B('w3d_world.js')); out.append(B('w3d_chars.js')); out.append(B('w3d_game.js')); out.append(B('w3d_fx.js')); out.append(overlay); out.append(c); continue
     if c.startswith("/* ---------- 루프 ---------- */") or c.startswith("let last = performance.now()"):
@@ -223,11 +233,10 @@ js = js.replace("G.raidT = 30;", "G.raidT = Math.max(12, 30 - 6 * ck('smuggler')
 old = "const a = S(d.x, d.y), c = S(tgt.x, tgt.y); st.ang = Math.atan2(c.y - a.y, c.x - a.x);"
 assert js.count(old) == 1; js = js.replace(old, "st.yaw = Math.atan2(tgt.x - d.x, tgt.y - d.y);")
 # 안내창 링크·제목·캔버스
-h = head.replace("<title>표류 뗏목 마을</title>", "<meta charset=\"utf-8\">\n<title>표류 뗏목 마을 3D</title>")
+h = head.replace("<title>표류 뗏목 마을</title>", "<title>표류 뗏목 마을 3D</title>")
 h = h.replace('<canvas id="game"', '<div id="world"></div>\n<canvas id="game"')
 # 3D 전용: 왼쪽 위 생존 일차 카드 숨김
-h = h.replace('</style>', '#dayCard{display:none!important}\n</style>', 1)
-h = h.replace("#game{position:fixed;inset:0;width:100%;height:100%;display:block}", "#world,#world canvas{position:fixed;inset:0;width:100%;height:100%;display:block}\n#game{position:fixed;inset:0;width:100%;height:100%;display:block}\n.panel a{color:#e2c27a}")
+h = h.replace('</style>', '#dayCard{display:none!important}\n#world,#world canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}\n.panel a{color:#287b93}\n</style>', 1)
 h = h + '<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>\n' + ''.join(f'<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/{f}"></script>\n' for f in ['shaders/CopyShader.js', 'shaders/LuminosityHighPassShader.js', 'postprocessing/EffectComposer.js', 'postprocessing/RenderPass.js', 'postprocessing/ShaderPass.js', 'postprocessing/UnrealBloomPass.js', 'loaders/GLTFLoader.js', 'utils/SkeletonUtils.js'])
 res = h + "<script>\n(() => {\n" + js + tail
 open(os.path.join(ROOT, 'raft-village-3d.html'), 'w', encoding='utf-8').write(res)

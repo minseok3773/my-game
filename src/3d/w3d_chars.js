@@ -10,7 +10,7 @@ if (THREE.GLTFLoader && THREE.SkeletonUtils) {
           if (!o.isMesh) return;
           o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false;
           // 색상표는 칸마다 한 색이라 번지지 않게, 다른 재질과 같은 색 공간으로
-          if (o.material.map) { o.material.map.encoding = THREE.LinearEncoding; o.material.map.magFilter = THREE.NearestFilter; o.material.map.needsUpdate = true; }
+          if (o.material.map) { o.material.map.encoding = THREE.sRGBEncoding; o.material.map.magFilter = THREE.NearestFilter; o.material.map.needsUpdate = true; }
         });
         const box = new THREE.Box3().setFromObject(g.scene);
         GL.models[n] = { scene: g.scene, clips: g.animations, h: box.max.y - box.min.y, len: Math.max(box.max.x - box.min.x, box.max.z - box.min.z) };
@@ -30,7 +30,7 @@ function recolorTex(map, key, pairs) {
   const d = cx.getImageData(0, 0, cv.width, cv.height), a = d.data;
   for (let i = 0; i < a.length; i += 4) for (const [f, t] of pairs) if (Math.abs(a[i] - f[0]) < 8 && Math.abs(a[i + 1] - f[1]) < 8 && Math.abs(a[i + 2] - f[2]) < 8) { a[i] = t[0]; a[i + 1] = t[1]; a[i + 2] = t[2]; break; }
   cx.putImageData(d, 0, 0);
-  const tx = new THREE.CanvasTexture(cv); tx.flipY = map.flipY; tx.encoding = THREE.LinearEncoding; tx.magFilter = THREE.NearestFilter;
+  const tx = new THREE.CanvasTexture(cv); tx.flipY = map.flipY; tx.encoding = THREE.sRGBEncoding; tx.magFilter = THREE.NearestFilter;
   return (_recol[key] = tx);
 }
 const PINK_PAIRS = [[[139, 30, 31], [244, 169, 191]]];
@@ -95,6 +95,10 @@ function makeGL(name, o = {}) {
   });
   const m = { root, body, gl: true, mixer, actions, cur: null, heading: 0, ph: rnd(0, 6), idleT: 0, weapons, head, hand, weaponMode: o.weapon || 'never', walk: o.walk && actions[o.walk] ? o.walk : 'Walk' };
   playClip(m, 'Idle', 0);
+  if (o.uniform) {
+    const pairs = [[[139, 30, 31], o.uniform], [[65, 50, 39], [43, 82, 108]], [[87, 65, 44], [60, 122, 152]]];
+    body.traverse(x => { if (x.isMesh && x.material.map) { x.material = x.material.clone(); x.material.map = recolorTex(x.material.map, 'crew-' + o.uniform.join('-'), pairs); } });
+  }
   if (o.bunny) {
     body.traverse(x => { if (x.isMesh && x.material.map) { x.material = x.material.clone(); x.material.map = recolorTex(x.material.map, 'pink', PINK_PAIRS); } });
     // 분홍 토끼 모자: 머리를 덮는 둥근 모자 + 흰 테두리 + 솜뭉치 + 귀 두 개
@@ -168,6 +172,10 @@ function animateGL(m, ent, dt, st = {}) {
 }
 // 역할별 캐릭터: 주인공은 토끼 귀를 단 헨리, 선원은 선장과 헨리, 상륙 해적은 상어 인간
 function mkChar(kind, ent) {
+  // 손님은 무장한 해적 모형 대신, 큰 머리·밝은 옷의 가벼운 마을 주민으로 표시합니다.
+  if (kind === 'customer') {
+    const m = makeAdult3(ent); m.head.scale.setScalar(1.3); m.root.scale.set(1.12, 1.06, 1.12); return m;
+  }
   if (!GL.ready) {
     if (kind === 'player') return makeKid3(PLAYER_LOOK);
     if (kind === 'worker') return makeKid3(ent.look);
@@ -175,8 +183,11 @@ function mkChar(kind, ent) {
     return makeAdult3({ shirt: '#6e2b2b', pants: '#2e2a26', hair: '#1d1d1d', skin: '#d9a87e', bandana: true });
   }
   const n = (ent.ph || 0) * 10 | 0;
-  if (kind === 'player') return makeGL('henry', { bunny: true, height: 1.62, walk: 'WalkHuman' });
-  if (kind === 'worker') return makeGL(n % 2 ? 'captain' : 'henry', { height: 1.5, weapon: n % 2 ? 'raid' : 'never' });
+  if (kind === 'player') {
+    const m = makeGL('henry', { bunny: true, height: 1.78, walk: 'WalkHuman' });
+    m.root.scale.set(1.1, 1, 1.1); return m;
+  }
+  if (kind === 'worker') return makeGL(n % 2 ? 'captain' : 'henry', { height: 1.5, weapon: n % 2 ? 'raid' : 'never', uniform: n % 2 ? [40, 137, 185] : [71, 167, 80] });
   if (kind === 'customer') return makeGL(n % 2 ? 'henry' : 'captain', { height: 1.55 });
   const ty = ent.type || 'normal';
   const m = makeGL('captain', { height: 1.6, weapon: ty === 'normal' ? 'always' : 'never', skull: ty === 'bomber' || ty === 'sniper' ? 2 : ty === 'thief' ? 1 : (n % 2 ? 1 : 2) });

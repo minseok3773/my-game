@@ -1,157 +1,95 @@
+<!doctype html>
+<html lang="ko">
+<head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>표류 뗏목 마을 3D</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=Gowun+Dodum&display=swap">
 <style>
-/* 레이아웃: 화면 전체가 바다 캔버스, 그 위에 떠 있는 나무 간판 같은 HUD */
+/* 밝은 색·두툼한 테두리·큼직한 숫자의 모바일 타이쿤 HUD */
 :root{
-  --sea:#1f6fa8; --deep:#134c78; --plank:#d9a066; --plank-dark:#8a5530;
-  --cash:#3fbf4f; --ink:#2a1a0e; --paper:#fff6e6; --alert:#e8432e;
-  --display:"Do Hyeon","Gowun Dodum","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --sea:#36bde1;--deep:#2395bc;--plank:#edbb75;--plank-dark:#64432e;
+  --cash:#64cf42;--ink:#30404a;--paper:#fff9e9;--alert:#ed6253;
+  --display:"Do Hyeon","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
   --body:"Gowun Dodum","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
-  color-scheme:dark;
+  color-scheme:light;
 }
+*{box-sizing:border-box}
 [hidden]{display:none!important}
-html,body{height:100%;overflow:hidden}
-body{background:var(--deep);color:var(--paper);font-family:var(--body);touch-action:none;user-select:none;-webkit-user-select:none}
-#world,#world canvas{position:fixed;inset:0;width:100%;height:100%;display:block}
-#game{position:fixed;inset:0;width:100%;height:100%;display:block}
-.panel a{color:#e2c27a}
+html,body{margin:0;height:100%;overflow:hidden}
+body{background:var(--sea);color:var(--ink);font-family:var(--body);touch-action:auto;user-select:none;-webkit-user-select:none}
+#game{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#world,#world canvas{touch-action:none}
 .hud{position:fixed;pointer-events:none;font-family:var(--display)}
-#dayCard{top:calc(10px + env(safe-area-inset-top,0px));left:calc(12px + env(safe-area-inset-left,0px));
-  background:linear-gradient(#b97a45,#94592d);border:3px solid #5e3519;border-radius:12px;padding:6px 12px 7px;
-  box-shadow:0 3px 0 #4a2912;color:var(--paper);text-shadow:0 2px 0 #4a2912}
-#dayCard b{display:block;font-size:20px;font-weight:400;letter-spacing:.5px}
-#dayCard b em{font-style:normal;color:#ffd84d;font-size:24px}
-#dayCard span{font-size:13px;opacity:.92;font-variant-numeric:tabular-nums}
-#money{top:calc(12px + env(safe-area-inset-top,0px));right:calc(12px + env(safe-area-inset-right,0px));
-  display:flex;align-items:center;gap:8px;background:rgba(20,30,40,.55);border-radius:999px;padding:4px 16px 4px 4px;
-  font-size:24px;font-variant-numeric:tabular-nums;transition:transform .12s}
-#money.pulse{transform:scale(1.12)}
-#money i{display:grid;place-items:center;width:44px;height:30px;border-radius:7px;background:var(--cash);border:3px solid #1e7a2b;
-  font-style:normal;font-size:15px;color:#e9ffe9;box-shadow:inset 0 0 0 2px #7fe08a}
-#level{top:calc(58px + env(safe-area-inset-top,0px));right:calc(12px + env(safe-area-inset-right,0px));display:flex;align-items:center;gap:8px;
-  background:rgba(20,30,40,.55);border-radius:999px;padding:4px 12px 4px 5px;font-size:15px}
-#level b{font-weight:400;background:#ffd84d;color:#4a2912;border-radius:999px;padding:1px 9px}
-#level s{display:block;width:72px;height:8px;border-radius:4px;background:rgba(255,255,255,.25);overflow:hidden;text-decoration:none}
-#level s i{display:block;height:100%;width:0;background:#ffd84d;transition:width .2s}
-#goal{top:calc(98px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);max-width:calc(100% - 32px);
-  background:var(--paper);color:var(--ink);border-radius:12px;padding:7px 14px;font-size:16px;text-align:center;
-  box-shadow:0 3px 0 rgba(0,0,0,.25);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#bag{bottom:calc(14px + env(safe-area-inset-bottom,0px));left:calc(12px + env(safe-area-inset-left,0px));
-  background:rgba(20,30,40,.55);border-radius:999px;padding:6px 14px;font-size:17px;font-variant-numeric:tabular-nums}
-#bag.full{background:var(--alert)}
-#menuBtn{position:fixed;bottom:calc(14px + env(safe-area-inset-bottom,0px));right:calc(12px + env(safe-area-inset-right,0px));
-  width:42px;height:42px;border-radius:50%;border:0;background:rgba(20,30,40,.55);color:var(--paper);font-size:20px;cursor:pointer}
-#strategyBtn:focus-visible,#menuBtn:focus-visible,.panel button:focus-visible{outline:3px solid #ffd84d;outline-offset:2px}
-#defense{bottom:calc(10px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:rgba(20,30,40,.6);
-  border-radius:12px;padding:5px 12px;font-size:13px;min-width:160px;max-width:calc(100% - 210px);text-align:center;font-variant-numeric:tabular-nums}
-#defense.raid{background:rgba(180,30,20,.8)}
-#hpBar{display:block;height:7px;border-radius:4px;background:rgba(255,255,255,.25);overflow:hidden;margin:3px 0}
-#hpBar i{display:block;height:100%;width:100%;background:#5fd16b}
-#hpBar.low i{background:#ff6b5a}
-#toast{top:40%;left:50%;transform:translate(-50%,-50%) scale(.6);opacity:0;font-size:30px;color:#fff;
-  text-shadow:0 3px 0 #4a2912,0 0 12px rgba(0,0,0,.4);transition:opacity .25s,transform .25s;white-space:nowrap}
-#toast.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
-.panel{position:fixed;inset:0;display:grid;place-items:center;background:rgba(8,24,40,.6);padding:16px}
-.panel>div{background:var(--paper);color:var(--ink);border-radius:16px;border:4px solid var(--plank-dark);
-  padding:20px 22px;max-width:360px;width:100%;box-shadow:0 6px 0 rgba(0,0,0,.3)}
-.panel h2{font-family:var(--display);font-weight:400;font-size:26px;margin:0 0 8px;text-wrap:balance}
-.panel p,.panel li{font-size:15px;line-height:1.6;margin:0 0 6px}
-.panel ul{padding-left:18px;margin:0 0 12px}
-.panel .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-.panel button{flex:1;font-family:var(--display);font-size:17px;border:0;border-radius:10px;padding:10px 12px;cursor:pointer;
-  background:var(--cash);color:#fff;box-shadow:0 3px 0 #1e7a2b}
-.panel button.ghost{background:#e7d6bd;color:var(--ink);box-shadow:0 3px 0 #b49a76}
-.panel button.danger{background:var(--alert);box-shadow:0 3px 0 #9b2416}
-@media (prefers-reduced-motion:reduce){#money,#toast{transition:none}}
-/* 유리 느낌 HUD */
-#dayCard,#money,#level,#bag,#defense,#menuBtn{background:rgba(255,255,255,.16);-webkit-backdrop-filter:blur(12px) saturate(150%);backdrop-filter:blur(12px) saturate(150%);
-  border:1px solid rgba(255,255,255,.4);box-shadow:0 6px 20px rgba(8,30,55,.28),inset 0 1px 0 rgba(255,255,255,.45);text-shadow:0 1px 2px rgba(10,30,50,.45)}
-#dayCard{border-radius:18px;padding:6px 13px 7px}
-#dayCard,#money,#level,#bag,#defense,#menuBtn{background:rgba(255,255,255,.2)}
-#dayCard b{font-size:18px}
-#dayCard b em{display:inline-block;background:linear-gradient(#ffe680,#ffc94d);color:#5a3410;text-shadow:none;border-radius:999px;padding:0 9px;margin:0 2px;font-size:20px;box-shadow:0 2px 0 rgba(120,70,10,.35)}
-#money i{border-radius:9px;box-shadow:inset 0 0 0 2px #7fe08a,0 2px 0 #1e7a2b;text-shadow:none}
-#level b{box-shadow:0 2px 0 rgba(120,70,10,.35);text-shadow:none}
-#level s i{background:linear-gradient(90deg,#ffe680,#ffb84d);box-shadow:0 0 8px rgba(255,210,90,.8)}
-#goal{border-radius:20px;padding:9px 18px;background:rgba(255,251,242,.96);color:#3a2414;box-shadow:0 6px 18px rgba(8,30,55,.3);
-  border:2px solid #fff;overflow:visible;white-space:normal;text-wrap:balance;word-break:keep-all;line-height:1.35}
-#goal::after{content:"";position:absolute;left:50%;bottom:-8px;width:12px;height:12px;background:rgba(255,251,242,.96);
-  transform:translateX(-50%) rotate(45deg);border-right:2px solid #fff;border-bottom:2px solid #fff}
-#goal.pop{animation:pop .35s ease-out}
-@keyframes pop{0%{transform:translateX(-50%) scale(.85)}60%{transform:translateX(-50%) scale(1.06)}100%{transform:translateX(-50%) scale(1)}}
-#bag.full{background:rgba(232,67,46,.75)}
-#bag{pointer-events:auto;cursor:pointer;user-select:none}
-#bag:focus-visible{outline:3px solid #ffd84d;outline-offset:2px}
-#bag em{font-style:normal;font-size:12px;opacity:.85;margin-left:6px;padding:1px 7px;border-radius:999px;background:rgba(255,255,255,.18)}
-#defense{border-radius:16px}
-#defense.raid{background:rgba(200,40,30,.6);animation:alarm 1s ease-in-out infinite}
-@keyframes alarm{50%{box-shadow:0 0 22px rgba(255,80,60,.9),inset 0 1px 0 rgba(255,255,255,.45)}}
-#hpBar i{background:linear-gradient(90deg,#7ee88a,#3fbf4f)}
-#toast{text-shadow:0 3px 0 #b5651d,0 0 18px rgba(255,200,90,.8)}
-.panel{background:rgba(8,24,40,.45);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
-.panel>div{border:2px solid rgba(255,255,255,.85);border-radius:22px;background:rgba(255,250,240,.96);box-shadow:0 12px 40px rgba(8,30,55,.4)}
-@media (prefers-reduced-motion:reduce){#goal.pop,#defense.raid{animation:none}}
-#quest{bottom:calc(64px + env(safe-area-inset-bottom,0px));left:calc(12px + env(safe-area-inset-left,0px));max-width:min(60%,250px);
-  border-radius:14px;padding:7px 12px 8px;background:rgba(16,24,32,.5);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
-  border:1px solid rgba(255,255,255,.16);box-shadow:0 6px 20px rgba(8,20,30,.3);text-shadow:0 1px 2px rgba(0,0,0,.4)}
-#qTitle{font-size:11px;opacity:.7;letter-spacing:.06em}
-#qText{font-size:14px;line-height:1.3;word-break:keep-all}
-#qText b{font-weight:400;color:#f0d48a}
-#qBar{display:block;height:5px;border-radius:3px;background:rgba(255,255,255,.18);margin-top:5px;overflow:hidden}
-#qFill{display:block;height:100%;width:0;background:linear-gradient(90deg,#d9b25a,#f3dc95);transition:width .25s}
-#quest.done{animation:qpop .5s ease-out}
-@keyframes qpop{0%{transform:scale(1)}35%{transform:scale(1.1);box-shadow:0 0 24px rgba(240,210,120,.8)}100%{transform:scale(1)}}
-@media (prefers-reduced-motion:reduce){#quest.done{animation:none}}
-/* 알림과 퀘스트는 캐릭터 위가 아니라 가방 옆 글자로 */
-#quest{bottom:calc(14px + env(safe-area-inset-bottom,0px));left:calc(150px + env(safe-area-inset-left,0px));right:calc(66px + env(safe-area-inset-right,0px));max-width:none;padding:6px 12px 7px}
-#qTitle{display:none}
-#qText{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#qBar{margin-top:3px;height:4px}
-#toast{top:auto;bottom:calc(62px + env(safe-area-inset-bottom,0px));left:calc(12px + env(safe-area-inset-left,0px));transform:none;font-size:15px;padding:6px 12px;border-radius:12px;
-  background:rgba(16,24,32,.62);text-shadow:0 1px 2px rgba(0,0,0,.5);max-width:calc(100% - 210px);white-space:normal;word-break:keep-all}
-#toast.show{transform:none}
-#defense{bottom:calc(62px + env(safe-area-inset-bottom,0px));left:auto;right:calc(12px + env(safe-area-inset-right,0px));transform:none;max-width:calc(52% - 12px)}
-/* 성인 톤: 어두운 유리 */
-#dayCard,#money,#level,#bag,#defense,#menuBtn{background:rgba(16,24,32,.48);border-color:rgba(255,255,255,.16)}
-#dayCard b em{background:linear-gradient(#e2c27a,#b98b3e);color:#2a1a0e}
-#level b{background:#cfae62;color:#2a1a0e}
-#goal{background:rgba(16,24,32,.82);color:#efe7da;border:1px solid rgba(255,255,255,.16)}
-#goal::after{background:rgba(16,24,32,.82);border-color:rgba(255,255,255,.16)}
-.panel>div{background:rgba(22,28,36,.96);color:#efe7da;border-color:rgba(255,255,255,.18)}
-.panel button.ghost{background:#3a4552;color:#efe7da;box-shadow:0 3px 0 #222a33}
-/* 정보 우선순위: 상단 목표 / 하단 준비·전투 / 맨 아래 조작 */
-.hud,#strategyBtn,#menuBtn{box-sizing:border-box}
-#quest{top:calc(12px + env(safe-area-inset-top,0px));bottom:auto;left:12px;right:auto;width:calc(100% - 176px);max-width:300px;padding:10px 12px;min-height:60px;border-radius:14px;background:rgba(17,38,48,.92)}
-#qTitle{display:block;font-size:10px;color:#a9c6c7;letter-spacing:.12em;margin-bottom:4px}
-#qText{font-size:12px;white-space:normal;line-height:1.45;word-break:keep-all;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}#qBar{margin-top:6px}
-#money{font-size:21px;min-width:132px;justify-content:flex-end;background:rgba(17,38,48,.92)}
-#money i{width:30px;height:28px;border:0;background:#427e57;box-shadow:none}
-#level{top:calc(57px + env(safe-area-inset-top,0px));padding:4px 8px;font-size:12px}#level s{width:70px}
-#goal{top:calc(102px + env(safe-area-inset-top,0px));left:12px;right:12px;transform:none;max-width:none;text-align:left;border-radius:12px;padding:10px 12px;border:1px solid #63cfc4;border-left:4px solid #63cfc4;background:rgba(17,38,48,.93);font-size:13px;line-height:1.5;box-shadow:0 4px 14px #08202a40}
-#goal::before{content:attr(data-label);display:block;font:10px var(--body);letter-spacing:.1em;color:#8ae3d9;margin-bottom:3px}#goal::after{display:none}#goal.pop{animation:none}
-#goal[data-kind=build]{border-color:#e7bd67}#goal[data-kind=build]::before{color:#f4ce81}
-#goal[data-kind=danger]{border-color:#f18a78}#goal[data-kind=danger]::before{color:#ffac9b}
-#defense{bottom:calc(72px + env(safe-area-inset-bottom,0px));left:12px;right:12px;max-width:none;min-width:0;padding:8px 12px;text-align:left;border-radius:12px;background:rgba(17,38,48,.93);font-size:12px}
-#defTop{float:left;margin-right:10px}#hpBar{height:6px;margin:5px 0 7px}#defInfo{font-size:11px;color:#d2e5df}
-#strategyBtn{position:fixed;z-index:4;border:1px solid #c4aa65;border-radius:12px;color:#fff3d1;font:14px var(--display);padding:9px 12px;cursor:pointer;bottom:calc(145px + env(safe-area-inset-bottom,0px));left:12px;right:12px;max-width:none;min-height:50px;background:#173c49f2;border-color:#c4aa65;text-align:left}
-#bag{bottom:calc(14px + env(safe-area-inset-bottom,0px));min-height:40px;display:flex;align-items:center;box-sizing:border-box;font-size:15px;padding:8px 14px;background:rgba(17,38,48,.93)}
-#menuBtn{width:42px;height:42px;background:rgba(17,38,48,.93)}
-#toast{bottom:calc(210px + env(safe-area-inset-bottom,0px));max-width:none;left:12px;right:12px;font-size:12px;line-height:1.5;background:rgba(17,38,48,.96)}
-.panel{z-index:20}.panel>div{box-sizing:border-box;max-height:calc(100dvh - 32px);overflow:auto}.panel button{min-height:44px}
-@media(min-width:700px){#goal{left:50%;right:auto;transform:translateX(-50%);width:420px;top:20px}#quest{width:250px}#defense,#strategyBtn{left:auto;width:300px}#strategyBtn{position:fixed;z-index:4;border:1px solid #c4aa65;border-radius:12px;color:#fff3d1;font:14px var(--display);padding:9px 12px;cursor:pointer;bottom:calc(145px + env(safe-area-inset-bottom,0px))}#toast{right:auto;max-width:360px}}
-@media(max-height:500px) and (orientation:landscape){#goal{top:12px;left:28%;right:26%;width:auto;transform:none;font-size:11px;padding:6px 9px}#quest{width:24%;max-width:190px;min-height:0;padding:7px 9px}#qText{font-size:10px}#defense{left:auto;width:230px;bottom:66px}#strategyBtn{left:auto;width:230px;bottom:138px;font-size:12px}#toast{right:auto;max-width:220px;bottom:66px}}
+#dayCard{display:none}
+#quest,#money,#level,#goal,#bag,#defense,#menuBtn,#strategyBtn{
+  border:3px solid #405363;background:var(--paper);color:var(--ink);
+  border-radius:14px;box-shadow:0 3px 0 #40536340,inset 0 2px 0 #fff9;text-shadow:none;
+}
+#quest{top:calc(10px + env(safe-area-inset-top,0px));left:calc(10px + env(safe-area-inset-left,0px));width:calc(100% - 156px);max-width:250px;height:78px;padding:7px 10px;overflow:hidden}
+#qTitle{font-size:11px;line-height:1.1;color:#a06c2d;margin-bottom:3px}
+#qText{font-size:13px;line-height:1.25;word-break:keep-all;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+#qText b{color:#218f45;font-weight:400}
+#qBar{display:block;height:6px;border-radius:4px;background:#e7dac0;margin-top:4px;overflow:hidden}
+#qFill{display:block;height:100%;width:0;background:#f6c346;transition:width .2s}
+#quest.done{animation:reward .35s ease-out}
+#money{top:calc(10px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));width:126px;height:44px;display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:3px 11px 3px 4px;font-size:24px;font-variant-numeric:tabular-nums;background:#e8ffcf;border-color:#3c663b;transition:transform .12s}
+#money i{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#63ca44;border:2px solid #3d8a30;color:#fff;font-style:normal;font-size:20px;box-shadow:inset 0 2px 0 #b2f080;text-shadow:0 1px 0 #347c29;flex:none}
+#money.pulse{transform:scale(1.08)}
+#level{top:calc(60px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));height:24px;width:126px;padding:0 5px;display:flex;gap:5px;align-items:center;border-width:2px;border-radius:9px;font-size:12px;box-shadow:none}
+#level b{font-weight:400;color:#7c542c;white-space:nowrap}
+#level s{display:block;flex:1;height:7px;background:#e8dcc6;border-radius:4px;overflow:hidden;text-decoration:none}
+#level s i{display:block;height:100%;width:0;background:#f7bc39;transition:width .2s}
+#goal{top:calc(92px + env(safe-area-inset-top,0px));left:10px;right:10px;max-width:none;padding:6px 10px;font-size:14px;line-height:1.35;word-break:keep-all;border-color:#349ca8;background:#edffff;box-shadow:0 3px 0 #227c8b50;text-align:center;white-space:normal}
+#goal::before{content:attr(data-label);display:inline-block;margin-right:6px;padding:2px 5px;border-radius:5px;background:#78dbd4;color:#225961;font-size:10px;vertical-align:1px;white-space:nowrap}
+#goal[data-kind=build]{border-color:#9b6b2d;background:#fff6d6}#goal[data-kind=build]::before{background:#ffd86c;color:#765020}
+#goal[data-kind=danger]{border-color:#9a3d36;background:#ffe8de}#goal[data-kind=danger]::before{background:#fa8a75;color:#763029}
+#bag{bottom:calc(10px + env(safe-area-inset-bottom,0px));left:calc(10px + env(safe-area-inset-left,0px));width:90px;height:48px;display:flex;align-items:center;justify-content:center;padding:4px;font-size:15px;font-variant-numeric:tabular-nums;pointer-events:auto;cursor:pointer;background:#fff3cc}
+#bag em{display:none}#bag.full{background:#ffcf8d;border-color:#bc6b27}
+#menuBtn{position:fixed;bottom:calc(10px + env(safe-area-inset-bottom,0px));right:calc(10px + env(safe-area-inset-right,0px));width:46px;height:48px;font-size:24px;font-family:var(--display);cursor:pointer;background:#fff1ce}
+#strategyBtn{position:fixed;z-index:4;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:calc(110px + env(safe-area-inset-left,0px));right:calc(66px + env(safe-area-inset-right,0px));height:48px;min-width:44px;min-height:44px;padding:3px 6px;font:16px/1.15 var(--display);text-align:center;cursor:pointer;background:#a8eaf0;border-color:#377b91;box-shadow:0 3px 0 #245c7050,inset 0 2px 0 #e9fdff}
+#strategyBtn span{display:block;font-size:11px;line-height:1.1;margin-top:2px;color:#356175;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#defense{bottom:calc(68px + env(safe-area-inset-bottom,0px));left:10px;right:10px;height:58px;padding:6px 10px;font-size:13px;border-color:#688647;background:#f5ffe5;font-variant-numeric:tabular-nums}
+#defTop{display:block;line-height:1.3;width:64%;white-space:nowrap}
+#hpBar{position:absolute;right:10px;top:10px;display:block;width:30%;height:9px;border:1px solid #73964e;border-radius:5px;background:#d4e5c2;overflow:hidden}
+#hpBar i{display:block;height:100%;width:100%;background:#70ce46}#hpBar.low i{background:#ee7354}
+#defInfo{display:block;margin-top:4px;font-size:12px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#52663c}
+#defense.raid{background:#ffe7d8;border-color:#a94f3c}#defense.raid #defInfo{color:#aa4536}
+#toast{left:10px;right:10px;bottom:calc(136px + env(safe-area-inset-bottom,0px));border:2px solid #7b633a;border-radius:12px;padding:7px 10px;background:#fff2ccec;color:#654f2e;font-size:13px;line-height:1.4;opacity:0;transition:opacity .2s;word-break:keep-all;text-align:center;box-shadow:0 3px 0 #644e2a30}
+#toast.show{opacity:1}
+.panel{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:16px;background:#1c65836b;touch-action:pan-y;overscroll-behavior:contain;overflow:auto}
+.panel>div{max-width:380px;width:100%;max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain;touch-action:pan-y;padding:20px;background:#fff8e8;color:#354650;border:3px solid #536271;border-radius:22px;box-shadow:0 6px 0 #2d465b55}
+.panel h2{font:26px/1.15 var(--display);margin:0 0 10px;color:#6e512d;text-wrap:balance}
+.panel p,.panel li{font-size:14px;line-height:1.6;margin:0 0 7px}
+.panel ul{padding-left:18px;margin:0 0 14px}
+.panel .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.panel button{flex:1;min-width:44px;min-height:46px;padding:10px 12px;border:2px solid #428231;border-radius:12px;background:#81d64a;color:#244c27;font:18px/1.25 var(--display);cursor:pointer;box-shadow:0 3px 0 #3f7b34}
+.panel button.ghost{border-color:#978057;background:#efdfbd;color:#6b5738;box-shadow:0 3px 0 #ae9769}
+.panel button.danger{background:#fa8c70;border-color:#a74f3b;color:#762f26;box-shadow:0 3px 0 #a74f3b}
+.panel button:disabled{opacity:.5;box-shadow:none;cursor:default}
+#strategyPanel .choices{display:grid;gap:10px;margin:14px 0}#strategyPanel button{text-align:left}#strategyPanel .choices button{background:#e2f8c4;border-color:#73a74f;color:#3f602e;box-shadow:0 3px 0 #74994d}
+#strategyPanel .choices button:nth-child(2){background:#d9f2ff;border-color:#5e9eaf;color:#315b70;box-shadow:0 3px 0 #5e8c9f}
+#strategyPanel .choices button:nth-child(3){background:#ffedb5;border-color:#bd9555;color:#765c34;box-shadow:0 3px 0 #a98c53}
+#strategyBtn:focus-visible,#menuBtn:focus-visible,#bag:focus-visible,.panel button:focus-visible{outline:3px solid #fff;outline-offset:3px;box-shadow:0 0 0 6px #2c8dac}
+@keyframes reward{50%{transform:scale(1.03)}}
+@media(min-width:700px){#goal{left:50%;right:auto;transform:translateX(-50%);top:14px;width:400px}#quest{width:240px}#strategyBtn{right:auto;width:200px}#defense{left:auto;width:300px;right:12px}}
+@media(max-height:500px) and (orientation:landscape){#quest{width:22%;max-width:170px;height:74px;padding:5px 8px}#qText{font-size:12px}#goal{top:12px;left:25%;right:25%;width:auto;transform:none;font-size:12px;padding:5px 7px}#goal::before{font-size:9px}#strategyBtn{right:auto;width:180px}#defense{left:auto;right:10px;width:220px;font-size:12px}#defInfo{font-size:11px}#toast{right:auto;max-width:250px;bottom:68px}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 #dayCard{display:none!important}
+#world,#world canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.panel a{color:#287b93}
 </style>
+</head>
+<body>
 
 <div id="world"></div>
 <canvas id="game" aria-label="표류 뗏목 마을 게임 화면"></canvas>
 <div class="hud" id="dayCard"><b>해상 생존 <em id="day">1</em>일차</b><span id="km">항해 거리 0 km</span></div>
 <div class="hud" id="money"><i>$</i><span id="moneyVal">0</span></div>
 <div class="hud" id="level"><b id="lv">Lv.1</b><s><i id="xpBar"></i></s></div>
-<div class="hud" id="goal">낚시터에서 생선을 챙기세요</div>
+<div class="hud" id="goal" role="status" aria-live="polite">낚시터에서 생선을 챙기세요</div>
 <div class="hud" id="bag" role="button" tabindex="0" aria-label="가방 비우기">🎒 0/10</div>
 <div class="hud" id="quest"><div id="qTitle">📜 퀘스트</div><div id="qText"></div><span id="qBar"><i id="qFill"></i></span></div>
 <div class="hud" id="defense" hidden><span id="defTop">🛡️ 마을 체력</span><span id="hpBar"><i id="hpFill"></i></span><span id="defInfo"></span></div>
@@ -215,18 +153,24 @@ let W = 0, H = 0, Z = 1;
 /* ---------- 3D 장면 ---------- */
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 $('world').appendChild(renderer.domElement);
 const scene = new THREE.Scene();
-const SKY_DAY = new THREE.Color(0x7cc6e0), SKY_DUSK = new THREE.Color(0xd99a7c), SKY_NIGHT = new THREE.Color(0x1a2740);
+const SKY_DAY = new THREE.Color(0x57c8e8), SKY_DUSK = new THREE.Color(0xd99a7c), SKY_NIGHT = new THREE.Color(0x1a2740);
 scene.background = SKY_DAY.clone();
 scene.fog = new THREE.Fog(0x8fbfcc, 20, 54);
-const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 240);
-const hemi = new THREE.HemisphereLight(0xd6eeff, 0x2a4656, 0.45); scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xfff1d8, 1.05);
+// 직교 아이소메트릭: 멀리 있는 시설도 같은 비율로 보여 주는 모바일 타이쿤 구도.
+const camera = new THREE.OrthographicCamera(-6, 6, 8, -8, 0.1, 160);
+const cameraFocus = new THREE.Vector3(5, 0.3, 3.75);
+const cameraOffset = new THREE.Vector3(12, 16, 12);
+camera.position.copy(cameraFocus).add(cameraOffset); camera.lookAt(cameraFocus);
+const hemi = new THREE.HemisphereLight(0xeafaff, 0xb8b08a, 0.8); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffedcc, 0.85);
 sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { left: -18, right: 18, top: 18, bottom: -18, near: 1, far: 70 });
 sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.025;
+sun.shadow.radius = 2.5;
 scene.add(sun, sun.target);
 // 밤에 켜지는 불빛: 화로, 등대, 주인공 주변
 const lampGrill = new THREE.PointLight(0xffa04a, 0, 7), lampTower = new THREE.PointLight(0xffe2a0, 0, 16), lampPlayer = new THREE.PointLight(0xffd9a0, 0, 6);
@@ -239,8 +183,13 @@ function resize() {
   DPR = Math.min(2, window.devicePixelRatio || 1);
   W = innerWidth; H = innerHeight;
   cv.width = W * DPR; cv.height = H * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  Z = Math.max(0.72, Math.min(1.3, Math.min(W, H * 0.7) / 500));
-  renderer.setSize(W, H); camera.aspect = W / H; camera.updateProjectionMatrix();
+  Z = Math.max(0.92, Math.min(1.2, W / 390));
+  const aspect = W / H;
+  // 세로 화면에서는 약 8칸 폭을 유지해 캐릭터가 실제 휴대폰에서도 큼직하게 보입니다.
+  const viewHeight = aspect < 0.8 ? 8.3 / aspect : aspect > 1.8 ? 10 : 13;
+  camera.left = -viewHeight * aspect / 2; camera.right = -camera.left;
+  camera.top = viewHeight / 2; camera.bottom = -camera.top;
+  renderer.setSize(W, H); camera.updateProjectionMatrix();
 }
 window.addEventListener('resize', resize); resize();
 
@@ -690,9 +639,9 @@ function updateSea(dt) {
 const jumping = c => c.kind === 'dolphin' && c.jump >= 0 && c.jump <= 1.1;
 // 뗏목보다 앞쪽(화면 아래)에서 뛰어오르는 돌고래는 뗏목 위에 그림
 function dockRect(id) {
-  const d = DEFS[id], a0 = 0.3, a1 = 10;
+  const d = DEFS[id], a0 = 0.3, a1 = 6.8;
   const xs = [d.x + d.dir[0] * a0, d.x + d.dir[0] * a1], ys = [d.y + d.dir[1] * a0, d.y + d.dir[1] * a1];
-  const wx = d.dir[0] ? 0 : 0.42, wy = d.dir[1] ? 0 : 0.42;
+  const wx = d.dir[0] ? 0 : 0.8, wy = d.dir[1] ? 0 : 0.8;
   return [Math.min(...xs) - wx, Math.min(...ys) - wy, Math.max(...xs) + wx, Math.max(...ys) + wy];
 }
 function dockAt(x, y) {
@@ -719,8 +668,9 @@ function inputDir() {
   let mag = Math.hypot(dx, dy) ? 1 : 0;
   if (!mag && joy.on) { const m = Math.hypot(joy.dx, joy.dy); if (m > 8) { dx = joy.dx; dy = joy.dy; mag = Math.min(1, m / 50); } }
   if (!mag) return null;
-  // 카메라가 남쪽 위에서 내려다보므로 화면 방향이 곧 세계 방향
-  const l = Math.hypot(dx, dy); return { x: dx / l * mag, y: dy / l * mag };
+  // 대각선 카메라의 오른쪽/위쪽으로 이동하도록 화면 입력을 바닥 좌표로 회전.
+  const wx = dx + dy, wy = dy - dx, l = Math.hypot(wx, wy);
+  return { x: wx / l * mag, y: wy / l * mag };
 }
 
 /* ---------- 효과 ---------- */
@@ -746,7 +696,11 @@ function bumpMoney() { moneyBox.classList.add('pulse'); pulseT = 0.12; }
 /* ---------- 손님 ---------- */
 const SHIRTS = ['#e85d75', '#6c5ce7', '#00a8a8', '#f2b134', '#8d6e63', '#4d96ff', '#9bc53d', '#c06c84'];
 const HAIRS = ['#3a2414', '#1d1d1d', '#a0522d', '#e2b65c', '#7a7a7a'];
-function slotPos(d, k) { const a = 0.95 + k * 0.75; return { x: d.x + d.dir[0] * a, y: d.y + d.dir[1] * a }; }
+function slotPos(d, k) {
+  const row = k === 0 ? 0 : 1 + Math.floor((k - 1) / 2);
+  const a = 1.05 + row * 0.82, side = k === 0 ? 0 : k % 2 ? -0.36 : 0.36;
+  return { x: d.x + d.dir[0] * a - d.dir[1] * side, y: d.y + d.dir[1] * a + d.dir[0] * side };
+}
 function updateShop(id, dt) {
   const d = DEFS[id], s = G.st[id], r = runtime[id];
   r.spawn -= dt;
@@ -1300,7 +1254,6 @@ const strategySale = () => G.tactic === 'trade' ? 1.4 : G.tactic === 'guard' ? 0
 const strategyDamage = () => G.tactic === 'guard' ? 0.7 : G.tactic === 'trade' ? 1.25 : 1;
 const strategyStyle = document.createElement('style');
 strategyStyle.textContent = `
-#strategyBtn span{display:block;font-size:12px;opacity:.85;margin-top:3px}
 #strategyPanel{z-index:30;overflow:auto} #strategyPanel>div{max-height:85dvh;overflow:auto;box-sizing:border-box}
 #strategyPanel .choices{display:grid;gap:10px;margin:14px 0} #strategyPanel button{text-align:left;line-height:1.5} #strategyPanel button small{display:block;font-family:inherit;font-size:13px} #strategyPanel button:disabled{opacity:.5;cursor:default}
 `;
@@ -1337,7 +1290,7 @@ strategyBtn.onclick = () => {
     };
     box.appendChild(b);
   }
-  strategyPanel.querySelector('.close').focus();
+  strategyPanel.querySelector('.close').focus({ preventScroll: true });
 };
 strategyPanel.addEventListener('keydown', e => {
   if (e.key === 'Escape') { e.preventDefault(); closeStrategy(); }
@@ -1351,7 +1304,9 @@ strategyPanel.addEventListener('keydown', e => {
 function strategyHud() {
   strategyBtn.hidden = !unlocked.has('expand1') || raidOn || paused;
   const plan = raidPlan(), tactic = TACTICS.find(t => t.id === G.tactic);
-  strategyBtn.innerHTML = `🧭 제${G.wave + 1}파 · ${plan.name} · ${Math.max(0, Math.ceil(G.raidT))}초<span>${tactic ? tactic.name : '준비 방침 선택'} · 방어 ${G.defended || 0}/5${G.expeditionWon ? ' 🏆 목표 달성' : ''}</span>`;
+  const seconds = Math.max(0, Math.ceil(G.raidT));
+  strategyBtn.innerHTML = `🧭 습격 ${seconds}초<span>${tactic ? tactic.name : '준비 선택 ›'}</span>`;
+  strategyBtn.setAttribute('aria-label', `제${G.wave + 1}파 ${plan.name}, ${seconds}초 후 습격. ${tactic ? tactic.name : '준비 선택'}. 방어 ${G.defended || 0}/5${G.expeditionWon ? ', 항로 확보 완료' : ''}`);
 }
 function finishStrategyRaid(wasLooted) {
   if (!wasLooted) {
@@ -1374,11 +1329,22 @@ function mat(c, o) {
 }
 function geo(key, make) { let g = _geos.get(key); if (!g) { g = make(); _geos.set(key, g); } return g; }
 const boxG = () => geo('box', () => new THREE.BoxGeometry(1, 1, 1));
+function softBoxG() {
+  return geo('toy-box', () => {
+    const s = new THREE.Shape(), r = 0.055, a = 0.5 - r;
+    s.moveTo(-a, -0.5); s.lineTo(a, -0.5); s.quadraticCurveTo(0.5, -0.5, 0.5, -a);
+    s.lineTo(0.5, a); s.quadraticCurveTo(0.5, 0.5, a, 0.5);
+    s.lineTo(-a, 0.5); s.quadraticCurveTo(-0.5, 0.5, -0.5, a);
+    s.lineTo(-0.5, -a); s.quadraticCurveTo(-0.5, -0.5, -a, -0.5);
+    const g = new THREE.ExtrudeGeometry(s, { depth: 0.9, bevelEnabled: true, bevelSegments: 1, steps: 1, bevelSize: 0.025, bevelThickness: 0.05, curveSegments: 2 });
+    g.translate(0, 0, -0.45); return g;
+  });
+}
 const cylG = (rt, rb, h, seg = 14) => geo(`c${rt},${rb},${h},${seg}`, () => new THREE.CylinderGeometry(rt, rb, h, seg));
 const sphG = (r, ws = 18, hs = 12, ps = 0, pl = Math.PI * 2, ts = 0, tl = Math.PI) => geo(`s${r},${ws},${hs},${ps},${pl},${ts},${tl}`, () => new THREE.SphereGeometry(r, ws, hs, ps, pl, ts, tl));
 const coneG = (r, h, seg = 12) => geo(`k${r},${h},${seg}`, () => new THREE.ConeGeometry(r, h, seg));
 function mk(g, m, cast = true, x = 0, y = 0, z = 0) { const o = new THREE.Mesh(g, m); o.castShadow = cast; o.receiveShadow = true; o.position.set(x, y, z); return o; }
-function bx(w, h, d, c, o, cast = true, x = 0, y = 0, z = 0) { const m = mk(boxG(), mat(c, o), cast, x, y, z); m.scale.set(w, h, d); return m; }
+function bx(w, h, d, c, o, cast = true, x = 0, y = 0, z = 0) { const m = mk(softBoxG(), mat(c, o), cast, x, y, z); m.scale.set(w, h, d); return m; }
 function ringMesh(r0, r1, color, opacity) {
   const m = new THREE.Mesh(geo(`r${r0},${r1}`, () => new THREE.RingGeometry(r0, r1, 40)), new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false }));
   m.rotation.x = -Math.PI / 2; return m;
@@ -1386,7 +1352,7 @@ function ringMesh(r0, r1, color, opacity) {
 
 /* ---------- 3D: 바다 ---------- */
 const uTime = { value: 0 };
-const waterMat = new THREE.MeshStandardMaterial({ color: 0x1f8db5, roughness: 0.22, metalness: 0.15, transparent: true, opacity: 0.94 });
+const waterMat = new THREE.MeshStandardMaterial({ color: 0x28aacd, roughness: 0.8, metalness: 0, transparent: true, opacity: 0.97 });
 waterMat.onBeforeCompile = sh => {
   sh.uniforms.uTime = uTime;
   sh.vertexShader = `uniform float uTime;
@@ -1401,7 +1367,7 @@ waterMat.onBeforeCompile = sh => {
 };
 const water = new THREE.Mesh(new THREE.PlaneGeometry(220, 220, 170, 170), waterMat);
 water.rotation.x = -Math.PI / 2; water.position.set(12, -0.45, 8); water.receiveShadow = true; scene.add(water);
-const WATER_DAY = new THREE.Color(0x1f8db5), WATER_NIGHT = new THREE.Color(0x163448);
+const WATER_DAY = new THREE.Color(0x28aacd), WATER_NIGHT = new THREE.Color(0x163448);
 // 뗏목 주변 얕은 물빛
 const shallow = (() => {
   const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
@@ -1417,7 +1383,7 @@ const plankIM = new THREE.InstancedMesh(boxG(), new THREE.MeshStandardMaterial({
 const baseIM = new THREE.InstancedMesh(boxG(), mat(0xbea277, { roughness: 1 }), MAXT);
 const logIM = new THREE.InstancedMesh(cylG(1, 1, 1, 10), mat(0x6a4529, { roughness: 0.9 }), MAXT * 2);
 for (const im of [plankIM, baseIM, logIM]) { im.receiveShadow = true; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); world.add(im); }
-const PLANK3 = [0xc9ad82, 0xc5a67a, 0xd0b68e, 0xcbb087, 0xc2a378].map(c => new THREE.Color(c)); // 가까운 색의 판자로 단조로움만 완화
+const PLANK3 = [0xe6b96d, 0xe9c27f, 0xedca8b, 0xe5b770, 0xeac181].map(c => new THREE.Color(c));
 for (let i = 0; i < MAXT * 3; i++) plankIM.setColorAt(i, PLANK3[i % 5]);
 const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _sv = new THREE.Vector3(), _pv = new THREE.Vector3(), _eu = new THREE.Euler();
 let raftKey = '';
@@ -1482,11 +1448,15 @@ function syncStack(group, arr) {
 
 /* ---------- 3D: 시설 ---------- */
 const objs = {}, docks = {}, zoneRings = {};
-const DISTRICT_COLORS = { fish: 0x4b9bb0, grilled: 0xd78a50, water: 0x55bcb8, tomato: 0x8fae58 };
+const DISTRICT_COLORS = { fish: 0x2babe4, grilled: 0xff8742, water: 0x25bc9c, tomato: 0x86c93f };
+const playerMarker = new THREE.Group();
+playerMarker.name = 'player-marker';
+playerMarker.add(ringMesh(0.39, 0.47, 0xffffff, 0.95), ringMesh(0.29, 0.37, 0x13bfc8, 0.9));
+world.add(playerMarker);
 // 시설에 붙는 정적 소품: 길과 상호작용 위치를 바꾸지 않고, 생성할 때만 조립합니다.
 function dressStation(d, parent) {
   const g = new THREE.Group(); g.name = 'station-details'; parent.add(g);
-  const accent = DISTRICT_COLORS[d.item || d.output] || (d.type === 'tent' ? 0xc4956b : 0x718fac);
+  const accent = DISTRICT_COLORS[d.item || d.output] || (d.type === 'tent' ? 0xffa132 : 0x5186c4);
   const wood = 0x8d6040;
   const barrel = (x, z) => {
     g.add(mk(cylG(0.18, 0.16, 0.42, 10), mat(wood), false, x, 0.21, z));
@@ -1584,18 +1554,29 @@ function buildStation(id) {
     o.inPile = new THREE.Group(); o.inPile.position.set(0, 0.21, 0.85); g.add(o.inPile);
     o.outPile = new THREE.Group(); o.outPile.position.set(0.85, 0.21, 0); g.add(o.outPile);
   } else if (d.type === 'shop') {
-    g.add(bx(1, 0.45, 1, 0xe6cfa3, { roughness: 0.8 }, true, 0, 0.225, 0));
+    const shopColor = DISTRICT_COLORS[d.item];
+    g.add(bx(1.14, 0.58, 1.1, shopColor, { roughness: 0.8 }, true, 0, 0.29, 0));
+    g.add(bx(1.22, 0.1, 1.18, 0xffefd2, { roughness: 0.8 }, true, 0, 0.58, 0));
     for (const [px, pz] of [[-0.56, -0.56], [0.56, -0.56], [-0.56, 0.56], [0.56, 0.56]]) g.add(mk(cylG(0.035, 0.035, 1.35, 6), mat(0x6e4526), true, px, 0.68, pz));
-    for (let i = 0; i < 4; i++) { const st = mk(boxG(), new THREE.MeshStandardMaterial({ color: i % 2 ? 0xe4dccd : vivid(d.color), roughness: 0.7 }), true, -0.465 + i * 0.31, 1.37, 0); st.scale.set(0.31, 0.05, 1.24); g.add(st); }
-    o.stock = new THREE.Group(); o.stock.position.y = 0.47; g.add(o.stock);
+    for (let i = 0; i < 4; i++) { const st = bx(0.32, 0.12, 1.35, i % 2 ? 0xfff6de : shopColor, { roughness: 0.85 }, true, -0.465 + i * 0.31, 1.48, 0); st.rotation.x = -0.1; g.add(st); }
+    o.stock = new THREE.Group(); o.stock.position.y = 0.64; g.add(o.stock);
     o.cash = new THREE.Group(); o.cash.position.set(d.cx - d.x, 0.03, d.cy - d.y); g.add(o.cash);
     const [x0, y0, x1, y1] = dockRect(id), dk = new THREE.Group();
     dk.add(bx(x1 - x0, 0.12, y1 - y0, 0xa7774a, { roughness: 0.9 }, false, (x0 + x1) / 2, -0.1, (y0 + y1) / 2));
-    for (let a = 1.5; a < 10; a += 2) dk.add(mk(cylG(0.07, 0.07, 0.6, 6), mat(0x5c391e), false, d.x + d.dir[0] * a, -0.4, d.y + d.dir[1] * a));
+    for (let a = 1.5; a < 6.6; a += 1.7) dk.add(mk(cylG(0.09, 0.09, 0.6, 6), mat(0x765033), false, d.x + d.dir[0] * a, -0.4, d.y + d.dir[1] * a));
     world.add(dk); docks[id] = dk;
     const zr = ringMesh(0.42, 0.5, 0xffffff, 0.6); zr.position.set(d.zx, 0.02, d.zy); world.add(zr); zoneRings[id] = zr;
   } else if (d.type === 'tent') {
-    g.add(mk(tentGeo(), mat(0xb9a07a, { roughness: 0.95, side: THREE.DoubleSide })));
+    g.add(mk(tentGeo(), mat(0xff951f, { roughness: 0.95, side: THREE.DoubleSide })));
+    // 밝은 천막에 두꺼운 지지대: 작은 화면에서도 숙소의 실루엣이 분명합니다.
+    for (const x of [-0.87, 0.87]) {
+      const points = [[x, 0.03, -0.66], [x, 1.12, 0], [x, 0.03, 0.66]];
+      for (let i = 0; i < 2; i++) {
+        const a = new THREE.Vector3(...points[i]), b = new THREE.Vector3(...points[i + 1]);
+        const pole = mk(cylG(0.035, 0.035, a.distanceTo(b), 6), mat(0x62432d));
+        pole.position.copy(a).add(b).multiplyScalar(0.5); pole.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.sub(a).normalize()); g.add(pole);
+      }
+    }
     const ridge = mk(cylG(0.04, 0.04, 1.8, 6), mat(0x8a5530), true, 0, 1.1, 0); ridge.rotation.z = Math.PI / 2; g.add(ridge);
   } else if (d.type === 'solar') {
     g.add(mk(cylG(0.06, 0.06, 0.8, 8), mat(0x888888, { metalness: 0.4 }), true, 0, 0.4, 0));
@@ -1655,25 +1636,43 @@ function syncStations() {
 const padObjs = new Map();
 function buildPad(p) {
   const g = new THREE.Group(); g.position.set(p.x, 0.03, p.y);
-  const base = new THREE.Mesh(geo('padBase', () => new THREE.PlaneGeometry(1.2, 1.2)), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.16, depthWrite: false }));
-  base.rotation.x = -Math.PI / 2; g.add(base);
+  g.add(bx(1.38, 0.035, 1.38, 0x74543c, { roughness: 1 }, false, 0, 0, 0));
+  const base = bx(1.3, 0.04, 1.3, 0xfffbeb, { roughness: 1 }, false, 0, 0.025, 0); g.add(base);
   const fill = new THREE.Mesh(geo('padFill', () => new THREE.PlaneGeometry(1.2, 1.2).translate(0, 0.6, 0)), new THREE.MeshBasicMaterial({ color: 0x59d36a, transparent: true, opacity: 0.8, depthWrite: false }));
-  fill.rotation.x = -Math.PI / 2; fill.position.set(0, 0.005, 0.6); g.add(fill);
+  fill.rotation.x = -Math.PI / 2; fill.position.set(0, 0.055, 0.6); g.add(fill);
+  const labelCanvas = document.createElement('canvas'); labelCanvas.width = labelCanvas.height = 128;
+  const labelTexture = new THREE.CanvasTexture(labelCanvas); labelTexture.encoding = THREE.sRGBEncoding;
+  const label = new THREE.Mesh(geo('pad-label', () => new THREE.PlaneGeometry(1.15, 1.15)), new THREE.MeshBasicMaterial({ map: labelTexture, transparent: true, depthWrite: false }));
+  label.rotation.x = -Math.PI / 2; label.position.y = 0.065; g.add(label);
   const sq = geo('padLine', () => new THREE.BufferGeometry().setFromPoints([[-0.6, -0.6], [0.6, -0.6], [0.6, 0.6], [-0.6, 0.6]].map(([x, z]) => new THREE.Vector3(x, 0.01, z))));
   const border = new THREE.LineLoop(sq, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true }));
   const ripple = new THREE.LineLoop(sq, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true }));
   g.add(border, ripple); world.add(g);
-  const o = { g, base, fill, border, ripple }; padObjs.set(p.id, o); return o;
+  const o = { g, base, fill, border, ripple, label, labelCanvas, labelTexture, labelSig: '', labelTime: -1 }; padObjs.set(p.id, o); return o;
 }
 function syncPads(vp) {
   const ids = new Set(vp.map(p => p.id));
-  for (const [id, o] of padObjs) if (!ids.has(id)) { world.remove(o.g); padObjs.delete(id); }
+  for (const [id, o] of padObjs) if (!ids.has(id)) {
+    world.remove(o.g); o.labelTexture.dispose(); o.label.material.dispose();
+    if (o.base.userData.ownMaterial) o.base.material.dispose();
+    o.fill.material.dispose(); o.border.material.dispose(); o.ripple.material.dispose(); padObjs.delete(id);
+  }
   for (const p of vp) {
     const o = padObjs.get(p.id) || buildPad(p), left = p.cost - (G.paid[p.id] || 0), afford = G.money >= left, ratio = (G.paid[p.id] || 0) / p.cost;
     const far = dist(player.x, player.y, p.x, p.y) > 6.5 && !afford;
     o.g.visible = !far || dist(player.x, player.y, p.x, p.y) < 9;
     o.border.material.color.setHex(afford ? 0xffd84d : 0xffffff); o.border.material.opacity = far ? 0.35 : 0.9;
-    o.base.material.color.setHex(afford ? 0xffe078 : 0xffffff);
+    // 패드마다 바뀌는 재질은 공유하지 않아 다른 칸의 상태를 덮어쓰지 않습니다.
+    if (!o.base.userData.ownMaterial) { o.base.material = o.base.material.clone(); o.base.userData.ownMaterial = true; }
+    o.base.material.color.setHex(afford ? 0xffec9b : 0xfffbeb);
+    const labelSig = `${p.icon}|${Math.ceil(left)}|${afford}`;
+    if (o.labelSig !== labelSig && (o.labelSig === '' || G.t - o.labelTime > 0.15 || o.labelTime > G.t)) {
+      const c = o.labelCanvas.getContext('2d'); c.clearRect(0, 0, 128, 128);
+      c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = '42px sans-serif'; c.fillText(p.icon, 64, 35);
+      c.font = 'bold 38px sans-serif'; c.fillStyle = afford ? '#348b30' : '#665947';
+      c.fillText('$' + fmt(Math.ceil(left)), 64, 91, 120);
+      o.labelTexture.needsUpdate = true; o.labelSig = labelSig; o.labelTime = G.t;
+    }
     o.fill.visible = ratio > 0; o.fill.scale.y = Math.max(0.001, ratio);
     const f = (G.t * 0.8 + p.x * 0.13) % 1;
     o.ripple.visible = afford && dist(player.x, player.y, p.x, p.y) < 4 && !raidOn;
@@ -1919,6 +1918,7 @@ function sync3D(dt) {
   uTime.value = G.t;
   raftY = Math.sin(G.t * 1.1) * 0.04;
   world.position.y = raftY;
+  playerMarker.position.set(player.x, 0.085, player.y);
   shallow.position.set(raftC.x, -0.2, raftC.y); shallow.scale.setScalar(raftC.r * 2.8);
   syncRaft(); syncStations(); syncPads(visiblePads()); syncSharks(dt); bossHud();
   // 캐릭터
@@ -1981,18 +1981,18 @@ function sync3D(dt) {
   const n = nightAmt(), dk = Math.min(1, duskAmt());
   const sky = SKY_DAY.clone().lerp(SKY_DUSK, dk * (1 - n)).lerp(SKY_NIGHT, n);
   scene.background.copy(sky); scene.fog.color.copy(sky);
-  sun.intensity = 1.05 * (1 - n * 0.82); sun.color.setHex(0xfff0d6).lerp(new THREE.Color(0xff9a5a), dk * 0.7 * (1 - n));
-  hemi.intensity = 0.45 * (1 - n * 0.55);
+  sun.intensity = 0.85 * (1 - n * 0.82); sun.color.setHex(0xffedcc).lerp(new THREE.Color(0xff9a5a), dk * 0.7 * (1 - n));
+  hemi.intensity = 0.8 * (1 - n * 0.55);
   waterMat.color.copy(WATER_DAY).lerp(WATER_NIGHT, n);
   if (unlocked.has('grill')) { const d = DEFS.grill, s = G.st.grill; lampGrill.position.set(d.x, 0.9, d.y); lampGrill.intensity = (s.inPile > 0 ? 0.5 : 0) + n * 1.3; }
   if (unlocked.has('lighthouse')) { const d = DEFS.lighthouse; lampTower.position.set(d.x, 3.6, d.y); lampTower.intensity = n * 2.2; }
   lampPlayer.position.set(player.x, 1.6, player.y); lampPlayer.intensity = n * 1.1;
   // 카메라: 높은 곳에서 내려다보며 부드럽게 따라감 (흔들림 포함)
-  const far = camera.aspect < 0.7 ? 2.25 : 1.8;
-  _pv.set(player.x, 12.5 * far, player.y + 9.5 * far);
-  camera.position.lerp(_pv, Math.min(1, dt * 4));
+  _pv.set(player.x - 0.45, 0.3, player.y - 0.45);
+  cameraFocus.lerp(_pv, Math.min(1, dt * 8));
+  camera.position.copy(cameraFocus).add(cameraOffset);
   if (shake > 0) camera.position.add(_pv.set(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)).multiplyScalar(shake * 0.5));
-  camera.lookAt(player.x, 0.4, player.y);
+  camera.lookAt(cameraFocus);
   // 밤에는 달빛처럼 머리 위에서 비춰 그림자를 짧게
   sun.position.set(player.x - 7 * (1 - n * 0.85), 14, player.y + 4 * (1 - n * 0.85)); sun.target.position.set(player.x, 0, player.y);
   camera.updateMatrixWorld();
@@ -2011,7 +2011,7 @@ if (THREE.GLTFLoader && THREE.SkeletonUtils) {
           if (!o.isMesh) return;
           o.castShadow = true; o.receiveShadow = true; o.frustumCulled = false;
           // 색상표는 칸마다 한 색이라 번지지 않게, 다른 재질과 같은 색 공간으로
-          if (o.material.map) { o.material.map.encoding = THREE.LinearEncoding; o.material.map.magFilter = THREE.NearestFilter; o.material.map.needsUpdate = true; }
+          if (o.material.map) { o.material.map.encoding = THREE.sRGBEncoding; o.material.map.magFilter = THREE.NearestFilter; o.material.map.needsUpdate = true; }
         });
         const box = new THREE.Box3().setFromObject(g.scene);
         GL.models[n] = { scene: g.scene, clips: g.animations, h: box.max.y - box.min.y, len: Math.max(box.max.x - box.min.x, box.max.z - box.min.z) };
@@ -2031,7 +2031,7 @@ function recolorTex(map, key, pairs) {
   const d = cx.getImageData(0, 0, cv.width, cv.height), a = d.data;
   for (let i = 0; i < a.length; i += 4) for (const [f, t] of pairs) if (Math.abs(a[i] - f[0]) < 8 && Math.abs(a[i + 1] - f[1]) < 8 && Math.abs(a[i + 2] - f[2]) < 8) { a[i] = t[0]; a[i + 1] = t[1]; a[i + 2] = t[2]; break; }
   cx.putImageData(d, 0, 0);
-  const tx = new THREE.CanvasTexture(cv); tx.flipY = map.flipY; tx.encoding = THREE.LinearEncoding; tx.magFilter = THREE.NearestFilter;
+  const tx = new THREE.CanvasTexture(cv); tx.flipY = map.flipY; tx.encoding = THREE.sRGBEncoding; tx.magFilter = THREE.NearestFilter;
   return (_recol[key] = tx);
 }
 const PINK_PAIRS = [[[139, 30, 31], [244, 169, 191]]];
@@ -2096,6 +2096,10 @@ function makeGL(name, o = {}) {
   });
   const m = { root, body, gl: true, mixer, actions, cur: null, heading: 0, ph: rnd(0, 6), idleT: 0, weapons, head, hand, weaponMode: o.weapon || 'never', walk: o.walk && actions[o.walk] ? o.walk : 'Walk' };
   playClip(m, 'Idle', 0);
+  if (o.uniform) {
+    const pairs = [[[139, 30, 31], o.uniform], [[65, 50, 39], [43, 82, 108]], [[87, 65, 44], [60, 122, 152]]];
+    body.traverse(x => { if (x.isMesh && x.material.map) { x.material = x.material.clone(); x.material.map = recolorTex(x.material.map, 'crew-' + o.uniform.join('-'), pairs); } });
+  }
   if (o.bunny) {
     body.traverse(x => { if (x.isMesh && x.material.map) { x.material = x.material.clone(); x.material.map = recolorTex(x.material.map, 'pink', PINK_PAIRS); } });
     // 분홍 토끼 모자: 머리를 덮는 둥근 모자 + 흰 테두리 + 솜뭉치 + 귀 두 개
@@ -2169,6 +2173,10 @@ function animateGL(m, ent, dt, st = {}) {
 }
 // 역할별 캐릭터: 주인공은 토끼 귀를 단 헨리, 선원은 선장과 헨리, 상륙 해적은 상어 인간
 function mkChar(kind, ent) {
+  // 손님은 무장한 해적 모형 대신, 큰 머리·밝은 옷의 가벼운 마을 주민으로 표시합니다.
+  if (kind === 'customer') {
+    const m = makeAdult3(ent); m.head.scale.setScalar(1.3); m.root.scale.set(1.12, 1.06, 1.12); return m;
+  }
   if (!GL.ready) {
     if (kind === 'player') return makeKid3(PLAYER_LOOK);
     if (kind === 'worker') return makeKid3(ent.look);
@@ -2176,8 +2184,11 @@ function mkChar(kind, ent) {
     return makeAdult3({ shirt: '#6e2b2b', pants: '#2e2a26', hair: '#1d1d1d', skin: '#d9a87e', bandana: true });
   }
   const n = (ent.ph || 0) * 10 | 0;
-  if (kind === 'player') return makeGL('henry', { bunny: true, height: 1.62, walk: 'WalkHuman' });
-  if (kind === 'worker') return makeGL(n % 2 ? 'captain' : 'henry', { height: 1.5, weapon: n % 2 ? 'raid' : 'never' });
+  if (kind === 'player') {
+    const m = makeGL('henry', { bunny: true, height: 1.78, walk: 'WalkHuman' });
+    m.root.scale.set(1.1, 1, 1.1); return m;
+  }
+  if (kind === 'worker') return makeGL(n % 2 ? 'captain' : 'henry', { height: 1.5, weapon: n % 2 ? 'raid' : 'never', uniform: n % 2 ? [40, 137, 185] : [71, 167, 80] });
   if (kind === 'customer') return makeGL(n % 2 ? 'henry' : 'captain', { height: 1.55 });
   const ty = ent.type || 'normal';
   const m = makeGL('captain', { height: 1.6, weapon: ty === 'normal' ? 'always' : 'never', skull: ty === 'bomber' || ty === 'sniper' ? 2 : ty === 'thief' ? 1 : (n % 2 ? 1 : 2) });
@@ -2242,14 +2253,16 @@ const cardStyle = document.createElement('style');
 cardStyle.textContent = `
 #cardPanel .box{max-width:420px;width:100%;text-align:center}
 #cardPanel h2{margin:0 0 4px}
-#cardPanel .sub{margin:0 0 14px;opacity:.85;font-size:14px}
+#cardPanel .sub{margin:0 0 14px;color:#78613f;font-size:14px}
 #cardPanel .cards{display:flex;flex-direction:column;gap:10px}
-#cardPanel button.card{display:flex;align-items:center;gap:12px;text-align:left;padding:12px 14px;border-radius:14px;background:#fff7ea;color:#3b2a1a;box-shadow:0 4px 0 #c9a77a;font-family:inherit}
-#cardPanel button.card .ic{font-size:30px;width:40px;text-align:center;flex:none}
+#cardPanel button.card{display:flex;align-items:center;gap:10px;text-align:left;padding:12px;border:2px solid #b69760;border-radius:14px;background:#fff2c7;color:#59462c;box-shadow:0 3px 0 #b69760;font-family:inherit}
+#cardPanel button.card:nth-child(2){background:#dff4fb;border-color:#7bafbd;box-shadow:0 3px 0 #7bafbd}
+#cardPanel button.card:nth-child(3){background:#e9f6d4;border-color:#8dad66;box-shadow:0 3px 0 #8dad66}
+#cardPanel button.card .ic{font-size:28px;width:34px;text-align:center;flex:none}
 #cardPanel button.card b{display:block;font-size:17px;font-family:var(--display)}
-#cardPanel button.card span{font-size:14px;opacity:.85}
-#cardPanel button.card .lv{margin-left:auto;font-size:12px;background:#3b2a1a;color:#ffe6a8;border-radius:8px;padding:2px 7px;flex:none}
-#bossBar{position:fixed;left:50%;bottom:136px;transform:translateX(-50%);width:min(320px,70vw);z-index:5;pointer-events:none;text-align:center;font-family:var(--display);color:#fff;text-shadow:0 2px 3px #000}
+#cardPanel button.card span{display:block;font-size:13px;line-height:1.4}
+#cardPanel button.card .lv{margin-left:auto;font:11px var(--display);background:#fffdf1;color:#76603b;border:1px solid #c8b085;border-radius:8px;padding:3px 5px;flex:none}
+#bossBar{position:fixed;left:50%;bottom:calc(136px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(320px,70vw);z-index:5;pointer-events:none;text-align:center;font-family:var(--display);color:#fff;text-shadow:0 2px 0 #78392c}
 #bossBar .bar{height:12px;border-radius:7px;background:rgba(10,10,20,.75);border:2px solid #f2d16b;overflow:hidden;margin-top:3px}
 #bossBar .fill{height:100%;background:linear-gradient(#ff8a7a,#d8231a);width:100%}
 `;
@@ -2394,7 +2407,14 @@ let composer = null;
 if (THREE.EffectComposer && THREE.RenderPass && THREE.UnrealBloomPass) {
   composer = new THREE.EffectComposer(renderer);
   composer.addPass(new THREE.RenderPass(scene, camera));
-  composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(256, 256), 0.65, 0.45, 0.93));
+  composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(256, 256), 0.18, 0.3, 1.15));
+  // 합성 경로도 일반 렌더와 동일한 색 공간으로 출력합니다.
+  const gammaPass = new THREE.ShaderPass({
+    uniforms: { tDiffuse: { value: null } },
+    vertexShader: 'varying vec2 vUv; void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+    fragmentShader: 'uniform sampler2D tDiffuse; varying vec2 vUv; void main(){vec4 c=texture2D(tDiffuse,vUv);gl_FragColor=vec4(mix(c.rgb*12.92,1.055*pow(max(c.rgb,vec3(0.0)),vec3(1.0/2.4))-0.055,step(vec3(0.0031308),c.rgb)),c.a);}'
+  });
+  composer.addPass(gammaPass);
 }
 function renderScene() { if (composer) composer.render(); else renderer.render(scene, camera); }
 function resizeFx() { if (composer) { composer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); composer.setSize(W, H); } }
@@ -2408,10 +2428,9 @@ function canvasTex(w, h, draw, repeat) {
 const glowTex = canvasTex(64, 64, (g) => { const r = g.createRadialGradient(32, 32, 0, 32, 32, 32); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.35, 'rgba(255,255,255,.55)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 64, 64); });
 const smokeTex = canvasTex(64, 64, (g) => { for (let i = 0; i < 6; i++) { const x = 20 + Math.random() * 24, y = 20 + Math.random() * 24, r = g.createRadialGradient(x, y, 0, x, y, 22); r.addColorStop(0, 'rgba(255,255,255,.5)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 64, 64); } });
 const woodTex = canvasTex(256, 32, (g, w, h) => {
-  g.fillStyle = '#efe2cc'; g.fillRect(0, 0, w, h);
-  for (let i = 0; i < 14; i++) { g.strokeStyle = `rgba(120,80,40,${0.12 + Math.random() * 0.18})`; g.lineWidth = 1 + Math.random() * 1.5; const y = Math.random() * h; g.beginPath(); g.moveTo(0, y); g.bezierCurveTo(w * 0.3, y + rnd(-4, 4), w * 0.6, y + rnd(-4, 4), w, y + rnd(-3, 3)); g.stroke(); }
-  for (let i = 0; i < 2; i++) { g.fillStyle = 'rgba(100,60,25,.35)'; g.beginPath(); g.ellipse(Math.random() * w, Math.random() * h, 5, 3, 0, 0, 7); g.fill(); }
-  g.fillStyle = 'rgba(60,40,25,.6)'; g.fillRect(6, h / 2 - 2, 4, 4); g.fillRect(w - 10, h / 2 - 2, 4, 4);
+  g.fillStyle = '#fff4d5'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 4; i++) { g.strokeStyle = 'rgba(139,93,43,.1)'; g.lineWidth = 1.2; const y = 5 + i * 7; g.beginPath(); g.moveTo(8, y); g.bezierCurveTo(w * 0.3, y + 2, w * 0.6, y - 2, w - 8, y); g.stroke(); }
+  g.fillStyle = 'rgba(102,73,41,.35)'; g.fillRect(6, h / 2 - 1, 3, 3); g.fillRect(w - 9, h / 2 - 1, 3, 3);
 });
 const stoneTex = canvasTex(128, 128, (g, w, h) => {
   g.fillStyle = '#8f8c86'; g.fillRect(0, 0, w, h);
@@ -2621,36 +2640,10 @@ function drawBooms() {
   }
 }
 function padBadge(p, full) {
-  const x = p.x, y = p.y, paid = G.paid[p.id] || 0, left = p.cost - paid, afford = G.money >= left;
-  // 멀리 있는 칸은 작은 아이콘만, 아주 먼 칸은 윤곽만
-  if (!full) {
-    if (dist(player.x, player.y, x, y) > 6.5) return;
-    const c = S(x, y, 12);
-    ctx.save(); ctx.shadowColor = 'rgba(20,50,70,.22)'; ctx.shadowBlur = 6 * Z;
-    ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.beginPath(); ctx.arc(c.x, c.y, 11 * Z, 0, 7); ctx.fill(); ctx.restore();
-    ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 1.2 * Z; ctx.beginPath(); ctx.arc(c.x, c.y, 11 * Z, 0, 7); ctx.stroke();
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = `${12 * Z}px sans-serif`; ctx.fillText(p.icon, c.x, c.y + 1);
-    return;
-  }
-  const c = S(x, y, 34 + Math.sin(G.t * 2.5 + p.x) * 3);
-  ctx.font = `${23 * Z}px "Do Hyeon", sans-serif`;
-  const label = `$${fmt(left)}`, tw = ctx.measureText(label).width, w = tw + 56 * Z, h = 38 * Z, x0 = c.x - w / 2, y0 = c.y - h / 2;
-  ctx.save(); ctx.shadowColor = 'rgba(20,50,70,.28)'; ctx.shadowBlur = 12 * Z; ctx.shadowOffsetY = 4 * Z;
-  ctx.fillStyle = afford ? 'rgba(255,248,228,.8)' : 'rgba(255,255,255,.62)';
-  ctx.beginPath(); ctx.roundRect(x0, y0, w, h, h / 2); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(c.x - 5 * Z, y0 + h - 1); ctx.lineTo(c.x, y0 + h + 6 * Z); ctx.lineTo(c.x + 5 * Z, y0 + h - 1); ctx.fill();
-  ctx.restore();
-  const gl = ctx.createLinearGradient(0, y0, 0, y0 + h); gl.addColorStop(0, 'rgba(255,255,255,.7)'); gl.addColorStop(0.55, 'rgba(255,255,255,0)');
-  ctx.fillStyle = gl; ctx.beginPath(); ctx.roundRect(x0 + 2, y0 + 1.5, w - 4, h * 0.55, h / 3); ctx.fill();
-  ctx.strokeStyle = afford ? '#f2c14e' : 'rgba(255,255,255,.95)'; ctx.lineWidth = 1.6 * Z; ctx.beginPath(); ctx.roundRect(x0, y0, w, h, h / 2); ctx.stroke();
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.font = `${20 * Z}px sans-serif`; ctx.fillText(p.icon, x0 + 20 * Z, c.y + 1);
-  ctx.font = `${23 * Z}px "Do Hyeon", sans-serif`; ctx.fillStyle = afford ? '#2f7d32' : '#3a2414'; ctx.fillText(label, x0 + 38 * Z + tw / 2, c.y + 1);
-  if (p.up) {
-    const ly = S(x, y).y, txt = `★${p.lv} → ★${p.lv + 1}`;
-    ctx.font = `${12 * Z}px "Do Hyeon", sans-serif`; ctx.lineWidth = 3 * Z; ctx.strokeStyle = 'rgba(60,35,20,.6)'; ctx.strokeText(txt, c.x, ly);
-    ctx.fillStyle = '#fff6c8'; ctx.fillText(txt, c.x, ly);
-  }
+  if (!full || dist(player.x, player.y, p.x, p.y) > 1.1) return;
+  const paid = G.paid[p.id] || 0, left = p.cost - paid;
+  sign(`${p.icon} $${fmt(left)}`, p.x, p.y, 95, '#fffbee', '#35434a', 21);
+  if (paid > 0) hpBar(p.x, p.y, 10, paid / p.cost, '#67cf48', 46);
 }
 function overlayWorld() {
   const n = nightAmt();
@@ -2671,7 +2664,7 @@ function overlayWorld() {
     const d = DEFS[id]; if (!d || d.x === undefined) continue;
     const up = dropOff(id);
     if (d.type === 'shop' && !raidOn && dist(player.x, player.y, d.x, d.y) < 5) {
-      sign(`${ICON[d.item]} ${d.name} · $${priceOf(d)}${slv(id) > 1 ? ' ★' + slv(id) : ''}`, d.x, d.y, 80 + up);
+      sign(`${ICON[d.item]} $${priceOf(d)}${slv(id) > 1 ? ' ★' + slv(id) : ''}`, d.x, d.y, 83 + up, '#fffbee', '#35434a', 17);
       const c = G.st[id].cash;
       if (c > 0) sign(`$${fmt(c)}`, d.cx, d.cy, 40 + Math.ceil(Math.min(9, Math.ceil(c / 8)) / 3) * 5, 'rgba(225,255,232,.9)', '#2f7d32', 16);
     } else if ((d.type === 'producer' || d.type === 'converter') && !raidOn && dist(player.x, player.y, d.x, d.y) < 2.8) sign(`${d.name}${slv(id) > 1 ? ' ★' + slv(id) : ''}`, d.x, d.y, 70 + up, '#ffd84d');
@@ -2687,10 +2680,10 @@ function overlayWorld() {
   const k = Z;
   for (const id of STATION_IDS) {
     if (!unlocked.has(id) || DEFS[id].type !== 'shop') continue;
-    for (const c of [...runtime[id].queue, ...runtime[id].leaving]) {
+    for (const [index, c] of [...runtime[id].queue, ...runtime[id].leaving].entries()) {
       const stage = c.emote ? 0 : c.wait > 12 ? 3 : c.wait > 8 ? 2 : c.wait > 4 ? 1 : 0;
       const emote = c.emote || [null, '😐', '😟', '😡'][stage], mood = ['happy', 'meh', 'worried', 'angry'][stage];
-      if (emote && c.alpha > 0.3) { const p = S(c.x, c.y, 76); bubble(p.x, p.y + Math.sin(G.t * 3 + (c.ph || 0)) * 1.5 * k, emote, k, emote === '😡' ? '#ffd9d4' : '#ffffff', emote === '😡' ? 1.2 : 0); }
+      if (emote && c.alpha > 0.3 && (index < 2 || index === runtime[id].queue.length)) { const p = S(c.x, c.y, 82); bubble(p.x, p.y + Math.sin(G.t * 3 + (c.ph || 0)) * 1.5 * k, emote, k, emote === '😡' ? '#ffd9d4' : '#ffffff', emote === '😡' ? 1.2 : 0); }
     }
   }
   for (const w of workers) { const em = w.job && w.job.cash ? '💵' : w.idle ? '💤' : null; if (em) { const p = S(w.x, w.y, 82); bubble(p.x, p.y, em, k); } }
@@ -2804,7 +2797,7 @@ let lastHud = '';
 function hud(obj) {
   strategyHud();
   $('goal').dataset.kind = raidOn ? 'danger' : /짓기|업그레이드/.test(obj.text) ? 'build' : 'interact';
-  $('goal').dataset.label = raidOn ? '위험 · 마을 방어' : /짓기|업그레이드/.test(obj.text) ? '건설 · 성장' : '작업 · 상호작용';
+  $('goal').dataset.label = raidOn ? '마을 방어' : /짓기|업그레이드/.test(obj.text) ? '건설' : '작업';
   const day = 1 + Math.floor(G.t / 40), km = G.t * 1.7 * (unlocked.has('solar') ? 1.4 : 1);
   const key = [Math.floor(G.money), day, Math.floor(km), G.stack.length, cap, obj.text, G.level, G.xp,
     unlocked.has('tent1'), Math.ceil(G.hp), G.soldiers, raidOn, Math.ceil(G.raidT), enemies.length, wages(), G.strike, phaseInfo(), G.qi, questInfo().cur, Math.round(incomePerMin() / 5)].join('|');
@@ -2877,3 +2870,5 @@ function start(data) {
 window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
 })();
 </script>
+</body>
+</html>

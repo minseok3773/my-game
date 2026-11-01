@@ -26,14 +26,16 @@ const cardStyle = document.createElement('style');
 cardStyle.textContent = `
 #cardPanel .box{max-width:420px;width:100%;text-align:center}
 #cardPanel h2{margin:0 0 4px}
-#cardPanel .sub{margin:0 0 14px;opacity:.85;font-size:14px}
+#cardPanel .sub{margin:0 0 14px;color:#78613f;font-size:14px}
 #cardPanel .cards{display:flex;flex-direction:column;gap:10px}
-#cardPanel button.card{display:flex;align-items:center;gap:12px;text-align:left;padding:12px 14px;border-radius:14px;background:#fff7ea;color:#3b2a1a;box-shadow:0 4px 0 #c9a77a;font-family:inherit}
-#cardPanel button.card .ic{font-size:30px;width:40px;text-align:center;flex:none}
+#cardPanel button.card{display:flex;align-items:center;gap:10px;text-align:left;padding:12px;border:2px solid #b69760;border-radius:14px;background:#fff2c7;color:#59462c;box-shadow:0 3px 0 #b69760;font-family:inherit}
+#cardPanel button.card:nth-child(2){background:#dff4fb;border-color:#7bafbd;box-shadow:0 3px 0 #7bafbd}
+#cardPanel button.card:nth-child(3){background:#e9f6d4;border-color:#8dad66;box-shadow:0 3px 0 #8dad66}
+#cardPanel button.card .ic{font-size:28px;width:34px;text-align:center;flex:none}
 #cardPanel button.card b{display:block;font-size:17px;font-family:var(--display)}
-#cardPanel button.card span{font-size:14px;opacity:.85}
-#cardPanel button.card .lv{margin-left:auto;font-size:12px;background:#3b2a1a;color:#ffe6a8;border-radius:8px;padding:2px 7px;flex:none}
-#bossBar{position:fixed;left:50%;bottom:136px;transform:translateX(-50%);width:min(320px,70vw);z-index:5;pointer-events:none;text-align:center;font-family:var(--display);color:#fff;text-shadow:0 2px 3px #000}
+#cardPanel button.card span{display:block;font-size:13px;line-height:1.4}
+#cardPanel button.card .lv{margin-left:auto;font:11px var(--display);background:#fffdf1;color:#76603b;border:1px solid #c8b085;border-radius:8px;padding:3px 5px;flex:none}
+#bossBar{position:fixed;left:50%;bottom:calc(136px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(320px,70vw);z-index:5;pointer-events:none;text-align:center;font-family:var(--display);color:#fff;text-shadow:0 2px 0 #78392c}
 #bossBar .bar{height:12px;border-radius:7px;background:rgba(10,10,20,.75);border:2px solid #f2d16b;overflow:hidden;margin-top:3px}
 #bossBar .fill{height:100%;background:linear-gradient(#ff8a7a,#d8231a);width:100%}
 `;

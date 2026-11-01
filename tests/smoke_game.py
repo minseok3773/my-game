@@ -13,7 +13,7 @@ with sync_playwright() as p:
  browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'])
  for version in ['3d']:
   print('Testing',version,flush=True)
-  page=browser.new_page(viewport={'width':390,'height':844})
+  page=browser.new_page(viewport={'width':390,'height':844},is_mobile=True,has_touch=True,device_scale_factor=2)
   errors=[]; page.on('pageerror',lambda e:errors.append(e.stack))
   def route(r):
    content=(ROOT/f'raft-village-{version}.html').read_text().replace('})();\n</script>',HOOK+'})();\n</script>')
@@ -28,6 +28,7 @@ with sync_playwright() as p:
   page.route(f'**/raft-village-{version}.html',route)
   page.goto(f'http://127.0.0.1:8000/raft-village-{version}.html',wait_until='networkidle')
   page.wait_for_function('!!window.gameTest',timeout=30000)
+  assert page.evaluate('innerWidth === 390 && document.documentElement.scrollWidth <= 390 && Math.abs(visualViewport.scale - 1) < .01'), 'Mobile layout viewport must match the device screen'
   assert page.evaluate('''async () => { const before=gameTest.G.t; gameTest.skewClock(); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); return gameTest.G.t >= before; }''')
   page.evaluate("""() => { const t=gameTest; t.unlock('expand1'); t.G.money=500; t.G.hp=50; t.hud(t.objective()); }""")
   page.locator('#strategyBtn').click();page.locator('#strategyPanel .choices button').nth(1).click()

@@ -8,11 +8,22 @@ function mat(c, o) {
 }
 function geo(key, make) { let g = _geos.get(key); if (!g) { g = make(); _geos.set(key, g); } return g; }
 const boxG = () => geo('box', () => new THREE.BoxGeometry(1, 1, 1));
+function softBoxG() {
+  return geo('toy-box', () => {
+    const s = new THREE.Shape(), r = 0.055, a = 0.5 - r;
+    s.moveTo(-a, -0.5); s.lineTo(a, -0.5); s.quadraticCurveTo(0.5, -0.5, 0.5, -a);
+    s.lineTo(0.5, a); s.quadraticCurveTo(0.5, 0.5, a, 0.5);
+    s.lineTo(-a, 0.5); s.quadraticCurveTo(-0.5, 0.5, -0.5, a);
+    s.lineTo(-0.5, -a); s.quadraticCurveTo(-0.5, -0.5, -a, -0.5);
+    const g = new THREE.ExtrudeGeometry(s, { depth: 0.9, bevelEnabled: true, bevelSegments: 1, steps: 1, bevelSize: 0.025, bevelThickness: 0.05, curveSegments: 2 });
+    g.translate(0, 0, -0.45); return g;
+  });
+}
 const cylG = (rt, rb, h, seg = 14) => geo(`c${rt},${rb},${h},${seg}`, () => new THREE.CylinderGeometry(rt, rb, h, seg));
 const sphG = (r, ws = 18, hs = 12, ps = 0, pl = Math.PI * 2, ts = 0, tl = Math.PI) => geo(`s${r},${ws},${hs},${ps},${pl},${ts},${tl}`, () => new THREE.SphereGeometry(r, ws, hs, ps, pl, ts, tl));
 const coneG = (r, h, seg = 12) => geo(`k${r},${h},${seg}`, () => new THREE.ConeGeometry(r, h, seg));
 function mk(g, m, cast = true, x = 0, y = 0, z = 0) { const o = new THREE.Mesh(g, m); o.castShadow = cast; o.receiveShadow = true; o.position.set(x, y, z); return o; }
-function bx(w, h, d, c, o, cast = true, x = 0, y = 0, z = 0) { const m = mk(boxG(), mat(c, o), cast, x, y, z); m.scale.set(w, h, d); return m; }
+function bx(w, h, d, c, o, cast = true, x = 0, y = 0, z = 0) { const m = mk(softBoxG(), mat(c, o), cast, x, y, z); m.scale.set(w, h, d); return m; }
 function ringMesh(r0, r1, color, opacity) {
   const m = new THREE.Mesh(geo(`r${r0},${r1}`, () => new THREE.RingGeometry(r0, r1, 40)), new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false }));
   m.rotation.x = -Math.PI / 2; return m;
@@ -20,7 +31,7 @@ function ringMesh(r0, r1, color, opacity) {
 
 /* ---------- 3D: 바다 ---------- */
 const uTime = { value: 0 };
-const waterMat = new THREE.MeshStandardMaterial({ color: 0x1f8db5, roughness: 0.22, metalness: 0.15, transparent: true, opacity: 0.94 });
+const waterMat = new THREE.MeshStandardMaterial({ color: 0x28aacd, roughness: 0.8, metalness: 0, transparent: true, opacity: 0.97 });
 waterMat.onBeforeCompile = sh => {
   sh.uniforms.uTime = uTime;
   sh.vertexShader = `uniform float uTime;
@@ -35,7 +46,7 @@ waterMat.onBeforeCompile = sh => {
 };
 const water = new THREE.Mesh(new THREE.PlaneGeometry(220, 220, 170, 170), waterMat);
 water.rotation.x = -Math.PI / 2; water.position.set(12, -0.45, 8); water.receiveShadow = true; scene.add(water);
-const WATER_DAY = new THREE.Color(0x1f8db5), WATER_NIGHT = new THREE.Color(0x163448);
+const WATER_DAY = new THREE.Color(0x28aacd), WATER_NIGHT = new THREE.Color(0x163448);
 // 뗏목 주변 얕은 물빛
 const shallow = (() => {
   const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
@@ -51,7 +62,7 @@ const plankIM = new THREE.InstancedMesh(boxG(), new THREE.MeshStandardMaterial({
 const baseIM = new THREE.InstancedMesh(boxG(), mat(0xbea277, { roughness: 1 }), MAXT);
 const logIM = new THREE.InstancedMesh(cylG(1, 1, 1, 10), mat(0x6a4529, { roughness: 0.9 }), MAXT * 2);
 for (const im of [plankIM, baseIM, logIM]) { im.receiveShadow = true; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); world.add(im); }
-const PLANK3 = [0xc9ad82, 0xc5a67a, 0xd0b68e, 0xcbb087, 0xc2a378].map(c => new THREE.Color(c)); // 가까운 색의 판자로 단조로움만 완화
+const PLANK3 = [0xe6b96d, 0xe9c27f, 0xedca8b, 0xe5b770, 0xeac181].map(c => new THREE.Color(c));
 for (let i = 0; i < MAXT * 3; i++) plankIM.setColorAt(i, PLANK3[i % 5]);
 const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _sv = new THREE.Vector3(), _pv = new THREE.Vector3(), _eu = new THREE.Euler();
 let raftKey = '';
@@ -116,11 +127,15 @@ function syncStack(group, arr) {
 
 /* ---------- 3D: 시설 ---------- */
 const objs = {}, docks = {}, zoneRings = {};
-const DISTRICT_COLORS = { fish: 0x4b9bb0, grilled: 0xd78a50, water: 0x55bcb8, tomato: 0x8fae58 };
+const DISTRICT_COLORS = { fish: 0x2babe4, grilled: 0xff8742, water: 0x25bc9c, tomato: 0x86c93f };
+const playerMarker = new THREE.Group();
+playerMarker.name = 'player-marker';
+playerMarker.add(ringMesh(0.39, 0.47, 0xffffff, 0.95), ringMesh(0.29, 0.37, 0x13bfc8, 0.9));
+world.add(playerMarker);
 // 시설에 붙는 정적 소품: 길과 상호작용 위치를 바꾸지 않고, 생성할 때만 조립합니다.
 function dressStation(d, parent) {
   const g = new THREE.Group(); g.name = 'station-details'; parent.add(g);
-  const accent = DISTRICT_COLORS[d.item || d.output] || (d.type === 'tent' ? 0xc4956b : 0x718fac);
+  const accent = DISTRICT_COLORS[d.item || d.output] || (d.type === 'tent' ? 0xffa132 : 0x5186c4);
   const wood = 0x8d6040;
   const barrel = (x, z) => {
     g.add(mk(cylG(0.18, 0.16, 0.42, 10), mat(wood), false, x, 0.21, z));
@@ -218,18 +233,29 @@ function buildStation(id) {
     o.inPile = new THREE.Group(); o.inPile.position.set(0, 0.21, 0.85); g.add(o.inPile);
     o.outPile = new THREE.Group(); o.outPile.position.set(0.85, 0.21, 0); g.add(o.outPile);
   } else if (d.type === 'shop') {
-    g.add(bx(1, 0.45, 1, 0xe6cfa3, { roughness: 0.8 }, true, 0, 0.225, 0));
+    const shopColor = DISTRICT_COLORS[d.item];
+    g.add(bx(1.14, 0.58, 1.1, shopColor, { roughness: 0.8 }, true, 0, 0.29, 0));
+    g.add(bx(1.22, 0.1, 1.18, 0xffefd2, { roughness: 0.8 }, true, 0, 0.58, 0));
     for (const [px, pz] of [[-0.56, -0.56], [0.56, -0.56], [-0.56, 0.56], [0.56, 0.56]]) g.add(mk(cylG(0.035, 0.035, 1.35, 6), mat(0x6e4526), true, px, 0.68, pz));
-    for (let i = 0; i < 4; i++) { const st = mk(boxG(), new THREE.MeshStandardMaterial({ color: i % 2 ? 0xe4dccd : vivid(d.color), roughness: 0.7 }), true, -0.465 + i * 0.31, 1.37, 0); st.scale.set(0.31, 0.05, 1.24); g.add(st); }
-    o.stock = new THREE.Group(); o.stock.position.y = 0.47; g.add(o.stock);
+    for (let i = 0; i < 4; i++) { const st = bx(0.32, 0.12, 1.35, i % 2 ? 0xfff6de : shopColor, { roughness: 0.85 }, true, -0.465 + i * 0.31, 1.48, 0); st.rotation.x = -0.1; g.add(st); }
+    o.stock = new THREE.Group(); o.stock.position.y = 0.64; g.add(o.stock);
     o.cash = new THREE.Group(); o.cash.position.set(d.cx - d.x, 0.03, d.cy - d.y); g.add(o.cash);
     const [x0, y0, x1, y1] = dockRect(id), dk = new THREE.Group();
     dk.add(bx(x1 - x0, 0.12, y1 - y0, 0xa7774a, { roughness: 0.9 }, false, (x0 + x1) / 2, -0.1, (y0 + y1) / 2));
-    for (let a = 1.5; a < 10; a += 2) dk.add(mk(cylG(0.07, 0.07, 0.6, 6), mat(0x5c391e), false, d.x + d.dir[0] * a, -0.4, d.y + d.dir[1] * a));
+    for (let a = 1.5; a < 6.6; a += 1.7) dk.add(mk(cylG(0.09, 0.09, 0.6, 6), mat(0x765033), false, d.x + d.dir[0] * a, -0.4, d.y + d.dir[1] * a));
     world.add(dk); docks[id] = dk;
     const zr = ringMesh(0.42, 0.5, 0xffffff, 0.6); zr.position.set(d.zx, 0.02, d.zy); world.add(zr); zoneRings[id] = zr;
   } else if (d.type === 'tent') {
-    g.add(mk(tentGeo(), mat(0xb9a07a, { roughness: 0.95, side: THREE.DoubleSide })));
+    g.add(mk(tentGeo(), mat(0xff951f, { roughness: 0.95, side: THREE.DoubleSide })));
+    // 밝은 천막에 두꺼운 지지대: 작은 화면에서도 숙소의 실루엣이 분명합니다.
+    for (const x of [-0.87, 0.87]) {
+      const points = [[x, 0.03, -0.66], [x, 1.12, 0], [x, 0.03, 0.66]];
+      for (let i = 0; i < 2; i++) {
+        const a = new THREE.Vector3(...points[i]), b = new THREE.Vector3(...points[i + 1]);
+        const pole = mk(cylG(0.035, 0.035, a.distanceTo(b), 6), mat(0x62432d));
+        pole.position.copy(a).add(b).multiplyScalar(0.5); pole.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.sub(a).normalize()); g.add(pole);
+      }
+    }
     const ridge = mk(cylG(0.04, 0.04, 1.8, 6), mat(0x8a5530), true, 0, 1.1, 0); ridge.rotation.z = Math.PI / 2; g.add(ridge);
   } else if (d.type === 'solar') {
     g.add(mk(cylG(0.06, 0.06, 0.8, 8), mat(0x888888, { metalness: 0.4 }), true, 0, 0.4, 0));
@@ -289,25 +315,43 @@ function syncStations() {
 const padObjs = new Map();
 function buildPad(p) {
   const g = new THREE.Group(); g.position.set(p.x, 0.03, p.y);
-  const base = new THREE.Mesh(geo('padBase', () => new THREE.PlaneGeometry(1.2, 1.2)), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.16, depthWrite: false }));
-  base.rotation.x = -Math.PI / 2; g.add(base);
+  g.add(bx(1.38, 0.035, 1.38, 0x74543c, { roughness: 1 }, false, 0, 0, 0));
+  const base = bx(1.3, 0.04, 1.3, 0xfffbeb, { roughness: 1 }, false, 0, 0.025, 0); g.add(base);
   const fill = new THREE.Mesh(geo('padFill', () => new THREE.PlaneGeometry(1.2, 1.2).translate(0, 0.6, 0)), new THREE.MeshBasicMaterial({ color: 0x59d36a, transparent: true, opacity: 0.8, depthWrite: false }));
-  fill.rotation.x = -Math.PI / 2; fill.position.set(0, 0.005, 0.6); g.add(fill);
+  fill.rotation.x = -Math.PI / 2; fill.position.set(0, 0.055, 0.6); g.add(fill);
+  const labelCanvas = document.createElement('canvas'); labelCanvas.width = labelCanvas.height = 128;
+  const labelTexture = new THREE.CanvasTexture(labelCanvas); labelTexture.encoding = THREE.sRGBEncoding;
+  const label = new THREE.Mesh(geo('pad-label', () => new THREE.PlaneGeometry(1.15, 1.15)), new THREE.MeshBasicMaterial({ map: labelTexture, transparent: true, depthWrite: false }));
+  label.rotation.x = -Math.PI / 2; label.position.y = 0.065; g.add(label);
   const sq = geo('padLine', () => new THREE.BufferGeometry().setFromPoints([[-0.6, -0.6], [0.6, -0.6], [0.6, 0.6], [-0.6, 0.6]].map(([x, z]) => new THREE.Vector3(x, 0.01, z))));
   const border = new THREE.LineLoop(sq, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true }));
   const ripple = new THREE.LineLoop(sq, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true }));
   g.add(border, ripple); world.add(g);
-  const o = { g, base, fill, border, ripple }; padObjs.set(p.id, o); return o;
+  const o = { g, base, fill, border, ripple, label, labelCanvas, labelTexture, labelSig: '', labelTime: -1 }; padObjs.set(p.id, o); return o;
 }
 function syncPads(vp) {
   const ids = new Set(vp.map(p => p.id));
-  for (const [id, o] of padObjs) if (!ids.has(id)) { world.remove(o.g); padObjs.delete(id); }
+  for (const [id, o] of padObjs) if (!ids.has(id)) {
+    world.remove(o.g); o.labelTexture.dispose(); o.label.material.dispose();
+    if (o.base.userData.ownMaterial) o.base.material.dispose();
+    o.fill.material.dispose(); o.border.material.dispose(); o.ripple.material.dispose(); padObjs.delete(id);
+  }
   for (const p of vp) {
     const o = padObjs.get(p.id) || buildPad(p), left = p.cost - (G.paid[p.id] || 0), afford = G.money >= left, ratio = (G.paid[p.id] || 0) / p.cost;
     const far = dist(player.x, player.y, p.x, p.y) > 6.5 && !afford;
     o.g.visible = !far || dist(player.x, player.y, p.x, p.y) < 9;
     o.border.material.color.setHex(afford ? 0xffd84d : 0xffffff); o.border.material.opacity = far ? 0.35 : 0.9;
-    o.base.material.color.setHex(afford ? 0xffe078 : 0xffffff);
+    // 패드마다 바뀌는 재질은 공유하지 않아 다른 칸의 상태를 덮어쓰지 않습니다.
+    if (!o.base.userData.ownMaterial) { o.base.material = o.base.material.clone(); o.base.userData.ownMaterial = true; }
+    o.base.material.color.setHex(afford ? 0xffec9b : 0xfffbeb);
+    const labelSig = `${p.icon}|${Math.ceil(left)}|${afford}`;
+    if (o.labelSig !== labelSig && (o.labelSig === '' || G.t - o.labelTime > 0.15 || o.labelTime > G.t)) {
+      const c = o.labelCanvas.getContext('2d'); c.clearRect(0, 0, 128, 128);
+      c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = '42px sans-serif'; c.fillText(p.icon, 64, 35);
+      c.font = 'bold 38px sans-serif'; c.fillStyle = afford ? '#348b30' : '#665947';
+      c.fillText('$' + fmt(Math.ceil(left)), 64, 91, 120);
+      o.labelTexture.needsUpdate = true; o.labelSig = labelSig; o.labelTime = G.t;
+    }
     o.fill.visible = ratio > 0; o.fill.scale.y = Math.max(0.001, ratio);
     const f = (G.t * 0.8 + p.x * 0.13) % 1;
     o.ripple.visible = afford && dist(player.x, player.y, p.x, p.y) < 4 && !raidOn;
@@ -553,6 +597,7 @@ function sync3D(dt) {
   uTime.value = G.t;
   raftY = Math.sin(G.t * 1.1) * 0.04;
   world.position.y = raftY;
+  playerMarker.position.set(player.x, 0.085, player.y);
   shallow.position.set(raftC.x, -0.2, raftC.y); shallow.scale.setScalar(raftC.r * 2.8);
   syncRaft(); syncStations(); syncPads(visiblePads()); syncSharks(dt); bossHud();
   // 캐릭터
@@ -615,18 +660,18 @@ function sync3D(dt) {
   const n = nightAmt(), dk = Math.min(1, duskAmt());
   const sky = SKY_DAY.clone().lerp(SKY_DUSK, dk * (1 - n)).lerp(SKY_NIGHT, n);
   scene.background.copy(sky); scene.fog.color.copy(sky);
-  sun.intensity = 1.05 * (1 - n * 0.82); sun.color.setHex(0xfff0d6).lerp(new THREE.Color(0xff9a5a), dk * 0.7 * (1 - n));
-  hemi.intensity = 0.45 * (1 - n * 0.55);
+  sun.intensity = 0.85 * (1 - n * 0.82); sun.color.setHex(0xffedcc).lerp(new THREE.Color(0xff9a5a), dk * 0.7 * (1 - n));
+  hemi.intensity = 0.8 * (1 - n * 0.55);
   waterMat.color.copy(WATER_DAY).lerp(WATER_NIGHT, n);
   if (unlocked.has('grill')) { const d = DEFS.grill, s = G.st.grill; lampGrill.position.set(d.x, 0.9, d.y); lampGrill.intensity = (s.inPile > 0 ? 0.5 : 0) + n * 1.3; }
   if (unlocked.has('lighthouse')) { const d = DEFS.lighthouse; lampTower.position.set(d.x, 3.6, d.y); lampTower.intensity = n * 2.2; }
   lampPlayer.position.set(player.x, 1.6, player.y); lampPlayer.intensity = n * 1.1;
   // 카메라: 높은 곳에서 내려다보며 부드럽게 따라감 (흔들림 포함)
-  const far = camera.aspect < 0.7 ? 2.25 : 1.8;
-  _pv.set(player.x, 12.5 * far, player.y + 9.5 * far);
-  camera.position.lerp(_pv, Math.min(1, dt * 4));
+  _pv.set(player.x - 0.45, 0.3, player.y - 0.45);
+  cameraFocus.lerp(_pv, Math.min(1, dt * 8));
+  camera.position.copy(cameraFocus).add(cameraOffset);
   if (shake > 0) camera.position.add(_pv.set(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)).multiplyScalar(shake * 0.5));
-  camera.lookAt(player.x, 0.4, player.y);
+  camera.lookAt(cameraFocus);
   // 밤에는 달빛처럼 머리 위에서 비춰 그림자를 짧게
   sun.position.set(player.x - 7 * (1 - n * 0.85), 14, player.y + 4 * (1 - n * 0.85)); sun.target.position.set(player.x, 0, player.y);
   camera.updateMatrixWorld();

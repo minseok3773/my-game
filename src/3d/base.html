@@ -1,152 +1,91 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>표류 뗏목 마을</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=Gowun+Dodum&display=swap">
 <style>
-/* 레이아웃: 화면 전체가 바다 캔버스, 그 위에 떠 있는 나무 간판 같은 HUD */
+/* 밝은 색·두툼한 테두리·큼직한 숫자의 모바일 타이쿤 HUD */
 :root{
-  --sea:#1f6fa8; --deep:#134c78; --plank:#d9a066; --plank-dark:#8a5530;
-  --cash:#3fbf4f; --ink:#2a1a0e; --paper:#fff6e6; --alert:#e8432e;
-  --display:"Do Hyeon","Gowun Dodum","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --sea:#36bde1;--deep:#2395bc;--plank:#edbb75;--plank-dark:#64432e;
+  --cash:#64cf42;--ink:#30404a;--paper:#fff9e9;--alert:#ed6253;
+  --display:"Do Hyeon","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
   --body:"Gowun Dodum","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
-  color-scheme:dark;
+  color-scheme:light;
 }
+*{box-sizing:border-box}
 [hidden]{display:none!important}
-html,body{height:100%;overflow:hidden}
-body{background:var(--deep);color:var(--paper);font-family:var(--body);touch-action:none;user-select:none;-webkit-user-select:none}
-#game{position:fixed;inset:0;width:100%;height:100%;display:block}
+html,body{margin:0;height:100%;overflow:hidden}
+body{background:var(--sea);color:var(--ink);font-family:var(--body);touch-action:auto;user-select:none;-webkit-user-select:none}
+#game{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#world,#world canvas{touch-action:none}
 .hud{position:fixed;pointer-events:none;font-family:var(--display)}
-#dayCard{top:calc(10px + env(safe-area-inset-top,0px));left:calc(12px + env(safe-area-inset-left,0px));
-  background:linear-gradient(#b97a45,#94592d);border:3px solid #5e3519;border-radius:12px;padding:6px 12px 7px;
-  box-shadow:0 3px 0 #4a2912;color:var(--paper);text-shadow:0 2px 0 #4a2912}
-#dayCard b{display:block;font-size:20px;font-weight:400;letter-spacing:.5px}
-#dayCard b em{font-style:normal;color:#ffd84d;font-size:24px}
-#dayCard span{font-size:13px;opacity:.92;font-variant-numeric:tabular-nums}
-#money{top:calc(12px + env(safe-area-inset-top,0px));right:calc(12px + env(safe-area-inset-right,0px));
-  display:flex;align-items:center;gap:8px;background:rgba(20,30,40,.55);border-radius:999px;padding:4px 16px 4px 4px;
-  font-size:24px;font-variant-numeric:tabular-nums;transition:transform .12s}
-#money.pulse{transform:scale(1.12)}
-#money i{display:grid;place-items:center;width:44px;height:30px;border-radius:7px;background:var(--cash);border:3px solid #1e7a2b;
-  font-style:normal;font-size:15px;color:#e9ffe9;box-shadow:inset 0 0 0 2px #7fe08a}
-#level{top:calc(58px + env(safe-area-inset-top,0px));right:calc(12px + env(safe-area-inset-right,0px));display:flex;align-items:center;gap:8px;
-  background:rgba(20,30,40,.55);border-radius:999px;padding:4px 12px 4px 5px;font-size:15px}
-#level b{font-weight:400;background:#ffd84d;color:#4a2912;border-radius:999px;padding:1px 9px}
-#level s{display:block;width:72px;height:8px;border-radius:4px;background:rgba(255,255,255,.25);overflow:hidden;text-decoration:none}
-#level s i{display:block;height:100%;width:0;background:#ffd84d;transition:width .2s}
-#goal{top:calc(98px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);max-width:calc(100% - 32px);
-  background:var(--paper);color:var(--ink);border-radius:12px;padding:7px 14px;font-size:16px;text-align:center;
-  box-shadow:0 3px 0 rgba(0,0,0,.25);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#bag{bottom:calc(14px + env(safe-area-inset-bottom,0px));left:calc(12px + env(safe-area-inset-left,0px));
-  background:rgba(20,30,40,.55);border-radius:999px;padding:6px 14px;font-size:17px;font-variant-numeric:tabular-nums}
-#bag.full{background:var(--alert)}
-#menuBtn{position:fixed;bottom:calc(14px + env(safe-area-inset-bottom,0px));right:calc(12px + env(safe-area-inset-right,0px));
-  width:42px;height:42px;border-radius:50%;border:0;background:rgba(20,30,40,.55);color:var(--paper);font-size:20px;cursor:pointer}
-#strategyBtn:focus-visible,#menuBtn:focus-visible,.panel button:focus-visible{outline:3px solid #ffd84d;outline-offset:2px}
-#defense{bottom:calc(10px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:rgba(20,30,40,.6);
-  border-radius:12px;padding:5px 12px;font-size:13px;min-width:160px;max-width:calc(100% - 210px);text-align:center;font-variant-numeric:tabular-nums}
-#defense.raid{background:rgba(180,30,20,.8)}
-#hpBar{display:block;height:7px;border-radius:4px;background:rgba(255,255,255,.25);overflow:hidden;margin:3px 0}
-#hpBar i{display:block;height:100%;width:100%;background:#5fd16b}
-#hpBar.low i{background:#ff6b5a}
-#toast{top:40%;left:50%;transform:translate(-50%,-50%) scale(.6);opacity:0;font-size:30px;color:#fff;
-  text-shadow:0 3px 0 #4a2912,0 0 12px rgba(0,0,0,.4);transition:opacity .25s,transform .25s;white-space:nowrap}
-#toast.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
-.panel{position:fixed;inset:0;display:grid;place-items:center;background:rgba(8,24,40,.6);padding:16px}
-.panel>div{background:var(--paper);color:var(--ink);border-radius:16px;border:4px solid var(--plank-dark);
-  padding:20px 22px;max-width:360px;width:100%;box-shadow:0 6px 0 rgba(0,0,0,.3)}
-.panel h2{font-family:var(--display);font-weight:400;font-size:26px;margin:0 0 8px;text-wrap:balance}
-.panel p,.panel li{font-size:15px;line-height:1.6;margin:0 0 6px}
-.panel ul{padding-left:18px;margin:0 0 12px}
-.panel .row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
-.panel button{flex:1;font-family:var(--display);font-size:17px;border:0;border-radius:10px;padding:10px 12px;cursor:pointer;
-  background:var(--cash);color:#fff;box-shadow:0 3px 0 #1e7a2b}
-.panel button.ghost{background:#e7d6bd;color:var(--ink);box-shadow:0 3px 0 #b49a76}
-.panel button.danger{background:var(--alert);box-shadow:0 3px 0 #9b2416}
-@media (prefers-reduced-motion:reduce){#money,#toast{transition:none}}
-/* 유리 느낌 HUD */
-#dayCard,#money,#level,#bag,#defense,#menuBtn{background:rgba(255,255,255,.16);-webkit-backdrop-filter:blur(12px) saturate(150%);backdrop-filter:blur(12px) saturate(150%);
-  border:1px solid rgba(255,255,255,.4);box-shadow:0 6px 20px rgba(8,30,55,.28),inset 0 1px 0 rgba(255,255,255,.45);text-shadow:0 1px 2px rgba(10,30,50,.45)}
-#dayCard{border-radius:18px;padding:6px 13px 7px}
-#dayCard,#money,#level,#bag,#defense,#menuBtn{background:rgba(255,255,255,.2)}
-#dayCard b{font-size:18px}
-#dayCard b em{display:inline-block;background:linear-gradient(#ffe680,#ffc94d);color:#5a3410;text-shadow:none;border-radius:999px;padding:0 9px;margin:0 2px;font-size:20px;box-shadow:0 2px 0 rgba(120,70,10,.35)}
-#money i{border-radius:9px;box-shadow:inset 0 0 0 2px #7fe08a,0 2px 0 #1e7a2b;text-shadow:none}
-#level b{box-shadow:0 2px 0 rgba(120,70,10,.35);text-shadow:none}
-#level s i{background:linear-gradient(90deg,#ffe680,#ffb84d);box-shadow:0 0 8px rgba(255,210,90,.8)}
-#goal{border-radius:20px;padding:9px 18px;background:rgba(255,251,242,.96);color:#3a2414;box-shadow:0 6px 18px rgba(8,30,55,.3);
-  border:2px solid #fff;overflow:visible;white-space:normal;text-wrap:balance;word-break:keep-all;line-height:1.35}
-#goal::after{content:"";position:absolute;left:50%;bottom:-8px;width:12px;height:12px;background:rgba(255,251,242,.96);
-  transform:translateX(-50%) rotate(45deg);border-right:2px solid #fff;border-bottom:2px solid #fff}
-#goal.pop{animation:pop .35s ease-out}
-@keyframes pop{0%{transform:translateX(-50%) scale(.85)}60%{transform:translateX(-50%) scale(1.06)}100%{transform:translateX(-50%) scale(1)}}
-#bag.full{background:rgba(232,67,46,.75)}
-#bag{pointer-events:auto;cursor:pointer;user-select:none}
-#bag:focus-visible{outline:3px solid #ffd84d;outline-offset:2px}
-#bag em{font-style:normal;font-size:12px;opacity:.85;margin-left:6px;padding:1px 7px;border-radius:999px;background:rgba(255,255,255,.18)}
-#defense{border-radius:16px}
-#defense.raid{background:rgba(200,40,30,.6);animation:alarm 1s ease-in-out infinite}
-@keyframes alarm{50%{box-shadow:0 0 22px rgba(255,80,60,.9),inset 0 1px 0 rgba(255,255,255,.45)}}
-#hpBar i{background:linear-gradient(90deg,#7ee88a,#3fbf4f)}
-#toast{text-shadow:0 3px 0 #b5651d,0 0 18px rgba(255,200,90,.8)}
-.panel{background:rgba(8,24,40,.45);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
-.panel>div{border:2px solid rgba(255,255,255,.85);border-radius:22px;background:rgba(255,250,240,.96);box-shadow:0 12px 40px rgba(8,30,55,.4)}
-@media (prefers-reduced-motion:reduce){#goal.pop,#defense.raid{animation:none}}
-#quest{bottom:calc(64px + env(safe-area-inset-bottom,0px));left:calc(12px + env(safe-area-inset-left,0px));max-width:min(60%,250px);
-  border-radius:14px;padding:7px 12px 8px;background:rgba(16,24,32,.5);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
-  border:1px solid rgba(255,255,255,.16);box-shadow:0 6px 20px rgba(8,20,30,.3);text-shadow:0 1px 2px rgba(0,0,0,.4)}
-#qTitle{font-size:11px;opacity:.7;letter-spacing:.06em}
-#qText{font-size:14px;line-height:1.3;word-break:keep-all}
-#qText b{font-weight:400;color:#f0d48a}
-#qBar{display:block;height:5px;border-radius:3px;background:rgba(255,255,255,.18);margin-top:5px;overflow:hidden}
-#qFill{display:block;height:100%;width:0;background:linear-gradient(90deg,#d9b25a,#f3dc95);transition:width .25s}
-#quest.done{animation:qpop .5s ease-out}
-@keyframes qpop{0%{transform:scale(1)}35%{transform:scale(1.1);box-shadow:0 0 24px rgba(240,210,120,.8)}100%{transform:scale(1)}}
-@media (prefers-reduced-motion:reduce){#quest.done{animation:none}}
-/* 알림과 퀘스트는 캐릭터 위가 아니라 가방 옆 글자로 */
-#quest{bottom:calc(14px + env(safe-area-inset-bottom,0px));left:calc(150px + env(safe-area-inset-left,0px));right:calc(66px + env(safe-area-inset-right,0px));max-width:none;padding:6px 12px 7px}
-#qTitle{display:none}
-#qText{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#qBar{margin-top:3px;height:4px}
-#toast{top:auto;bottom:calc(62px + env(safe-area-inset-bottom,0px));left:calc(12px + env(safe-area-inset-left,0px));transform:none;font-size:15px;padding:6px 12px;border-radius:12px;
-  background:rgba(16,24,32,.62);text-shadow:0 1px 2px rgba(0,0,0,.5);max-width:calc(100% - 210px);white-space:normal;word-break:keep-all}
-#toast.show{transform:none}
-#defense{bottom:calc(62px + env(safe-area-inset-bottom,0px));left:auto;right:calc(12px + env(safe-area-inset-right,0px));transform:none;max-width:calc(52% - 12px)}
-/* 성인 톤: 어두운 유리 */
-#dayCard,#money,#level,#bag,#defense,#menuBtn{background:rgba(16,24,32,.48);border-color:rgba(255,255,255,.16)}
-#dayCard b em{background:linear-gradient(#e2c27a,#b98b3e);color:#2a1a0e}
-#level b{background:#cfae62;color:#2a1a0e}
-#goal{background:rgba(16,24,32,.82);color:#efe7da;border:1px solid rgba(255,255,255,.16)}
-#goal::after{background:rgba(16,24,32,.82);border-color:rgba(255,255,255,.16)}
-.panel>div{background:rgba(22,28,36,.96);color:#efe7da;border-color:rgba(255,255,255,.18)}
-.panel button.ghost{background:#3a4552;color:#efe7da;box-shadow:0 3px 0 #222a33}
-/* 정보 우선순위: 상단 목표 / 하단 준비·전투 / 맨 아래 조작 */
-.hud,#strategyBtn,#menuBtn{box-sizing:border-box}
-#quest{top:calc(12px + env(safe-area-inset-top,0px));bottom:auto;left:12px;right:auto;width:calc(100% - 176px);max-width:300px;padding:10px 12px;min-height:60px;border-radius:14px;background:rgba(17,38,48,.92)}
-#qTitle{display:block;font-size:10px;color:#a9c6c7;letter-spacing:.12em;margin-bottom:4px}
-#qText{font-size:12px;white-space:normal;line-height:1.45;word-break:keep-all;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}#qBar{margin-top:6px}
-#money{font-size:21px;min-width:132px;justify-content:flex-end;background:rgba(17,38,48,.92)}
-#money i{width:30px;height:28px;border:0;background:#427e57;box-shadow:none}
-#level{top:calc(57px + env(safe-area-inset-top,0px));padding:4px 8px;font-size:12px}#level s{width:70px}
-#goal{top:calc(102px + env(safe-area-inset-top,0px));left:12px;right:12px;transform:none;max-width:none;text-align:left;border-radius:12px;padding:10px 12px;border:1px solid #63cfc4;border-left:4px solid #63cfc4;background:rgba(17,38,48,.93);font-size:13px;line-height:1.5;box-shadow:0 4px 14px #08202a40}
-#goal::before{content:attr(data-label);display:block;font:10px var(--body);letter-spacing:.1em;color:#8ae3d9;margin-bottom:3px}#goal::after{display:none}#goal.pop{animation:none}
-#goal[data-kind=build]{border-color:#e7bd67}#goal[data-kind=build]::before{color:#f4ce81}
-#goal[data-kind=danger]{border-color:#f18a78}#goal[data-kind=danger]::before{color:#ffac9b}
-#defense{bottom:calc(72px + env(safe-area-inset-bottom,0px));left:12px;right:12px;max-width:none;min-width:0;padding:8px 12px;text-align:left;border-radius:12px;background:rgba(17,38,48,.93);font-size:12px}
-#defTop{float:left;margin-right:10px}#hpBar{height:6px;margin:5px 0 7px}#defInfo{font-size:11px;color:#d2e5df}
-#strategyBtn{position:fixed;z-index:4;border:1px solid #c4aa65;border-radius:12px;color:#fff3d1;font:14px var(--display);padding:9px 12px;cursor:pointer;bottom:calc(145px + env(safe-area-inset-bottom,0px));left:12px;right:12px;max-width:none;min-height:50px;background:#173c49f2;border-color:#c4aa65;text-align:left}
-#bag{bottom:calc(14px + env(safe-area-inset-bottom,0px));min-height:40px;display:flex;align-items:center;box-sizing:border-box;font-size:15px;padding:8px 14px;background:rgba(17,38,48,.93)}
-#menuBtn{width:42px;height:42px;background:rgba(17,38,48,.93)}
-#toast{bottom:calc(210px + env(safe-area-inset-bottom,0px));max-width:none;left:12px;right:12px;font-size:12px;line-height:1.5;background:rgba(17,38,48,.96)}
-.panel{z-index:20}.panel>div{box-sizing:border-box;max-height:calc(100dvh - 32px);overflow:auto}.panel button{min-height:44px}
-@media(min-width:700px){#goal{left:50%;right:auto;transform:translateX(-50%);width:420px;top:20px}#quest{width:250px}#defense,#strategyBtn{left:auto;width:300px}#strategyBtn{position:fixed;z-index:4;border:1px solid #c4aa65;border-radius:12px;color:#fff3d1;font:14px var(--display);padding:9px 12px;cursor:pointer;bottom:calc(145px + env(safe-area-inset-bottom,0px))}#toast{right:auto;max-width:360px}}
-@media(max-height:500px) and (orientation:landscape){#goal{top:12px;left:28%;right:26%;width:auto;transform:none;font-size:11px;padding:6px 9px}#quest{width:24%;max-width:190px;min-height:0;padding:7px 9px}#qText{font-size:10px}#defense{left:auto;width:230px;bottom:66px}#strategyBtn{left:auto;width:230px;bottom:138px;font-size:12px}#toast{right:auto;max-width:220px;bottom:66px}}
+#dayCard{display:none}
+#quest,#money,#level,#goal,#bag,#defense,#menuBtn,#strategyBtn{
+  border:3px solid #405363;background:var(--paper);color:var(--ink);
+  border-radius:14px;box-shadow:0 3px 0 #40536340,inset 0 2px 0 #fff9;text-shadow:none;
+}
+#quest{top:calc(10px + env(safe-area-inset-top,0px));left:calc(10px + env(safe-area-inset-left,0px));width:calc(100% - 156px);max-width:250px;height:78px;padding:7px 10px;overflow:hidden}
+#qTitle{font-size:11px;line-height:1.1;color:#a06c2d;margin-bottom:3px}
+#qText{font-size:13px;line-height:1.25;word-break:keep-all;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+#qText b{color:#218f45;font-weight:400}
+#qBar{display:block;height:6px;border-radius:4px;background:#e7dac0;margin-top:4px;overflow:hidden}
+#qFill{display:block;height:100%;width:0;background:#f6c346;transition:width .2s}
+#quest.done{animation:reward .35s ease-out}
+#money{top:calc(10px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));width:126px;height:44px;display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:3px 11px 3px 4px;font-size:24px;font-variant-numeric:tabular-nums;background:#e8ffcf;border-color:#3c663b;transition:transform .12s}
+#money i{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#63ca44;border:2px solid #3d8a30;color:#fff;font-style:normal;font-size:20px;box-shadow:inset 0 2px 0 #b2f080;text-shadow:0 1px 0 #347c29;flex:none}
+#money.pulse{transform:scale(1.08)}
+#level{top:calc(60px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));height:24px;width:126px;padding:0 5px;display:flex;gap:5px;align-items:center;border-width:2px;border-radius:9px;font-size:12px;box-shadow:none}
+#level b{font-weight:400;color:#7c542c;white-space:nowrap}
+#level s{display:block;flex:1;height:7px;background:#e8dcc6;border-radius:4px;overflow:hidden;text-decoration:none}
+#level s i{display:block;height:100%;width:0;background:#f7bc39;transition:width .2s}
+#goal{top:calc(92px + env(safe-area-inset-top,0px));left:10px;right:10px;max-width:none;padding:6px 10px;font-size:14px;line-height:1.35;word-break:keep-all;border-color:#349ca8;background:#edffff;box-shadow:0 3px 0 #227c8b50;text-align:center;white-space:normal}
+#goal::before{content:attr(data-label);display:inline-block;margin-right:6px;padding:2px 5px;border-radius:5px;background:#78dbd4;color:#225961;font-size:10px;vertical-align:1px;white-space:nowrap}
+#goal[data-kind=build]{border-color:#9b6b2d;background:#fff6d6}#goal[data-kind=build]::before{background:#ffd86c;color:#765020}
+#goal[data-kind=danger]{border-color:#9a3d36;background:#ffe8de}#goal[data-kind=danger]::before{background:#fa8a75;color:#763029}
+#bag{bottom:calc(10px + env(safe-area-inset-bottom,0px));left:calc(10px + env(safe-area-inset-left,0px));width:90px;height:48px;display:flex;align-items:center;justify-content:center;padding:4px;font-size:15px;font-variant-numeric:tabular-nums;pointer-events:auto;cursor:pointer;background:#fff3cc}
+#bag em{display:none}#bag.full{background:#ffcf8d;border-color:#bc6b27}
+#menuBtn{position:fixed;bottom:calc(10px + env(safe-area-inset-bottom,0px));right:calc(10px + env(safe-area-inset-right,0px));width:46px;height:48px;font-size:24px;font-family:var(--display);cursor:pointer;background:#fff1ce}
+#strategyBtn{position:fixed;z-index:4;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:calc(110px + env(safe-area-inset-left,0px));right:calc(66px + env(safe-area-inset-right,0px));height:48px;min-width:44px;min-height:44px;padding:3px 6px;font:16px/1.15 var(--display);text-align:center;cursor:pointer;background:#a8eaf0;border-color:#377b91;box-shadow:0 3px 0 #245c7050,inset 0 2px 0 #e9fdff}
+#strategyBtn span{display:block;font-size:11px;line-height:1.1;margin-top:2px;color:#356175;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#defense{bottom:calc(68px + env(safe-area-inset-bottom,0px));left:10px;right:10px;height:58px;padding:6px 10px;font-size:13px;border-color:#688647;background:#f5ffe5;font-variant-numeric:tabular-nums}
+#defTop{display:block;line-height:1.3;width:64%;white-space:nowrap}
+#hpBar{position:absolute;right:10px;top:10px;display:block;width:30%;height:9px;border:1px solid #73964e;border-radius:5px;background:#d4e5c2;overflow:hidden}
+#hpBar i{display:block;height:100%;width:100%;background:#70ce46}#hpBar.low i{background:#ee7354}
+#defInfo{display:block;margin-top:4px;font-size:12px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#52663c}
+#defense.raid{background:#ffe7d8;border-color:#a94f3c}#defense.raid #defInfo{color:#aa4536}
+#toast{left:10px;right:10px;bottom:calc(136px + env(safe-area-inset-bottom,0px));border:2px solid #7b633a;border-radius:12px;padding:7px 10px;background:#fff2ccec;color:#654f2e;font-size:13px;line-height:1.4;opacity:0;transition:opacity .2s;word-break:keep-all;text-align:center;box-shadow:0 3px 0 #644e2a30}
+#toast.show{opacity:1}
+.panel{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:16px;background:#1c65836b;touch-action:pan-y;overscroll-behavior:contain;overflow:auto}
+.panel>div{max-width:380px;width:100%;max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain;touch-action:pan-y;padding:20px;background:#fff8e8;color:#354650;border:3px solid #536271;border-radius:22px;box-shadow:0 6px 0 #2d465b55}
+.panel h2{font:26px/1.15 var(--display);margin:0 0 10px;color:#6e512d;text-wrap:balance}
+.panel p,.panel li{font-size:14px;line-height:1.6;margin:0 0 7px}
+.panel ul{padding-left:18px;margin:0 0 14px}
+.panel .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.panel button{flex:1;min-width:44px;min-height:46px;padding:10px 12px;border:2px solid #428231;border-radius:12px;background:#81d64a;color:#244c27;font:18px/1.25 var(--display);cursor:pointer;box-shadow:0 3px 0 #3f7b34}
+.panel button.ghost{border-color:#978057;background:#efdfbd;color:#6b5738;box-shadow:0 3px 0 #ae9769}
+.panel button.danger{background:#fa8c70;border-color:#a74f3b;color:#762f26;box-shadow:0 3px 0 #a74f3b}
+.panel button:disabled{opacity:.5;box-shadow:none;cursor:default}
+#strategyPanel .choices{display:grid;gap:10px;margin:14px 0}#strategyPanel button{text-align:left}#strategyPanel .choices button{background:#e2f8c4;border-color:#73a74f;color:#3f602e;box-shadow:0 3px 0 #74994d}
+#strategyPanel .choices button:nth-child(2){background:#d9f2ff;border-color:#5e9eaf;color:#315b70;box-shadow:0 3px 0 #5e8c9f}
+#strategyPanel .choices button:nth-child(3){background:#ffedb5;border-color:#bd9555;color:#765c34;box-shadow:0 3px 0 #a98c53}
+#strategyBtn:focus-visible,#menuBtn:focus-visible,#bag:focus-visible,.panel button:focus-visible{outline:3px solid #fff;outline-offset:3px;box-shadow:0 0 0 6px #2c8dac}
+@keyframes reward{50%{transform:scale(1.03)}}
+@media(min-width:700px){#goal{left:50%;right:auto;transform:translateX(-50%);top:14px;width:400px}#quest{width:240px}#strategyBtn{right:auto;width:200px}#defense{left:auto;width:300px;right:12px}}
+@media(max-height:500px) and (orientation:landscape){#quest{width:22%;max-width:170px;height:74px;padding:5px 8px}#qText{font-size:12px}#goal{top:12px;left:25%;right:25%;width:auto;transform:none;font-size:12px;padding:5px 7px}#goal::before{font-size:9px}#strategyBtn{right:auto;width:180px}#defense{left:auto;right:10px;width:220px;font-size:12px}#defInfo{font-size:11px}#toast{right:auto;max-width:250px;bottom:68px}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
+</head>
+<body>
 
 <canvas id="game" aria-label="표류 뗏목 마을 게임 화면"></canvas>
 <div class="hud" id="dayCard"><b>해상 생존 <em id="day">1</em>일차</b><span id="km">항해 거리 0 km</span></div>
 <div class="hud" id="money"><i>$</i><span id="moneyVal">0</span></div>
 <div class="hud" id="level"><b id="lv">Lv.1</b><s><i id="xpBar"></i></s></div>
-<div class="hud" id="goal">낚시터에서 생선을 챙기세요</div>
+<div class="hud" id="goal" role="status" aria-live="polite">낚시터에서 생선을 챙기세요</div>
 <div class="hud" id="bag" role="button" tabindex="0" aria-label="가방 비우기">🎒 0/10</div>
 <div class="hud" id="quest"><div id="qTitle">📜 퀘스트</div><div id="qText"></div><span id="qBar"><i id="qFill"></i></span></div>
 <div class="hud" id="defense" hidden><span id="defTop">🛡️ 마을 체력</span><span id="hpBar"><i id="hpFill"></i></span><span id="defInfo"></span></div>
@@ -2100,7 +2039,6 @@ const strategySale = () => G.tactic === 'trade' ? 1.4 : G.tactic === 'guard' ? 0
 const strategyDamage = () => G.tactic === 'guard' ? 0.7 : G.tactic === 'trade' ? 1.25 : 1;
 const strategyStyle = document.createElement('style');
 strategyStyle.textContent = `
-#strategyBtn span{display:block;font-size:12px;opacity:.85;margin-top:3px}
 #strategyPanel{z-index:30;overflow:auto} #strategyPanel>div{max-height:85dvh;overflow:auto;box-sizing:border-box}
 #strategyPanel .choices{display:grid;gap:10px;margin:14px 0} #strategyPanel button{text-align:left;line-height:1.5} #strategyPanel button small{display:block;font-family:inherit;font-size:13px} #strategyPanel button:disabled{opacity:.5;cursor:default}
 `;
@@ -2137,7 +2075,7 @@ strategyBtn.onclick = () => {
     };
     box.appendChild(b);
   }
-  strategyPanel.querySelector('.close').focus();
+  strategyPanel.querySelector('.close').focus({ preventScroll: true });
 };
 strategyPanel.addEventListener('keydown', e => {
   if (e.key === 'Escape') { e.preventDefault(); closeStrategy(); }
@@ -2151,7 +2089,9 @@ strategyPanel.addEventListener('keydown', e => {
 function strategyHud() {
   strategyBtn.hidden = !unlocked.has('expand1') || raidOn || paused;
   const plan = raidPlan(), tactic = TACTICS.find(t => t.id === G.tactic);
-  strategyBtn.innerHTML = `🧭 제${G.wave + 1}파 · ${plan.name} · ${Math.max(0, Math.ceil(G.raidT))}초<span>${tactic ? tactic.name : '준비 방침 선택'} · 방어 ${G.defended || 0}/5${G.expeditionWon ? ' 🏆 목표 달성' : ''}</span>`;
+  const seconds = Math.max(0, Math.ceil(G.raidT));
+  strategyBtn.innerHTML = `🧭 습격 ${seconds}초<span>${tactic ? tactic.name : '준비 선택 ›'}</span>`;
+  strategyBtn.setAttribute('aria-label', `제${G.wave + 1}파 ${plan.name}, ${seconds}초 후 습격. ${tactic ? tactic.name : '준비 선택'}. 방어 ${G.defended || 0}/5${G.expeditionWon ? ', 항로 확보 완료' : ''}`);
 }
 function finishStrategyRaid(wasLooted) {
   if (!wasLooted) {
@@ -2169,7 +2109,7 @@ let lastHud = '';
 function hud(obj) {
   strategyHud();
   $('goal').dataset.kind = raidOn ? 'danger' : /짓기|업그레이드/.test(obj.text) ? 'build' : 'interact';
-  $('goal').dataset.label = raidOn ? '위험 · 마을 방어' : /짓기|업그레이드/.test(obj.text) ? '건설 · 성장' : '작업 · 상호작용';
+  $('goal').dataset.label = raidOn ? '마을 방어' : /짓기|업그레이드/.test(obj.text) ? '건설' : '작업';
   const day = 1 + Math.floor(G.t / 40), km = G.t * 1.7 * (unlocked.has('solar') ? 1.4 : 1);
   const key = [Math.floor(G.money), day, Math.floor(km), G.stack.length, cap, obj.text, G.level, G.xp,
     unlocked.has('tent1'), Math.ceil(G.hp), G.soldiers, raidOn, Math.ceil(G.raidT), enemies.length, wages(), G.strike, phaseInfo(), G.qi, questInfo().cur, Math.round(incomePerMin() / 5)].join('|');
@@ -2317,3 +2257,5 @@ function start(data) {
 window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
 })();
 </script>
+</body>
+</html>

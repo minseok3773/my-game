@@ -4,7 +4,14 @@ let composer = null;
 if (THREE.EffectComposer && THREE.RenderPass && THREE.UnrealBloomPass) {
   composer = new THREE.EffectComposer(renderer);
   composer.addPass(new THREE.RenderPass(scene, camera));
-  composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(256, 256), 0.65, 0.45, 0.93));
+  composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(256, 256), 0.18, 0.3, 1.15));
+  // 합성 경로도 일반 렌더와 동일한 색 공간으로 출력합니다.
+  const gammaPass = new THREE.ShaderPass({
+    uniforms: { tDiffuse: { value: null } },
+    vertexShader: 'varying vec2 vUv; void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+    fragmentShader: 'uniform sampler2D tDiffuse; varying vec2 vUv; void main(){vec4 c=texture2D(tDiffuse,vUv);gl_FragColor=vec4(mix(c.rgb*12.92,1.055*pow(max(c.rgb,vec3(0.0)),vec3(1.0/2.4))-0.055,step(vec3(0.0031308),c.rgb)),c.a);}'
+  });
+  composer.addPass(gammaPass);
 }
 function renderScene() { if (composer) composer.render(); else renderer.render(scene, camera); }
 function resizeFx() { if (composer) { composer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); composer.setSize(W, H); } }
@@ -18,10 +25,9 @@ function canvasTex(w, h, draw, repeat) {
 const glowTex = canvasTex(64, 64, (g) => { const r = g.createRadialGradient(32, 32, 0, 32, 32, 32); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.35, 'rgba(255,255,255,.55)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 64, 64); });
 const smokeTex = canvasTex(64, 64, (g) => { for (let i = 0; i < 6; i++) { const x = 20 + Math.random() * 24, y = 20 + Math.random() * 24, r = g.createRadialGradient(x, y, 0, x, y, 22); r.addColorStop(0, 'rgba(255,255,255,.5)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 64, 64); } });
 const woodTex = canvasTex(256, 32, (g, w, h) => {
-  g.fillStyle = '#efe2cc'; g.fillRect(0, 0, w, h);
-  for (let i = 0; i < 14; i++) { g.strokeStyle = `rgba(120,80,40,${0.12 + Math.random() * 0.18})`; g.lineWidth = 1 + Math.random() * 1.5; const y = Math.random() * h; g.beginPath(); g.moveTo(0, y); g.bezierCurveTo(w * 0.3, y + rnd(-4, 4), w * 0.6, y + rnd(-4, 4), w, y + rnd(-3, 3)); g.stroke(); }
-  for (let i = 0; i < 2; i++) { g.fillStyle = 'rgba(100,60,25,.35)'; g.beginPath(); g.ellipse(Math.random() * w, Math.random() * h, 5, 3, 0, 0, 7); g.fill(); }
-  g.fillStyle = 'rgba(60,40,25,.6)'; g.fillRect(6, h / 2 - 2, 4, 4); g.fillRect(w - 10, h / 2 - 2, 4, 4);
+  g.fillStyle = '#fff4d5'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 4; i++) { g.strokeStyle = 'rgba(139,93,43,.1)'; g.lineWidth = 1.2; const y = 5 + i * 7; g.beginPath(); g.moveTo(8, y); g.bezierCurveTo(w * 0.3, y + 2, w * 0.6, y - 2, w - 8, y); g.stroke(); }
+  g.fillStyle = 'rgba(102,73,41,.35)'; g.fillRect(6, h / 2 - 1, 3, 3); g.fillRect(w - 9, h / 2 - 1, 3, 3);
 });
 const stoneTex = canvasTex(128, 128, (g, w, h) => {
   g.fillStyle = '#8f8c86'; g.fillRect(0, 0, w, h);
