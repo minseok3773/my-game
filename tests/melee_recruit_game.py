@@ -89,17 +89,17 @@ def main():
         # The automatic trigger, rather than an overlay button, pays once.
         page.evaluate('crewTest.tick(.1)')
         assert page.evaluate('crewTest.data().money===470 && crewTest.data().count===1 && !crewTest.recruit()')
-        page.evaluate('crewTest.tick(3.7);crewTest.save()')
+        page.evaluate('crewTest.tick(.5);crewTest.save()')
         for _ in range(2):
             page.reload(wait_until='networkidle');page.wait_for_function('!!window.crewTest')
             result=page.evaluate('crewTest.data()')
             assert result['count']==1 and result['hps']==[7] and result['money']==470,result
-            assert abs(result['job']['remaining']-1.3)<1e-6,result
-        page.evaluate('crewTest.tick(1.4)')
+            assert abs(result['job']['remaining']-.4)<1e-6,result
+        page.evaluate('crewTest.tick(.4)')
         result=page.evaluate('crewTest.data()')
         assert result['count']==2 and result['money']==470 and not result.get('job'),result
         assert not page.evaluate('crewTest.recruit()')
-        print('Standing recruitment pad: insufficient funds, one charge/job,5s completion, preserved wounds/paid timer across2 reloads PASS',flush=True)
+        print('Standing recruitment pad: insufficient funds, one charge/job,1s completion, preserved wounds/paid timer across2 reloads PASS',flush=True)
         page.evaluate('crewTest.kill();crewTest.upgrade()')
         result=page.evaluate('crewTest.data()')
         assert result['count']==3 and result['capacity']==4,result

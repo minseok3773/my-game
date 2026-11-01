@@ -290,7 +290,7 @@ function syncStations() {
   for (const id in objs) if (!unlocked.has(id)) { world.remove(objs[id].g); if (docks[id]) world.remove(docks[id]); if (zoneRings[id]) world.remove(zoneRings[id]); delete objs[id]; delete docks[id]; delete zoneRings[id]; }
   for (const id of unlocked) {
     const d = DEFS[id];
-    if (!d || ['bag', 'expand'].includes(d.type)) continue;
+    if (!d || ['bag', 'expand', 'training'].includes(d.type)) continue;
     const o = objs[id] || buildStation(id), s = G.st[id];
     o.g.position.y = dropOff(id) / 40;
     if (o.pile) syncPile(o.pile, d.item, s.pile);
@@ -337,18 +337,23 @@ function syncPads(vp) {
     o.fill.material.dispose(); o.border.material.dispose(); o.ripple.material.dispose(); padObjs.delete(id);
   }
   for (const p of vp) {
-    const o = padObjs.get(p.id) || buildPad(p), left = p.recruit ? 30 : p.cost - (G.paid[p.id] || 0), afford = p.recruit ? p.canRecruit : G.money >= left, ratio = p.recruit ? (p.pending ? 1 - p.remaining / 5 : 0) : (G.paid[p.id] || 0) / p.cost;
+    const o = padObjs.get(p.id) || buildPad(p), left = p.recruit ? 30 : p.cost - (G.paid[p.id] || 0), afford = p.recruit ? p.canRecruit : p.train ? !p.maxed && G.money >= left : G.money >= left, ratio = p.recruit ? p.progress : p.train ? p.level / TRAINING_MAX_LEVEL : (G.paid[p.id] || 0) / p.cost;
     const far = dist(player.x, player.y, p.x, p.y) > 6.5 && !afford;
     o.g.visible = !far || dist(player.x, player.y, p.x, p.y) < 9;
-    o.border.material.color.setHex(p.recruit ? 0x24b39e : afford ? 0xffd84d : 0xffffff); o.border.material.opacity = far ? 0.35 : 0.9;
+    o.border.material.color.setHex(p.recruit ? 0x24b39e : p.train ? (p.kind === 'hero' ? 0xe8ab29 : 0x4294df) : afford ? 0xffd84d : 0xffffff); o.border.material.opacity = far ? 0.35 : 0.9;
     // 패드마다 바뀌는 재질은 공유하지 않아 다른 칸의 상태를 덮어쓰지 않습니다.
     if (!o.base.userData.ownMaterial) { o.base.material = o.base.material.clone(); o.base.userData.ownMaterial = true; }
-    o.base.material.color.setHex(p.recruit ? 0xd2fff0 : afford ? 0xffec9b : 0xfffbeb);
-    const labelSig = `${p.icon}|${Math.ceil(left)}|${afford}|${p.live}|${p.capacity}|${p.pending}|${Math.ceil(p.remaining || 0)}`;
+    o.base.material.color.setHex(p.recruit ? 0xd2fff0 : p.train ? (p.kind === 'hero' ? 0xffecc0 : 0xd9f0ff) : afford ? 0xffec9b : 0xfffbeb);
+    const labelSig = `${p.icon}|${Math.ceil(left)}|${afford}|${p.live}|${p.capacity}|${p.pending}|${Math.ceil(p.remaining || 0)}|${p.level}|${p.maxed}`;
     if (o.labelSig !== labelSig && (o.labelSig === '' || G.t - o.labelTime > 0.15 || o.labelTime > G.t)) {
       const c = o.labelCanvas.getContext('2d'); c.clearRect(0, 0, 128, 128);
       c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#415a43';
-      if (p.recruit) {
+      if (p.train) {
+        c.font = 'bold 26px sans-serif'; c.fillText(p.kind === 'hero' ? '영웅 강화' : '일꾼 강화',64,27,120);
+        c.font = 'bold 24px sans-serif'; c.fillText(p.maxed ? `Lv.${p.level} MAX` : `Lv.${p.level} → ${p.level+1}`,64,66,120);
+        c.font = 'bold 32px sans-serif'; c.fillStyle = p.kind === 'hero' ? '#9b6426' : '#2673a4';
+        c.fillText(p.maxed ? '완료' : '$'+fmt(p.cost),64,105,120);
+      } else if (p.recruit) {
         c.font = 'bold 26px sans-serif'; c.fillText(`일꾼 ${p.live}/${p.capacity}`,64,27,120);
         c.font = 'bold 36px sans-serif'; c.fillStyle = '#178c74';
         c.fillText(p.pending ? `${Math.ceil(p.remaining)}초` : p.live >= p.capacity ? '완료' : '$30',64,77,120);
@@ -607,7 +612,7 @@ function sync3D(dt) {
   world.position.y = raftY;
   playerMarker.position.set(player.x, 0.085, player.y);
   shallow.position.set(raftC.x, -0.2, raftC.y); shallow.scale.setScalar(raftC.r * 2.8);
-  syncRaft(); syncStations(); syncPads([...visiblePads(), ...recruitmentPads()]); syncSharks(dt); bossHud();
+  syncRaft(); syncStations(); syncTrainingStations(); syncPads([...visiblePads(), ...recruitmentPads(), ...trainingPads()]); syncSharks(dt); bossHud();
   // 캐릭터
   for (const m of models.values()) m.seen = false;
   const pm = charModel(player, () => mkChar('player', player)); pm.rifle.visible = false; animChar(pm, player, dt, { fighting: !!player.fighting, dead: !!player.dead }); syncStack(pm.carry, G.stack);

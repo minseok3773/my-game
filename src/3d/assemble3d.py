@@ -164,7 +164,7 @@ for c in chunks:
     if c.startswith("function dockRect("):
         out.append(c.replace('a1 = 10;', 'a1 = 6.8;').replace('0 : 0.42', '0 : 0.8')); continue
     if c.startswith("/* ---------- HUD ---------- */"):
-        out.append(B('w3d_world.js')); out.append(B('w3d_chars.js')); out.append(B('w3d_game.js')); out.append(B('w3d_melee.js')); out.append(B('w3d_hero.js')); out.append(B('w3d_crew.js')); out.append(B('w3d_fx.js')); out.append(overlay); out.append(c); continue
+        out.append(B('w3d_world.js')); out.append(B('w3d_chars.js')); out.append(B('w3d_game.js')); out.append(B('w3d_melee.js')); out.append(B('w3d_hero.js')); out.append(B('w3d_crew.js')); out.append(B('w3d_training.js')); out.append(B('w3d_fx.js')); out.append(overlay); out.append(c); continue
     if c.startswith("/* ---------- 루프 ---------- */") or c.startswith("let last = performance.now()"):
         continue
     if keep(c): out.append(c)
@@ -174,11 +174,11 @@ js = js.replace("const KEY = 'raft-village-v1';", "const KEY = 'raft-village-3d-
 js = re.sub(r"const phaseInfo = \(\) => \{[^\n]*\n", "const phaseInfo = () => '☀️ 낮';\n", js)
 js = re.sub(r"function nightAmt\(\) \{[^\n]*\n", "function nightAmt() { return 0; }\n", js)
 js = re.sub(r"function duskAmt\(\) \{[^\n]*\n", "function duskAmt() { return 0; }\n", js)
-# 3D 전용: 30초마다 습격, 습격할 때마다 해적 레벨업(체력·공격력 10%씩 복리 상승)
+# 3D 전용: 전투 종료 후 60초마다 습격, 습격할 때마다 해적 레벨업(체력·공격력 10%씩 복리 상승)
 R3 = [
-    ("G.raidT = G.raidT ?? 60;", "G.raidT = G.raidT ?? 30;"),
-    ("G.raidT = rnd(55, 80);", "G.raidT = 30;"),
-    ("if (id === 'expand1') G.raidT = 90;", "if (id === 'expand1') G.raidT = Math.min(G.raidT, 30);"),
+    ("G.raidT = G.raidT ?? 60;", "G.raidT = G.raidT ?? RAID_INTERVAL;"),
+    ("G.raidT = rnd(55, 80);", "G.raidT = 60;"),
+    ("if (id === 'expand1') G.raidT = 90;", "if (id === 'expand1') G.raidT = RAID_INTERVAL;"),
     ("function spawnBoarder(ship) {", "const pirMul = () => Math.pow(1.1, Math.max(0, G.wave - 1)); // 해적 레벨 배율\nfunction spawnBoarder(ship) {"),
     ("hp = (ship.big ? 1.6 : 1) * (6 + G.wave * 2);", "hp = Math.round((ship.big ? 1.6 : 1) * (6 + G.wave * 2) * pirMul());"),
     ("moveTo(e, tgt.x, tgt.y, 1.7, dt, null, true)", "moveTo(e, tgt.x, tgt.y, 1.7 * Math.min(1.5, 1 + 0.03 * (G.wave - 1)), dt, null, true)"),
@@ -222,7 +222,7 @@ R4 = [
     ("dust(p.x, p.y, 8); floatText(p.x, p.y, '해적 상륙!', '#ffb0a0');", "setupBoarder(enemies[enemies.length - 1]); dust(p.x, p.y, 8); floatText(p.x, p.y, '해적 상륙!', '#ffb0a0');"),
     ("if (e.kind === 'boarder') { updateBoarder(e, dt); continue; }", "if (e.kind === 'boarder') { updateBoarder(e, dt); continue; }\n    if (e.boss && e.state === 'attack') bossTick(e, dt);"),
     ("  raidIntro = { t: 0, n };", "  if (G.wave % 5 === 0) spawnBoss();\n  raidIntro = { t: 0, n };"),
-    ("G.raidT = 30; if (!looted) toast('해적을 격퇴했습니다'); finishStrategyRaid(looted); looted = false;", "G.raidT = 30; if (!looted) { toast('해적을 격퇴했습니다'); offerCards(); } finishStrategyRaid(looted); looted = false;"),
+    ("G.raidT = 60; if (!looted) toast('해적을 격퇴했습니다'); finishStrategyRaid(looted); looted = false;", "G.raidT = 60; if (!looted) { toast('해적을 격퇴했습니다'); offerCards(); } finishStrategyRaid(looted); looted = false;"),
     ("e.hp / e.max, '#ff4d3d', 26, G.wave);", "e.hp / e.max, ({ bomber: '#ff9a2e', thief: '#c9a2ff', sniper: '#5ec8ff' })[e.type] || '#ff4d3d', 26, G.wave);"),
     ("else hpBar(e.x, e.y, e.big ? 120 : 90,", "else if (!e.boss) hpBar(e.x, e.y, e.big ? 120 : 90,"),
 ]
@@ -280,7 +280,7 @@ js = js.replace("  const go = () => requestAnimationFrame(frame);", "  if (G.car
 js = js.replace("strategySale() * d.price", "strategySale() * (1 + 0.35 * ck('smuggler')) * Math.pow(0.85, ck('bunker')) * d.price")
 js = js.replace("s.dmg * strategyDamage()", "s.dmg * strategyDamage() * (1 + 0.2 * ck('glass')) * Math.pow(0.8, ck('bunker'))")
 js = js.replace("(1 + 0.3 * ck('towerDmg'))", "(1 + 0.3 * ck('towerDmg') + 0.6 * ck('glass'))")
-js = js.replace("G.raidT = 30;", "G.raidT = Math.max(12, 30 - 6 * ck('smuggler')); ")
+
 old = "const a = S(d.x, d.y), c = S(tgt.x, tgt.y); st.ang = Math.atan2(c.y - a.y, c.x - a.x);"
 assert js.count(old) == 1; js = js.replace(old, "st.yaw = Math.atan2(tgt.x - d.x, tgt.y - d.y);")
 # 안내창 링크·제목·캔버스

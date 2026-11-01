@@ -1,4 +1,13 @@
 /* ---------- 3D 전용 재미 요소: 강화 카드 · 해적 종류 · 보스 ---------- */
+const RAID_INTERVAL = 60;
+function restoreRaidSchedule() {
+  if (G.raidIntervalVersion !== 1) {
+    if (!G.combat?.raidOn) G.raidT = RAID_INTERVAL;
+    G.raidIntervalVersion = 1;
+  }
+  if (!Number.isFinite(G.raidT)) G.raidT = RAID_INTERVAL;
+  G.raidT = Math.max(0, G.raidT);
+}
 const PIRATE_BALANCE = Object.freeze({ health: 4, damage: 4 / 3, shipSpeed: 2, crewSpeed: 0.5 });
 const PIRATE_BALANCE_VERSION = 2;
 // 진행 중인 구버전 습격도 남은 체력 비율을 유지해 한 번만 새 난이도로 전환.
@@ -14,7 +23,7 @@ function restorePirateBalance(combat) {
 }
 // 습격을 막을 때마다 카드 3장 중 1장을 골라 판마다 다르게 성장
 const CARDS = [
-  { id: 'smuggler', icon: '🏴‍☠️', name: '밀수 항로', desc: '판매가 +35% · 이후 습격 준비 시간 -6초 (최소 12초)', max: 2 },
+  { id: 'smuggler', icon: '🏴‍☠️', name: '밀수 항로', desc: '판매가 +35% · 습격 간격 60초 유지', max: 2 },
   { id: 'glass', icon: '🔥', name: '과충전 포탄', desc: '포탑 피해 +60% · 아군이 받는 피해 +20%', max: 2 },
   { id: 'bunker', icon: '⚓', name: '요새 경제', desc: '아군이 받는 피해 -20% · 판매가 -15%', max: 2 },
   { id: 'towerDmg', icon: '🎯', name: '포탑 화력', desc: '포탑 피해 +30%', max: 5 },
@@ -32,8 +41,9 @@ const CARDS = [
 ];
 function ck(id) { return (G && G.cards && G.cards[id]) || 0; }
 const lootMul = () => 1 + 0.5 * ck('loot');
-const crewHpMax = () => Math.round(15 * (1 + 0.5 * ck('crewHp'))) + 10 * ck('villageHp');
+const crewHpMax = () => Math.round(15 * (1 + 0.5 * ck('crewHp'))) + 10 * ck('villageHp') + 5 * trainingLevel('crew');
 const crewMul = () => 1 + 0.4 * ck('crewPower');
+const crewAttack = () => 3 * (1 + 0.1 * (lv() - 1)) * crewMul() + trainingLevel('crew');
 
 const cardStyle = document.createElement('style');
 cardStyle.textContent = `

@@ -2,7 +2,16 @@
 const tentCapacity = id => DEFS[id]?.type === 'tent' ? DEFS[id].workers + (slv(id) - 1) * 2 : 0;
 const crewCount = id => workers.filter(w => w.tent === id && w.hp > 0).length;
 const recruitmentCost = () => 30;
+const RECRUIT_SECONDS = 1;
 const crewTents = () => [...unlocked].filter(id => DEFS[id]?.type === 'tent');
+function restoreRecruitmentJobs() {
+  G.recruitment = G.recruitment || {};
+  // 이미 지불한 구버전 5초 모집은 비용을 유지하고 남은 시간을 최대 1초로 줄입니다.
+  for (const job of Object.values(G.recruitment)) {
+    job.remaining = Math.min(RECRUIT_SECONDS, Math.max(0, Number.isFinite(job.remaining) ? job.remaining : RECRUIT_SECONDS));
+    job.duration = RECRUIT_SECONDS;
+  }
+}
 function snapshotCrewRoster() {
   const record = w => ({ x: w.x, y: w.y, hp: w.hp, ph: w.ph, bob: 0,
     ...(w.tent ? { tent: w.tent, carry: [...w.carry], look: w.look } : {}) });
@@ -59,7 +68,8 @@ function recruitmentPads() {
     if (!point) return null;
     const live = crewCount(tent), capacity = tentCapacity(tent), job = G.recruitment?.[tent];
     return { id:'recruit:'+tent, tent, recruit:true, x:point.x, y:point.y, cost:30,
-      icon:'⛺', live, capacity, remaining:job ? Math.max(0,job.remaining) : 0,
+      icon:'⛺', live, capacity, remaining:job ? Math.max(0,job.remaining) : 0, duration:RECRUIT_SECONDS,
+      progress:job ? Math.max(0, Math.min(1, 1-job.remaining/RECRUIT_SECONDS)) : 0,
       pending:!!job, canRecruit:live<capacity && !job && G.money>=30 };
   }).filter(Boolean);
 }
@@ -67,24 +77,29 @@ function recruitWorker(id) {
   const pad = recruitmentPads().find(p => p.tent === id);
   const heroReady = typeof isHeroAvailable === 'function' ? isHeroAvailable() : true;
   if (!heroReady || !pad || dist(player.x,player.y,pad.x,pad.y)>0.6 || !pad.canRecruit) return false;
-  G.money -= 30; G.recruitment[id] = { remaining:5, paid:30 };
-  save(); toast(`⛺ ${DEFS[id].name} · $30 결제, 일꾼 모집 중 (5초)`); return true;
+  G.money -= 30; G.recruitment[id] = { remaining:RECRUIT_SECONDS, duration:RECRUIT_SECONDS, paid:30 };
+  save(); toast(`⛺ ${DEFS[id].name} · $30 결제, 일꾼 모집 중 (1초)`); return true;
 }
 function tickRecruitment(dt) {
-  // 이미 결제한 모집은 칸을 떠나거나 주인공이 쓰러져도 마저 진행합니다.
-  for (const [id,job] of Object.entries(G.recruitment || {})) {
-    if (!unlocked.has(id) || !tentCapacity(id)) continue;
-    job.remaining = Math.max(0,job.remaining-dt);
-    if (job.remaining>0) continue;
-    delete G.recruitment[id];
-    if (crewCount(id)<tentCapacity(id)) { spawnWorker(id,1); toast(`⛺ ${DEFS[id].name} · 일꾼 1명 합류`); }
-    save();
-  }
+  if (!(dt>0) || paused) return;
   const heroReady = typeof isHeroAvailable === 'function' ? isHeroAvailable() : true;
-  if (!heroReady || paused) return;
-  const pad = recruitmentPads().filter(p => dist(player.x,player.y,p.x,p.y)<=0.6)
-    .sort((a,b) => dist(player.x,player.y,a.x,a.y)-dist(player.x,player.y,b.x,b.y) || a.id.localeCompare(b.id))[0];
-  if (pad?.canRecruit) recruitWorker(pad.tent);
+  const pad = heroReady ? recruitmentPads().filter(p => dist(player.x,player.y,p.x,p.y)<=0.6)
+    .sort((a,b) => dist(player.x,player.y,a.x,a.y)-dist(player.x,player.y,b.x,b.y) || a.id.localeCompare(b.id))[0]
+    : null;
+  // 첫 틱부터 시간을 사용하고, 완료 후 남은 시간을 다음 모집에 넘겨 정확히 초당 1명을 충원합니다.
+  // 이미 결제한 모집은 칸을 떠나거나 주인공이 쓰러져도 마저 진행합니다.
+  for (const id of crewTents()) {
+    let remainingDt = dt;
+    while (remainingDt>1e-8) {
+      if (!G.recruitment[id] && (pad?.tent!==id || !recruitWorker(id))) break;
+      const job = G.recruitment[id];
+      if (job.remaining>remainingDt+1e-8) { job.remaining-=remainingDt; break; }
+      remainingDt = Math.max(0,remainingDt-Math.max(0,job.remaining));
+      delete G.recruitment[id];
+      if (crewCount(id)<tentCapacity(id)) { spawnWorker(id,1); toast(`⛺ ${DEFS[id].name} · 일꾼 1명 합류`); }
+      save();
+    }
+  }
 }
 function crewHealthStatus() {
   const hp = workers.reduce((n, w) => n + Math.max(0, w.hp), 0) + soldiers.reduce((n, s) => n + Math.max(0, s.hp), 0);
@@ -114,6 +129,6 @@ function recruitmentHud() {
   if (pad) recruitHint.textContent = pad.pending ? `⛺ 모집 중 ${Math.ceil(pad.remaining)}초 · ${pad.live}/${pad.capacity}명`
     : pad.live>=pad.capacity ? `⛺ ${DEFS[pad.tent].name} · 정원 ${pad.capacity}명 충원 완료`
     : G.money<30 ? `⛺ 일꾼 충원 $30 · 자금이 부족합니다`
-    : `⛺ 네모 칸에 서 있으면 $30씩 자동 충원 · ${pad.live}/${pad.capacity}명`;
+    : `⛺ 네모 칸에 서 있으면 $30씩 · 1초에 1명 충원 · ${pad.live}/${pad.capacity}명`;
   document.body.classList.toggle('has-recruit',!recruitHint.hidden);
 }

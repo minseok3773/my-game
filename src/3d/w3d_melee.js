@@ -95,7 +95,7 @@ function updateDefenders(dt, bl, mult) {
     unit.cd = (unit.cd ?? 0.3) - dt;
     if (unit.cd <= 0) {
       unit.cd = worker ? 0.85 : 0.7 / (1 + 0.15 * (bl - 1));
-      swordStrike(unit, foe, (worker ? 3 * (1 + 0.1 * (lv() - 1)) : 4.5 * mult) * crewMul());
+      swordStrike(unit, foe, worker ? crewAttack() : 4.5 * mult * crewMul());
     }
   }
   if (raidOn && G.raidHadCrew && !workers.length && !soldiers.length && !isHeroAvailable()) {

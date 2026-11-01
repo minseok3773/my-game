@@ -262,28 +262,28 @@ def main():
             assert state["money"] == 470 and state["cost"] == 30 and state["job"], state
         new.evaluate("progressTest.reset(1,true);progressTest.tickRecruit(1)")
         assert new.evaluate("progressTest.recruitState().money") == 500
-        new.evaluate("progressTest.stand();progressTest.tickRecruit(10.2)")
+        new.evaluate("progressTest.stand();progressTest.tickRecruit(2)")
         state = new.evaluate("progressTest.recruitState()")
         assert state["count"] == 2 and state["money"] == 440 and not state["job"], state
-        new.evaluate("progressTest.tickRecruit(6)")
+        new.evaluate("progressTest.tickRecruit(1)")
         assert new.evaluate("progressTest.recruitState().money") == 440
         for method in ("fullPad", "brokePad"):
             state = new.evaluate(f"progressTest.{method}()")
             assert not state["job"], state
             assert state["money"] == (500 if method == "fullPad" else 29), state
-        new.evaluate("progressTest.reset(1,true);progressTest.stand();progressTest.tickRecruit(.1);progressTest.leave();progressTest.tickRecruit(5.1)")
+        new.evaluate("progressTest.reset(1,true);progressTest.stand();progressTest.tickRecruit(.1);progressTest.leave();progressTest.tickRecruit(1.1)")
         state = new.evaluate("progressTest.recruitState()")
         assert state["count"] == 1 and state["money"] == 470 and not state["job"], state
-        print("Fixed $30 pad auto-fill, repeated vacancies, leave/full/broke guards PASS", flush=True)
+        print("Fixed $30 pad auto-fill at one worker/second, leave/full/broke guards PASS", flush=True)
 
-        new.evaluate("progressTest.reset(1,true);progressTest.stand();progressTest.tickRecruit(2.4);progressTest.save()")
+        new.evaluate("progressTest.reset(1,true);progressTest.stand();progressTest.tickRecruit(.4);progressTest.save()")
         expected = new.evaluate("progressTest.recruitState()")
         for _ in range(2):
             new.reload(wait_until="networkidle")
             new.wait_for_function("!!window.progressTest")
             state = new.evaluate("progressTest.recruitState()")
             assert state == expected, (state, expected)
-        new.evaluate("progressTest.leave();progressTest.tickRecruit(3)")
+        new.evaluate("progressTest.leave();progressTest.tickRecruit(.7)")
         assert new.evaluate("progressTest.recruitState().count === 1 && progressTest.recruitState().money === 470")
         print("Paid pad job and vacant roster survive two reloads without duplicate payment PASS", flush=True)
 

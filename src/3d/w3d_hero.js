@@ -1,8 +1,8 @@
 /* ---------- 선장 백병전·전투 성장 (마을 생산 숙련도와 별도 저장) ---------- */
 const heroLevel = () => G.hero?.level || 1;
 const heroXpNeed = (level = heroLevel()) => 20 + 10 * (level - 1);
-const heroAttack = () => 4 + 2 * (heroLevel() - 1) + 2 * ck('playerGun');
-const heroMaxHp = () => 40 + 6 * (heroLevel() - 1);
+const heroAttack = () => 4 + 2 * (heroLevel() - 1) + 2 * ck('playerGun') + 3 * trainingLevel('hero');
+const heroMaxHp = () => 40 + 6 * (heroLevel() - 1) + 10 * trainingLevel('hero');
 const isHeroAvailable = () => !!player && !player.dead && player.hp > 0 && !(G.hero?.downT > 0);
 function initializeHeroState() {
   const old = G.hero || {};
