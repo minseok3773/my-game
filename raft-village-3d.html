@@ -153,7 +153,6 @@ body{background:var(--deep);color:var(--paper);font-family:var(--body);touch-act
       <li>해적선이 붙으면 해적이 뗏목에 상륙합니다. 해군과 포탑이 맞서 싸웁니다</li>
       <li>마을 체력이 0이 되면 함락됩니다. 자금 절반 약탈, 해군 이탈, 시설 하나 파손</li>
     </ul>
-    <p><a href="https://claude.ai/artifact/U1UfocAvdezpwGo3rWH2ek" target="_blank" rel="noopener">2D 버전으로 하기 ↗</a></p>
     <div class="row"><button id="startBtn">출항하기</button></div>
     <div class="row" id="resetRow" hidden><button class="danger" id="resetBtn">처음부터 다시</button></div>
   </div>
@@ -448,7 +447,7 @@ function load() {
 /* ---------- 좌표 ---------- */
 let lift = 0; // 뗏목이 파도에 들썩이는 높이 (바다 층은 0)
 const _sp = new THREE.Vector3();
-// 세계 좌표(x, y는 바닥 평면, z는 2D 버전의 높이 단위)를 화면 좌표로
+// 세계 좌표(x, y는 바닥 평면, z는 높이)를 화면 좌표로
 function S(x, y, z = 0) { _sp.set(x, raftY + z / 40, y).project(camera); return { x: (_sp.x * 0.5 + 0.5) * W, y: (-_sp.y * 0.5 + 0.5) * H }; }
 
 function poly(pts, fill, stroke, lw = 1) {
@@ -1624,7 +1623,7 @@ function makeAdult3(o) {
   }
   return m;
 }
-// 걷기 사이클과 귀 스프링 (2D 버전과 같은 동작을 3D 관절로)
+// 걷기 사이클과 귀 스프링 (모형을 불러오기 전 도형 캐릭터용)
 function animate3(m, ent, dt, fighting) {
   const vx = ent.vx || 0, vy = ent.vy || 0, spd = Math.hypot(vx, vy), t = G.t;
   if (spd > 0.12) { m.idleT = 0; m.rest = undefined; } else m.idleT += dt;

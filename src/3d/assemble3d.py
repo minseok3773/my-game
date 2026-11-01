@@ -1,8 +1,9 @@
 import re
-# 저장소 맨 위에서 실행: python3 src/3d/assemble3d.py  (2D 파일의 게임 규칙 + 3D 모듈 → raft-village-3d.html)
+# 저장소 맨 위에서 실행: python3 src/3d/assemble3d.py  (base.html의 게임 규칙 + 3D 모듈 → raft-village-3d.html)
+# base.html은 게임 규칙·화면 UI의 바탕 파일이며, 그 안의 평면 그리기 코드는 조립할 때 빠짐
 import os
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(os.path.dirname(HERE))
-src = open(os.path.join(ROOT, 'raft-village-2d.html'), encoding='utf-8').read()
+src = open(os.path.join(HERE, 'base.html'), encoding='utf-8').read()
 B = lambda n: open(os.path.join(HERE, n), encoding='utf-8').read()
 a = src.index("<script>\n(() => {"); b = src.rindex("})();\n</script>")
 head, body, tail = src[:a], src[a + len("<script>\n(() => {\n"):b], src[b:]
@@ -126,7 +127,7 @@ function frame(now) {
 }
 """
 newS = """const _sp = new THREE.Vector3();
-// 세계 좌표(x, y는 바닥 평면, z는 2D 버전의 높이 단위)를 화면 좌표로
+// 세계 좌표(x, y는 바닥 평면, z는 높이)를 화면 좌표로
 function S(x, y, z = 0) { _sp.set(x, raftY + z / 40, y).project(camera); return { x: (_sp.x * 0.5 + 0.5) * W, y: (-_sp.y * 0.5 + 0.5) * H }; }
 """
 newInput = """function inputDir() {
@@ -220,7 +221,6 @@ h = h.replace('<canvas id="game"', '<div id="world"></div>\n<canvas id="game"')
 # 3D 전용: 왼쪽 위 생존 일차 카드 숨김
 h = h.replace('</style>', '#dayCard{display:none!important}\n</style>', 1)
 h = h.replace("#game{position:fixed;inset:0;width:100%;height:100%;display:block}", "#world,#world canvas{position:fixed;inset:0;width:100%;height:100%;display:block}\n#game{position:fixed;inset:0;width:100%;height:100%;display:block}\n.panel a{color:#e2c27a}")
-h = h.replace('<div class="row"><button id="startBtn">출항하기</button></div>', '<p><a href="https://claude.ai/artifact/U1UfocAvdezpwGo3rWH2ek" target="_blank" rel="noopener">2D 버전으로 하기 ↗</a></p>\n    <div class="row"><button id="startBtn">출항하기</button></div>')
 h = h + '<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>\n' + ''.join(f'<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/{f}"></script>\n' for f in ['shaders/CopyShader.js', 'shaders/LuminosityHighPassShader.js', 'postprocessing/EffectComposer.js', 'postprocessing/RenderPass.js', 'postprocessing/ShaderPass.js', 'postprocessing/UnrealBloomPass.js', 'loaders/GLTFLoader.js', 'utils/SkeletonUtils.js'])
 res = h + "<script>\n(() => {\n" + js + tail
 open(os.path.join(ROOT, 'raft-village-3d.html'), 'w', encoding='utf-8').write(res)
