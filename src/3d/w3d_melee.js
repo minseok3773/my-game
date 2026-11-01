@@ -45,11 +45,11 @@ function updateSwordBoarder(e, dt) {
   const d = dist(e.x, e.y, foe.x, foe.y);
   if (d > MELEE_REACH) {
     const speed = e.type === 'bomber' ? 2.3 : e.type === 'thief' ? 2.4 : e.type === 'sniper' ? 1.6 : 1.7;
-    moveTo(e, foe.x, foe.y, speed * Math.min(1.5, 1 + 0.03 * (G.wave - 1)), dt, null, true); return;
+    moveTo(e, foe.x, foe.y, speed * Math.min(1.5, 1 + 0.03 * ((e.level || pirateLevel()) - 1)), dt, null, true); return;
   }
   stopMove(e, dt); e.fighting = true;
   e.atkT = (e.atkT ?? 0.8) - dt;
-  if (e.atkT <= 0) { e.atkT = 1.05; swordStrike(e, foe, (e.type === 'bomber' ? 6 : e.type === 'sniper' ? 3 : 2.5) * pirMul() * PIRATE_BALANCE.damage * (e.attackMul || 1), true); }
+  if (e.atkT <= 0) { e.atkT = 1.05; swordStrike(e, foe, pirateAttack(e), true); }
 }
 function updateDefenders(dt, bl, mult) {
   const foes = enemies.filter(e => e.kind === 'boarder' && alive(e));

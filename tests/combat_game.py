@@ -5,6 +5,7 @@ Run with the repository's local HTTP server on port 8000. Requires Playwright,
 production files and actual player saves are not modified.
 """
 
+import copy
 import math
 import subprocess
 from pathlib import Path
@@ -63,7 +64,7 @@ window.combatTest = {
         }
         this.reset(wave - 1); startRaid();
         enemies.forEach((e, i) => results.push({key: `${wave}/ship/${i}/${!!e.boss}`,
-          hp: e.hp, max: e.max}));
+          hp: e.hp, max: e.max, big:!!e.big, boss:!!e.boss, armor:raidPlan(G.wave).armor}));
       }
     } finally { pickPirateType = originalPick; }
     return results;
@@ -198,21 +199,38 @@ def main():
         old, new = pages
         old_hp = old.evaluate("combatTest.hpCases()")
         new_hp = new.evaluate("combatTest.hpCases()")
-        assert len(old_hp) == len(new_hp)
-        for before, after in zip(old_hp, new_hp):
-            assert before["key"] == after["key"]
-            close(after["hp"], before["hp"], after["key"])
-            close(after["max"], before["max"], after["key"])
+        baseline_hp = {case["key"]: case for case in old_hp}
+        ship_counts = {}
+        for after in new_hp:
+            parts = after["key"].split("/")
+            wave = int(parts[0])
+            level = math.ceil(wave / 3)
             if "onDeck" in after:
+                # Compare the same actual pirate level, including all type/big rounding.
+                before = baseline_hp["/".join([str(level), *parts[1:]])]
+                close(after["hp"], before["hp"], after["key"])
+                close(after["max"], before["max"], after["key"])
                 assert after["onDeck"], after
-        print(f"Existing HP preserved after all wave/type/armor rounding PASS ({len(new_hp)} cases)", flush=True)
+            else:
+                base_hp = math.floor((3 if after["big"] else 1) * (12 + level * 5) * 1.1 ** (level - 1) + .5)
+                expected = 4 * math.floor(base_hp * after["armor"] + .5)
+                close(after["hp"], expected, after["key"])
+                close(after["max"], expected, after["key"])
+                ship_counts[wave] = ship_counts.get(wave, 0) + 1
+        for wave, count in ship_counts.items():
+            level = math.ceil(wave / 3)
+            expected_count = min(14, 3 + math.floor(level * .9) + (2 if (wave - 1) % 4 == 2 else 0))
+            assert count == expected_count, (wave, count, expected_count)
+        print(f"Level-based HP, type/armor rounding and slower fleet growth PASS ({len(new_hp)} cases)", flush=True)
 
         old_damage = old.evaluate("combatTest.damageCases()")
         new_damage = new.evaluate("combatTest.damageCases()")
         for name, before in old_damage.items():
-            multiplier = 1 if name.endswith("friendly-shot") else 1 / 3
+            wave = int(name.split("/")[0])
+            level = math.ceil(wave / 3)
+            multiplier = 1 if name.endswith("friendly-shot") else 1 / 3 * 1.1 ** (level - wave)
             close(new_damage[name], before * multiplier, name)
-        print(f"Enemy damage one third and friendly damage unchanged PASS ({len(new_damage)} cases)", flush=True)
+        print(f"Three-raids-per-level damage; level-one tuning and friendly damage preserved PASS ({len(new_damage)} cases)", flush=True)
 
         old_speed = old.evaluate("combatTest.movementCases()")
         new_speed = new.evaluate("combatTest.movementCases()")
@@ -230,10 +248,9 @@ def main():
         legacy = old.evaluate("combatTest.legacySave()")
         migrated = new.evaluate("data => combatTest.importSave(data)", legacy)
         for before, after in zip(legacy["combat"]["enemies"], migrated["combat"]["enemies"]):
-            close(after["hp"], before["hp"], "current-version saved HP")
-            close(after["max"], before["max"], "current-version saved max HP")
             close(after["hp"] / after["max"], before["hp"] / before["max"], "legacy health ratio")
-        assert migrated["combat"]["balanceVersion"] == 2
+        assert migrated["combat"]["balanceVersion"] == 2 and migrated["pirateProgressVersion"] == 1
+        assert migrated["wave"] == legacy["wave"]
         expected = [{"hp":e["hp"], "max":e["max"]} for e in migrated["combat"]["enemies"]]
         for _ in range(2):
             new.reload(wait_until="networkidle")
@@ -241,13 +258,17 @@ def main():
             snapshot = new.evaluate("combatTest.snapshot()")
             assert snapshot["enemies"] == expected, snapshot
             assert snapshot["combat"]["balanceVersion"] == 2
-        print("Current active-raid HP unchanged across migration and two reloads PASS", flush=True)
-        # Earlier version1 saves still need the previous health migration once.
-        legacy["combat"]["balanceVersion"] = 1
-        migrated = new.evaluate("data => combatTest.importSave(data)", legacy)
-        for before, after in zip(legacy["combat"]["enemies"], migrated["combat"]["enemies"]):
-            close(after["hp"], before["hp"] * 2, "version1 current HP")
-            close(after["max"], before["max"] * 2, "version1 max HP")
+        print("Active-raid wounds preserved by progression migration and two reloads PASS", flush=True)
+        # Exercise the independent older health migration after progression is current.
+        version_one = copy.deepcopy(migrated)
+        version_one["combat"]["balanceVersion"] = 1
+        for e in version_one["combat"]["enemies"]:
+            e["hp"] /= 2
+            e["max"] /= 2
+        migrated = new.evaluate("data => combatTest.importSave(data)", version_one)
+        for before, after in zip(expected, migrated["combat"]["enemies"]):
+            close(after["hp"], before["hp"], "version1 current HP")
+            close(after["max"], before["max"], "version1 max HP")
         again = new.evaluate("data => combatTest.importSave(data)", migrated)
         assert again["combat"]["enemies"] == migrated["combat"]["enemies"]
         print("Version1 health migration still runs exactly once PASS", flush=True)

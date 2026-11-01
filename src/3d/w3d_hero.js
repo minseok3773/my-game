@@ -1,4 +1,5 @@
 /* ---------- 선장 백병전·전투 성장 (마을 생산 숙련도와 별도 저장) ---------- */
+const HERO_MAX_LEVEL = 50;
 const heroLevel = () => G.hero?.level || 1;
 const heroXpNeed = (level = heroLevel()) => 20 + 10 * (level - 1);
 const heroAttack = () => 4 + 2 * (heroLevel() - 1) + 2 * ck('playerGun') + 3 * trainingLevel('hero');
@@ -6,7 +7,9 @@ const heroMaxHp = () => 40 + 6 * (heroLevel() - 1) + 10 * trainingLevel('hero');
 const isHeroAvailable = () => !!player && !player.dead && player.hp > 0 && !(G.hero?.downT > 0);
 function initializeHeroState() {
   const old = G.hero || {};
-  G.hero = { level: Math.max(1, Math.floor(old.level || G.level || 1)), xp: Math.max(0, old.xp || 0),
+  const savedLevel = Number(old.level ?? G.level ?? 1);
+  const level = Number.isFinite(savedLevel) ? Math.min(HERO_MAX_LEVEL, Math.max(1, Math.floor(savedLevel))) : 1;
+  G.hero = { level, xp: level >= HERO_MAX_LEVEL ? 0 : Math.max(0, Number.isFinite(old.xp) ? old.xp : 0),
     downT: Math.max(0, old.downT || 0), kills: old.kills || 0,
     engagedWave: old.engagedWave || 0, rewardedWave: old.rewardedWave || 0 };
   G.hero.hp = Math.max(0, Math.min(heroMaxHp(), old.hp ?? heroMaxHp()));
@@ -18,13 +21,15 @@ function restoreHeroRuntime() {
 }
 function snapshotHero() { G.hero.hp = Math.max(0, player.hp); }
 function gainCombatXp(n) {
-  if (!(n > 0)) return;
+  if (heroLevel() >= HERO_MAX_LEVEL) { G.hero.xp = 0; return; }
+  if (!(n > 0) || !Number.isFinite(n)) return;
   G.hero.xp += n;
   let gained = 0;
-  while (G.hero.xp >= heroXpNeed()) {
+  while (heroLevel() < HERO_MAX_LEVEL && G.hero.xp >= heroXpNeed()) {
     G.hero.xp -= heroXpNeed(); G.hero.level++; gained++;
     if (isHeroAvailable()) player.hp = Math.min(heroMaxHp(), player.hp + 6);
   }
+  if (heroLevel() >= HERO_MAX_LEVEL) G.hero.xp = 0;
   if (gained) {
     toast(`⚔️ 선장 Lv.${heroLevel()}! 공격력 ${heroAttack()} · 체력 ${heroMaxHp()}`);
     floatText(player.x, player.y, `Lv.${heroLevel()} ↑`, '#ffe485');

@@ -1,5 +1,5 @@
 /* ---------- 영웅·선원 훈련소: 건설 후 시설 앞에서 단계별 강화 ---------- */
-const TRAINING_MAX_LEVEL = 10;
+const TRAINING_MAX_LEVEL = 50;
 const TRAINING_FACILITIES = {
   heroForge: { id: 'heroForge', kind: 'hero', name: '영웅 훈련소', icon: '⚔️',
     x: 20.25, y: 1.75, cost: 100, pad: { x: 20.25, y: 3.65 }, color: 0x4f9ed1 },
@@ -18,7 +18,7 @@ function initializeTrainingState() {
   G.training = { hero: level(old.hero), crew: level(old.crew) };
 }
 const trainingLevel = kind => G.training?.[kind] || 0;
-const trainingCost = kind => Math.round((kind === 'hero' ? 60 : 50) * Math.pow(1.45, trainingLevel(kind)) / 5) * 5;
+const trainingCost = kind => (kind === 'hero' ? 60 : 50) + (kind === 'hero' ? 25 : 20) * trainingLevel(kind);
 const trainingFacility = kind => Object.values(TRAINING_FACILITIES).find(f => f.kind === kind);
 function canUseTraining(kind) {
   const f = trainingFacility(kind);

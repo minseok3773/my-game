@@ -102,7 +102,7 @@ function overlayWorld() {
   }
   for (const w of workers) { const em = w.job && w.job.cash ? '💵' : w.idle ? '💤' : null; if (em) { const p = S(w.x, w.y, 82); bubble(p.x, p.y, em, k); } }
   if (G.stack.length >= cap) { const p = S(player.x, player.y, 92); bubble(p.x, p.y, '🎒', k); }
-  for (const w of workers) if ((w.hp ?? CREW_HP) < CREW_HP) hpBar(w.x, w.y, 76, w.hp / CREW_HP, '#5fd16b', 24, slv(w.tent));
+  for (const w of workers) if ((w.hp ?? CREW_HP) < CREW_HP) hpBar(w.x, w.y, 76, w.hp / CREW_HP, '#5fd16b', 24, Math.max(1, trainingLevel('crew')));
   for (const s of soldiers) if ((s.hp ?? 12) < 12) hpBar(s.x, s.y, 76, s.hp / 12, '#5fd16b', 24, blv());
   for (const e of enemies) {
     if (!alive(e)) continue;
@@ -160,7 +160,7 @@ for c in chunks:
     if c.startswith("function dockRect("):
         out.append("function dockRect(id) { return customerDockRect(id); }\n"); continue
     if c.startswith("/* ---------- HUD ---------- */"):
-        out.append(B('w3d_world.js')); out.append(B('w3d_chars.js')); out.append(B('w3d_game.js')); out.append(B('w3d_melee.js')); out.append(B('w3d_hero.js')); out.append(B('w3d_crew.js')); out.append(B('w3d_training.js')); out.append(B('w3d_customers.js')); out.append(B('w3d_fx.js')); out.append(overlay); out.append(c); continue
+        out.append(B('w3d_world.js')); out.append(B('w3d_chars.js')); out.append(B('w3d_game.js')); out.append(B('w3d_progression.js')); out.append(B('w3d_melee.js')); out.append(B('w3d_hero.js')); out.append(B('w3d_crew.js')); out.append(B('w3d_training.js')); out.append(B('w3d_customers.js')); out.append(B('w3d_fx.js')); out.append(overlay); out.append(c); continue
     if c.startswith("/* ---------- 루프 ---------- */") or c.startswith("let last = performance.now()"):
         continue
     if keep(c): out.append(c)
@@ -170,17 +170,17 @@ js = js.replace("const KEY = 'raft-village-v1';", "const KEY = 'raft-village-3d-
 js = re.sub(r"const phaseInfo = \(\) => \{[^\n]*\n", "const phaseInfo = () => '☀️ 낮';\n", js)
 js = re.sub(r"function nightAmt\(\) \{[^\n]*\n", "function nightAmt() { return 0; }\n", js)
 js = re.sub(r"function duskAmt\(\) \{[^\n]*\n", "function duskAmt() { return 0; }\n", js)
-# 3D 전용: 전투 종료 후 60초마다 습격, 습격할 때마다 해적 레벨업(체력·공격력 10%씩 복리 상승)
+# 3D 전용: 전투 종료 후 60초 준비, 침공 3회당 해적 1레벨 성장
 R3 = [
     ("G.raidT = G.raidT ?? 60;", "G.raidT = G.raidT ?? RAID_INTERVAL;"),
     ("G.raidT = rnd(55, 80);", "G.raidT = 60;"),
     ("if (id === 'expand1') G.raidT = 90;", "if (id === 'expand1') G.raidT = RAID_INTERVAL;"),
-    ("function spawnBoarder(ship) {", "const pirMul = () => Math.pow(1.1, Math.max(0, G.wave - 1)); // 해적 레벨 배율\nfunction spawnBoarder(ship) {"),
-    ("hp = (ship.big ? 1.6 : 1) * (6 + G.wave * 2);", "hp = Math.round((ship.big ? 1.6 : 1) * (6 + G.wave * 2) * pirMul());"),
-    ("moveTo(e, tgt.x, tgt.y, 1.7, dt, null, true)", "moveTo(e, tgt.x, tgt.y, 1.7 * Math.min(1.5, 1 + 0.03 * (G.wave - 1)), dt, null, true)"),
+    ("function spawnBoarder(ship) {", "const pirMul = () => pirateMultiplier(); // 침공 횟수와 분리한 해적 레벨 배율\nfunction spawnBoarder(ship) {"),
+    ("hp = (ship.big ? 1.6 : 1) * (6 + G.wave * 2);", "hp = Math.round((ship.big ? 1.6 : 1) * (6 + pirateLevel() * 2) * pirMul());"),
+    ("moveTo(e, tgt.x, tgt.y, 1.7, dt, null, true)", "moveTo(e, tgt.x, tgt.y, 1.7 * Math.min(1.5, 1 + 0.03 * (pirateLevel() - 1)), dt, null, true)"),
     ("foe.hp = (foe.hp ?? 12) - 2.5;", "foe.hp = (foe.hp ?? 12) - 2.5 * pirMul() * PIRATE_BALANCE.damage;"),
     ("hitVillage({ dmg: 3, x1: e.x, y1: e.y })", "hitVillage({ dmg: 3 * pirMul() * PIRATE_BALANCE.damage, x1: e.x, y1: e.y })"),
-    ("const hp = (big ? 3 : 1) * (12 + G.wave * 5);", "const hp = Math.round((big ? 3 : 1) * (12 + G.wave * 5) * pirMul());"),
+    ("const hp = (big ? 3 : 1) * (12 + G.wave * 5);", "const hp = Math.round((big ? 3 : 1) * (12 + pirateLevel() * 5) * pirMul());"),
     ("'enemy', e.big ? 10 : 5, 1.0", "'enemy', (e.big ? 10 : 5) * pirMul(), 1.0"),
     ("hp: Math.round(hp * raidPlan(G.wave).armor), max: Math.round(hp * raidPlan(G.wave).armor)", "hp: PIRATE_BALANCE.health * Math.round(hp * raidPlan(G.wave).armor), max: PIRATE_BALANCE.health * Math.round(hp * raidPlan(G.wave).armor)"),
     ("dur, kind, dmg, target:", "dur, kind, dmg: kind === 'enemy' ? dmg * PIRATE_BALANCE.damage : dmg, target:"),
@@ -190,8 +190,7 @@ R3 = [
     ("if (nearRaft(e.x, e.y, 1.5)) e.state = 'attack';", "if (nearRaft(e.x, e.y, 1.5)) { e.state = 'attack'; e.boardT = 0; } // 도착하면 바로 상륙 준비"),
     ("const workerSpeed = () => 2.8", "const workerSpeed = () => PIRATE_BALANCE.crewSpeed * 2.8"),
     ("G.combat = { raidOn, looted, enemies };", "G.combat = { raidOn, looted, enemies, balanceVersion: PIRATE_BALANCE_VERSION };"),
-    ("enemies = G.combat.enemies; raidOn = true;", "restorePirateBalance(G.combat); enemies = G.combat.enemies; raidOn = true;"),
-    ("toast(`⚠️ 해적 습격 경보 · 제${G.wave}파 ${n}척`);", "toast(G.wave > 1 ? `⚠️ 제${G.wave}파 ${n}척 · 해골 해적 Lv.${G.wave} (힘 +${Math.round((pirMul() - 1) * 100)}%)` : `⚠️ 해적 습격 경보 · 제${G.wave}파 ${n}척`);"),
+    ("toast(`⚠️ 해적 습격 경보 · 제${G.wave}파 ${n}척`);", "toast(G.wave > 1 ? `⚠️ 제${G.wave}파 ${n}척 · 해골 해적 Lv.${pirateLevel()} (힘 +${Math.round((pirMul() - 1) * 100)}%)` : `⚠️ 해적 습격 경보 · 제${G.wave}파 ${n}척`);"),
 ]
 for a_, b_ in R3:
     assert js.count(a_) == 1, a_
@@ -217,7 +216,7 @@ R4 = [
     ("function updateBoarder(e, dt) {", "function updateBoarderBase(e, dt) {"),
     ("dust(p.x, p.y, 8); floatText(p.x, p.y, '해적 상륙!', '#ffb0a0');", "setupBoarder(enemies[enemies.length - 1]); dust(p.x, p.y, 8); floatText(p.x, p.y, '해적 상륙!', '#ffb0a0');"),
     ("if (e.kind === 'boarder') { updateBoarder(e, dt); continue; }", "if (e.kind === 'boarder') { updateBoarder(e, dt); continue; }\n    if (e.boss && e.state === 'attack') bossTick(e, dt);"),
-    ("  raidIntro = { t: 0, n };", "  if (G.wave % 5 === 0) spawnBoss();\n  raidIntro = { t: 0, n };"),
+    ("  raidIntro = { t: 0, n };", "  if (bossDueNextRaid(G.wave)) spawnBoss();\n  raidIntro = { t: 0, n };"),
     ("G.raidT = 60; if (!looted) toast('해적을 격퇴했습니다'); finishStrategyRaid(looted); looted = false;", "G.raidT = 60; if (!looted) { toast('해적을 격퇴했습니다'); offerCards(); } finishStrategyRaid(looted); looted = false;"),
     ("e.hp / e.max, '#ff4d3d', 26, G.wave);", "e.hp / e.max, ({ bomber: '#ff9a2e', thief: '#c9a2ff', sniper: '#5ec8ff' })[e.type] || '#ff4d3d', 26, G.wave);"),
     ("else hpBar(e.x, e.y, e.big ? 120 : 90,", "else if (!e.boss) hpBar(e.x, e.y, e.big ? 120 : 90,"),
@@ -242,7 +241,7 @@ js = js.replace(old_board, """      if (e.boardT <= 0) {
         const budget = e.landingBudget || (e.boss ? 8 : e.big ? 4 : 2);
         const burst = e.boarded ? 1 : e.big ? 3 : 2;
         for (let k = 0; k < burst && (e.boarded || 0) < budget; k++) {
-          if (enemies.filter(b => b.kind === 'boarder' && alive(b)).length >= Math.min(16, 4 + G.wave * 2)) break;
+          if (enemies.filter(b => b.kind === 'boarder' && alive(b)).length >= Math.min(16, 4 + pirateLevel() * 2)) break;
           spawnBoarder(e); e.boarded = (e.boarded || 0) + 1;
         }
         if ((e.boarded || 0) >= budget) e.state = 'flee';
@@ -269,6 +268,10 @@ js = js.replace('function sinkEnemy(e) {', 'function sinkEnemy(e) {\n  if (e.bos
 js = js.replace("  for (const s of soldiers) if ((s.hp ?? 12) < 12)", "  if (isHeroAvailable() && (raidOn || player.hp < heroMaxHp())) hpBar(player.x, player.y, 86, player.hp / heroMaxHp(), '#f3d15c', 32, heroLevel());\n  for (const s of soldiers) if ((s.hp ?? 12) < 12)")
 js = js.replace("hpBar(e.x, e.y, 74,", "hpBar(e.x, e.y, e.champion ? 110 : 74,")
 js = js.replace("|| '#ff4d3d', 26, G.wave);", "|| '#ff4d3d', e.champion ? 44 : 26, G.wave);")
+
+# 적 체력 배지에는 실제 해적 레벨을 표시합니다.
+js = js.replace("e.champion ? 44 : 26, G.wave);", "e.champion ? 44 : 26, e.level || pirateLevel());")
+js = js.replace("e.big ? 50 : 36, G.wave);", "e.big ? 50 : 36, e.level || pirateLevel());")
 
 # 저장된 강화 선택을 복구해 새로고침으로 보상을 잃거나 다시 뽑지 않게 함
 js = js.replace("  const go = () => requestAnimationFrame(frame);", "  if (G.cardOffer && G.cardOffer.length) offerCards();\n  const go = () => requestAnimationFrame(frame);")

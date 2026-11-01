@@ -79,7 +79,7 @@ function offerCards() {
   const pick = (G.cardOffer || []).map(id => pool.find(c => c.id === id)).filter(Boolean);
   if (!pick.length) while (pick.length < 3 && pool.length) pick.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
   G.cardOffer = pick.map(c => c.id);
-  cardPanel.querySelector('.sub').textContent = `제${G.wave}파를 막아냈습니다! 하나만 고르세요 · 다음 해적은 Lv.${G.wave + 1}`;
+  cardPanel.querySelector('.sub').textContent = `제${G.wave}파를 막아냈습니다! 하나만 고르세요 · 다음 해적은 Lv.${pirateLevel(G.wave + 1)}`;
   const box = cardPanel.querySelector('.cards'); box.innerHTML = '';
   for (const c of pick) {
     const b = document.createElement('button'); b.className = 'card';
@@ -106,13 +106,13 @@ const PIRATE_TYPES = {
 };
 function pickPirateType() {
   const forecast = raidPlan(G.wave).type;
-  if (forecast !== 'normal' && Math.random() < 0.65) return forecast;
+  if (forecast !== 'normal' && pirateLevel() >= (PIRATE_TYPES[forecast]?.from || Infinity) && Math.random() < 0.65) return forecast;
   const r = Math.random(); let acc = 0;
-  for (const [k, t] of Object.entries(PIRATE_TYPES)) { if (G.wave < t.from) continue; acc += t.chance; if (r < acc) return k; }
+  for (const [k, t] of Object.entries(PIRATE_TYPES)) { if (pirateLevel() < t.from) continue; acc += t.chance; if (r < acc) return k; }
   return 'normal';
 }
 function setupBoarder(e) {
-  e.type = pickPirateType(); e.home = { x: e.x, y: e.y };
+  e.level = pirateLevel(); e.type = pickPirateType(); e.home = { x: e.x, y: e.y };
   const t = PIRATE_TYPES[e.type];
   if (t) {
     e.hp = e.max = Math.max(1, Math.round(e.hp * t.hp));
@@ -130,18 +130,23 @@ function updateBoarder(e, dt) { updateSwordBoarder(e, dt); }
 
 // 해적 Lv.5·10·15마다 보스선에서 상어 대장이 직접 상륙합니다.
 function spawnBoss() {
+  if (!bossDueNextRaid(G.wave)) return false;
+  const level = pirateLevel();
+  G.lastBossLevel = level;
   const a = rnd(0, 6.28), r = raftC.r + 16;
-  const hp = PIRATE_BALANCE.health * Math.round(10 * (12 + G.wave * 5) * pirMul());
-  enemies.push({ x: raftC.x + Math.cos(a) * r, y: raftC.y + Math.sin(a) * r, hp, max: hp, big: true, boss: true, state: 'approach', fireT: 2, bob: 0, sinkT: 0, ang: 0, salvoT: 4, summonT: 6 });
-  setTimeout(() => toast(`☠️ 보스 침공! 상어 대장 Lv.${G.wave} · 갑판 전투 준비`), 1600);
+  const hp = normalPirateShipHp(level) * BOSS_POWER_MULTIPLIER;
+  enemies.push({ x: raftC.x + Math.cos(a) * r, y: raftC.y + Math.sin(a) * r, hp, max: hp, level, big: true, boss: true, state: 'approach', fireT: 2, bob: 0, sinkT: 0, ang: 0, salvoT: 4, summonT: 6 });
+  setTimeout(() => toast(`☠️ 보스 침공! 상어 대장 Lv.${level} · 체력·공격력 5배`), 1600);
+  return enemies[enemies.length - 1];
 }
 
 function spawnBossBoarder(ship) {
   if (!ship?.boss || ship.kind === 'boarder' || ship.bossBoarded || G.bossBoardedWave === G.wave) return;
   ship.bossBoarded = true; G.bossBoardedWave = G.wave;
-  const p = shorePoint(ship.x, ship.y), hp = Math.max(140, Math.round(120 * pirMul() + 8 * G.wave));
+  const level = ship.level || pirateLevel();
+  const p = shorePoint(ship.x, ship.y), hp = normalPirateHp(level) * BOSS_POWER_MULTIPLIER;
   enemies.push({ kind:'boarder', boss:true, champion:true, type:'boss', x:p.x, y:p.y,
-    hp, max:hp, attackMul:2, state:'walk', atkT:1.1, bob:0, vx:0, vy:0, sinkT:0,
+    hp, max:hp, level, attackMul:BOSS_POWER_MULTIPLIER, state:'walk', atkT:1.1, bob:0, vx:0, vy:0, sinkT:0,
     ang:0, ph:0.1, home:{x:p.x,y:p.y}, goal:{x:p.x,y:p.y} });
   dust(p.x,p.y,14); toast('☠️ 상어 대장 상륙! 선장과 선원이 함께 맞서 싸우세요');
 }
@@ -153,6 +158,6 @@ function bossHud() {
   const b = enemies.find(e => e.champion && alive(e)) || enemies.find(e => e.boss && !e.bossBoarded && alive(e));
   bossBar.hidden = !b; document.body.classList.toggle('has-boss', !!b);
   if (!b) return;
-  bossBar.querySelector('.nm').textContent = `☠️ ${b.champion ? '상어 대장' : '보스선 접근 중'} Lv.${G.wave} · ${Math.ceil(b.hp)}/${b.max}`;
+  bossBar.querySelector('.nm').textContent = `☠️ ${b.champion ? '상어 대장' : '보스선 접근 중'} Lv.${b.level || pirateLevel()} · ${Math.ceil(b.hp)}/${b.max}`;
   bossBar.querySelector('.fill').style.width = `${Math.max(0, b.hp / b.max) * 100}%`;
 }

@@ -90,7 +90,7 @@ window.trainingTest = {
     G.money=trainingCost('hero')-1;const poor=upgradeTraining('hero');
     G.money=initial;player.hp=0;player.dead=true;G.hero.downT=8;
     const down=upgradeTraining('hero');G.hero.downT=0;player.dead=false;player.hp=heroMaxHp();
-    G.training.hero=10;const capped=upgradeTraining('hero');
+    G.training.hero=TRAINING_MAX_LEVEL;const capped=upgradeTraining('hero');
     return {unbuilt,distant,poor,down,capped,money:G.money};
   },
   upgradeHero() {

@@ -62,7 +62,7 @@ window.progressTest = {
     return {wave:G.wave,carriers:enemies.filter(e => e.boss && e.kind!=='boarder').length,
       champions:enemies.filter(e=>e.kind==='boarder'&&e.champion).length};
   },
-  landBoss(wave=5) {
+  landBoss(wave=13) {
     this.reset(wave-1);startRaid();raidOn=true;
     const carrier=enemies.find(e=>e.boss&&e.kind!=='boarder');
     enemies=enemies.filter(e=>e===carrier);
@@ -80,7 +80,7 @@ window.progressTest = {
       carrierState:carrier.state,bossHp:boss.hp,bossMax:boss.max};
   },
   bossCombat() {
-    this.reset(5); raidOn=true;
+    this.reset(13); raidOn=true;
     const ship={x:-2,y:5,big:true,boss:true};
     spawnBossBoarder(ship);const boss=enemies.find(e=>e.kind==='boarder'&&e.champion);
     Object.assign(boss,{x:5.5,y:4,hp:10000,max:10000,atkT:0});
@@ -93,7 +93,7 @@ window.progressTest = {
       damage:hp-boss.hp,heroAttack:attack,xp:G.hero.xp,heroLevel:heroLevel()};
   },
   navyVersusBoss() {
-    this.reset(5); raidOn=true; player.x=9; player.y=7;
+    this.reset(13); raidOn=true; player.x=9; player.y=7;
     spawnBossBoarder({x:-2,y:5,big:true,boss:true});
     const boss=enemies.find(e=>e.kind==='boarder'&&e.champion);
     Object.assign(boss,{x:4.5,y:4,hp:10000,max:10000,atkT:0});
@@ -102,11 +102,11 @@ window.progressTest = {
     updateDefenders(.05,1,1);return {navyHurt,bossHurt:boss.hp<10000,fighting:navy.fighting};
   },
   sunkBossStillLands() {
-    this.milestone(5);const ship=enemies.find(e=>e.boss&&e.kind!=='boarder');
+    this.milestone(13);const ship=enemies.find(e=>e.boss&&e.kind!=='boarder');
     sinkEnemy(ship);return enemies.filter(e=>e.kind==='boarder'&&e.champion).length;
   },
   cappedBossStillLands() {
-    this.milestone(5);const ship=enemies.find(e=>e.boss&&e.kind!=='boarder');
+    this.milestone(13);const ship=enemies.find(e=>e.boss&&e.kind!=='boarder');
     enemies=[ship];Object.assign(ship,{state:'attack',x:-2,y:5,boardT:0});
     for(let i=0;i<16;i++)this.pirate('normal',8,7);
     updateMilitary(0);updateMilitary(0);
@@ -172,7 +172,7 @@ window.progressTest = {
     return {width:parseFloat(bossBar.querySelector('.fill').style.width),hidden:bossBar.hidden};
   },
   knockout() {
-    this.reset(5);raidOn=true;const e=this.pirate('normal',5.5,4);e.champion=true;e.boss=true;
+    this.reset(13);raidOn=true;const e=this.pirate('normal',5.5,4);e.champion=true;e.boss=true;
     player.hp=1;e.atkT=0;updateBoarder(e,0);
     const down=this.heroState();tickHeroState(8.1);return {down,recovered:this.heroState(),alive:isHeroAvailable()};
   },
@@ -254,8 +254,10 @@ def main():
         old_damage = old.evaluate("progressTest.damageCases()")
         new_damage = new.evaluate("progressTest.damageCases()")
         for label, damage in old_damage.items():
-            same(new_damage[label], damage / 3, label)
-        print(f"Pirate per-hit damage exactly one third of prior release PASS ({len(new_damage)} cases)", flush=True)
+            wave = int(label.split("/")[0])
+            level = math.ceil(wave / 3)
+            same(new_damage[label], damage / 3 * 1.1 ** (level - wave), label)
+        print(f"Pirate damage follows slower levels for every melee type PASS ({len(new_damage)} cases)", flush=True)
 
         for level in (1, 5, 10):
             state = new.evaluate("level => progressTest.highLevelPad(level)", level)
@@ -287,10 +289,10 @@ def main():
         assert new.evaluate("progressTest.recruitState().count === 1 && progressTest.recruitState().money === 470")
         print("Paid pad job and vacant roster survive two reloads without duplicate payment PASS", flush=True)
 
-        for wave in (4, 5, 10):
+        for wave in (12, 13, 28):
             milestone = new.evaluate("wave => progressTest.milestone(wave)", wave)
-            assert milestone["carriers"] == (0 if wave == 4 else 1), milestone
-        for wave in (5, 10):
+            assert milestone["carriers"] == (0 if wave == 12 else 1), milestone
+        for wave in (13, 28):
             landed = new.evaluate("wave => progressTest.landBoss(wave)", wave)
             assert landed["landed"] and landed["countBefore"] == landed["countAfter"] == 1, landed
         combat = new.evaluate("progressTest.bossCombat()")
@@ -301,7 +303,7 @@ def main():
         assert new.evaluate("progressTest.sunkBossStillLands()") == 1
         assert new.evaluate("progressTest.cappedBossStillLands()") == 1
         assert new.evaluate("progressTest.defeatedBossStaysDefeated()") == 0
-        print("Every fifth invasion lands exactly one boss; boss/player/crew exchange melee damage PASS", flush=True)
+        print("Every fifth pirate level lands exactly one boss; boss/player/crew exchange melee damage PASS", flush=True)
 
         hit = new.evaluate("progressTest.attackOnce()")
         assert hit["after"]["xp"] > hit["before"]["xp"], hit
