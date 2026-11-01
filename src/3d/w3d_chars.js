@@ -142,14 +142,15 @@ function mkChar(kind, ent) {
         ? { shirt: '#547f91', pants: '#8f7b52', hair: '#354d61', skin: '#7ba6b7' }
         : { shirt: ent.shirt || '#66777b', pants: '#637c86', hair: ent.hair || '#3c291d', skin: '#bf946e' };
     const m = makeAdult3({ ...colors, bandana: true });
-    m.melee = kind === 'worker' || kind === 'boarder';
+    m.melee = kind !== 'customer';
+    if (ent.champion) m.root.scale.multiplyScalar(1.42);
     return attachCharacterGear(m, m.body, 1.08, 0.32);
   }
   const n = Math.floor((ent.ph || 0) * 10);
-  if (kind === 'player') return makeGL('captain', { height: 1.78, weapon: 'always' });
+  if (kind === 'player') { const m = makeGL('captain', { height: 1.78, weapon: 'always' }); m.melee = true; return m; }
   if (kind === 'worker') { const m = makeGL('henry', { height: 1.58, weapon: 'never' }); m.melee = true; return m; }
   if (kind === 'customer') return makeGL(n % 3 === 0 ? 'captain' : 'henry', { height: 1.55, weapon: 'never' });
-  const m = makeGL(n % 2 ? 'mako' : 'sharky', { height: 1.65, weapon: 'always' });
+  const m = makeGL(ent.champion ? 'mako' : n % 2 ? 'mako' : 'sharky', { height: ent.champion ? 2.35 : 1.65, weapon: 'always' });
   m.melee = true;
   return m;
 }

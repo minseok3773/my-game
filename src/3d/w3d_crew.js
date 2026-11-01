@@ -1,7 +1,7 @@
 /* ---------- 텐트별 유료 일꾼 충원·명부 저장 ---------- */
 const tentCapacity = id => DEFS[id]?.type === 'tent' ? DEFS[id].workers + (slv(id) - 1) * 2 : 0;
 const crewCount = id => workers.filter(w => w.tent === id && w.hp > 0).length;
-const recruitmentCost = id => 30 + (slv(id) - 1) * 10;
+const recruitmentCost = () => 30;
 const crewTents = () => [...unlocked].filter(id => DEFS[id]?.type === 'tent');
 function snapshotCrewRoster() {
   const record = w => ({ x: w.x, y: w.y, hp: w.hp, ph: w.ph, bob: 0,
@@ -31,75 +31,89 @@ function restoreCrewRoster(legacyRespawn) {
   }
   G.crewRoster = workers.map(w => ({ tent: w.tent, x: w.x, y: w.y, hp: w.hp, carry: [...w.carry], ph: w.ph, look: w.look }));
 }
+// 후보는 텐트 입구 쪽부터 검사합니다. 향후 건설·증축 칸도 피해 저장 후 위치를 유지합니다.
+function recruitmentPadPosition(id) {
+  G.recruitPadPositions = G.recruitPadPositions || {};
+  const fitsRaft = p => walkable(p.x, p.y) && [-0.62, 0.62].every(dx => [-0.62, 0.62].every(dy => hasTile(Math.floor(p.x + dx), Math.floor(p.y + dy))));
+  const saved = G.recruitPadPositions[id];
+  if (saved && fitsRaft(saved)) return saved;
+  const d = DEFS[id];
+  const blockers = [
+    ...PADS.filter(p => p.id !== id),
+    ...Object.values(UPG),
+    ...Object.entries(DEFS).filter(([other, def]) => other !== id && Number.isFinite(def.x)).map(([, def]) => def),
+    ...Object.entries(G.recruitPadPositions).filter(([other]) => other !== id).map(([, point]) => point),
+  ];
+  const offsets = [[0,1.8],[-2.1,0],[2.1,.5],[0,-2.1],[-1.5,.5],[1.8,0],[-1.8,1],[0,2.4],[-2.4,-.5],[2.4,-.5]];
+  const candidates = offsets.map(([dx,dy]) => ({ x:d.x+dx, y:d.y+dy })).filter(fitsRaft);
+  if (!candidates.length) return null;
+  const clearance = point => Math.min(...blockers.map(other => Math.max(Math.abs(point.x-other.x),Math.abs(point.y-other.y))));
+  const point = candidates.find(candidate => clearance(candidate) >= 1.35)
+    || candidates.reduce((best,candidate) => clearance(candidate)>clearance(best) ? candidate : best);
+  G.recruitPadPositions[id] = point;
+  return point;
+}
+function recruitmentPads() {
+  return crewTents().map(tent => {
+    const point = recruitmentPadPosition(tent);
+    if (!point) return null;
+    const live = crewCount(tent), capacity = tentCapacity(tent), job = G.recruitment?.[tent];
+    return { id:'recruit:'+tent, tent, recruit:true, x:point.x, y:point.y, cost:30,
+      icon:'⛺', live, capacity, remaining:job ? Math.max(0,job.remaining) : 0,
+      pending:!!job, canRecruit:live<capacity && !job && G.money>=30 };
+  }).filter(Boolean);
+}
 function recruitWorker(id) {
-  if (!unlocked.has(id) || !tentCapacity(id) || G.recruitment[id] || crewCount(id) >= tentCapacity(id)) return false;
-  const cost = recruitmentCost(id);
-  if (G.money < cost) { toast(`충원 자금이 부족합니다 · $${cost} 필요`); return false; }
-  G.money -= cost; G.recruitment[id] = { remaining: 5, paid: cost };
-  save(); toast(`⛺ ${DEFS[id].name} · 일꾼 모집 시작 (5초)`); return true;
+  const pad = recruitmentPads().find(p => p.tent === id);
+  const heroReady = typeof isHeroAvailable === 'function' ? isHeroAvailable() : true;
+  if (!heroReady || !pad || dist(player.x,player.y,pad.x,pad.y)>0.6 || !pad.canRecruit) return false;
+  G.money -= 30; G.recruitment[id] = { remaining:5, paid:30 };
+  save(); toast(`⛺ ${DEFS[id].name} · $30 결제, 일꾼 모집 중 (5초)`); return true;
 }
 function tickRecruitment(dt) {
-  for (const [id, job] of Object.entries(G.recruitment || {})) {
+  // 이미 결제한 모집은 칸을 떠나거나 주인공이 쓰러져도 마저 진행합니다.
+  for (const [id,job] of Object.entries(G.recruitment || {})) {
     if (!unlocked.has(id) || !tentCapacity(id)) continue;
-    job.remaining = Math.max(0, job.remaining - dt);
-    if (job.remaining > 0) continue;
+    job.remaining = Math.max(0,job.remaining-dt);
+    if (job.remaining>0) continue;
     delete G.recruitment[id];
-    if (crewCount(id) < tentCapacity(id)) { spawnWorker(id, 1); toast(`⛺ ${DEFS[id].name} · 일꾼 1명 합류`); }
+    if (crewCount(id)<tentCapacity(id)) { spawnWorker(id,1); toast(`⛺ ${DEFS[id].name} · 일꾼 1명 합류`); }
     save();
   }
+  const heroReady = typeof isHeroAvailable === 'function' ? isHeroAvailable() : true;
+  if (!heroReady || paused) return;
+  const pad = recruitmentPads().filter(p => dist(player.x,player.y,p.x,p.y)<=0.6)
+    .sort((a,b) => dist(player.x,player.y,a.x,a.y)-dist(player.x,player.y,b.x,b.y) || a.id.localeCompare(b.id))[0];
+  if (pad?.canRecruit) recruitWorker(pad.tent);
 }
 function crewHealthStatus() {
   const hp = workers.reduce((n, w) => n + Math.max(0, w.hp), 0) + soldiers.reduce((n, s) => n + Math.max(0, s.hp), 0);
   const max = crewTents().reduce((n, id) => n + tentCapacity(id) * crewHpMax(), 0) + soldiers.length * 12;
   return { hp, max, ratio: max ? Math.min(1, hp / max) : 0 };
 }
+// 구버전 build의 참조만 유지합니다. 실제 충원은 텐트 바닥 칸에서만 합니다.
+const recruitPanel = document.createElement('div'); recruitPanel.hidden = true;
 const recruitStyle = document.createElement('style');
 recruitStyle.textContent = `
-#recruitBtn{position:fixed;left:10px;bottom:calc(136px + env(safe-area-inset-bottom,0px));z-index:4;min-height:44px;max-width:170px;padding:8px 12px;border:3px solid #8a663d;border-radius:12px;background:#ffe5a3;color:#624620;font:15px var(--display);box-shadow:0 3px 0 #805a3040;cursor:pointer}
-#recruitBtn:focus-visible{outline:3px solid #fff;outline-offset:3px}
-body.has-recruit #toast{bottom:calc(192px + env(safe-area-inset-bottom,0px))}
-body.has-boss #recruitBtn{bottom:calc(188px + env(safe-area-inset-bottom,0px))}
-body.has-boss.has-recruit #toast{bottom:calc(244px + env(safe-area-inset-bottom,0px))}
-#recruitPanel{z-index:31}#recruitPanel .tent-list{display:grid;gap:12px;margin:14px 0}#recruitPanel article{border:2px solid #c6ae7a;border-radius:12px;padding:12px;background:#fff1cf}#recruitPanel article p{margin:6px 0}#recruitPanel article button{width:100%;font-size:15px}
-@media(max-height:500px) and (orientation:landscape){#recruitBtn{bottom:68px;max-width:170px}body.has-recruit #toast{bottom:120px}}
+#recruitHint{left:10px;bottom:calc(136px + env(safe-area-inset-bottom,0px));z-index:4;max-width:230px;padding:7px 10px;border:2px solid #8a663d;border-radius:11px;background:#fff0beed;color:#624620;font:13px/1.35 var(--display);box-shadow:0 3px 0 #805a3030;pointer-events:none}
+body.has-boss #toast{bottom:calc(216px + env(safe-area-inset-bottom,0px))}
+body.has-recruit #toast{bottom:calc(198px + env(safe-area-inset-bottom,0px))}
+body.has-boss #recruitHint{bottom:calc(216px + env(safe-area-inset-bottom,0px))}
+body.has-boss.has-recruit #toast{bottom:calc(278px + env(safe-area-inset-bottom,0px))}
+@media(max-height:500px) and (orientation:landscape){#recruitHint{bottom:68px;max-width:210px}body.has-boss #toast{bottom:calc(216px + env(safe-area-inset-bottom,0px))}
+body.has-recruit #toast{bottom:132px}}
 `;
 document.head.appendChild(recruitStyle);
-const recruitBtn = document.createElement('button'); recruitBtn.id = 'recruitBtn'; recruitBtn.hidden = true;
-document.body.appendChild(recruitBtn);
-const recruitPanel = document.createElement('div'); recruitPanel.id = 'recruitPanel'; recruitPanel.className = 'panel'; recruitPanel.hidden = true;
-recruitPanel.innerHTML = '<div role="dialog" aria-modal="true" aria-labelledby="recruitTitle"><h2 id="recruitTitle">⛺ 텐트 충원</h2><p>전사한 일꾼은 자동으로 복귀하지 않습니다. 텐트의 빈자리에 한 명씩 모집하세요.</p><p class="funds"></p><div class="tent-list"></div><button class="ghost close">돌아가기</button></div>';
-document.body.appendChild(recruitPanel);
-function closeRecruitment() { recruitPanel.hidden = true; paused = false; last = performance.now(); }
-function openRecruitment() {
-  if (paused || !crewTents().length) return;
-  paused = true; recruitPanel.hidden = false;
-  recruitPanel.querySelector('.funds').textContent = `보유 자금 $${fmt(G.money)} · 모집 시간 5초 · 생산 위치: 각 텐트`;
-  const list = recruitPanel.querySelector('.tent-list'); list.replaceChildren();
-  for (const id of crewTents()) {
-    const live = crewCount(id), capacity = tentCapacity(id), job = G.recruitment[id], cost = recruitmentCost(id);
-    const row = document.createElement('article'); row.dataset.tent = id;
-    const title = document.createElement('b'); title.textContent = `${DEFS[id].name} ★${slv(id)} · ${live}/${capacity}명`;
-    const text = document.createElement('p'); text.textContent = job ? `모집 중 · ${Math.ceil(job.remaining)}초 남음 (결제 완료)` : live >= capacity ? '현재 정원이 모두 근무 중입니다.' : `결원 ${capacity - live}명 · 1명 모집 $${cost}`;
-    const button = document.createElement('button'); button.textContent = job ? '모집 진행 중' : `일꾼 1명 모집 · $${cost}`;
-    button.disabled = !!job || live >= capacity || G.money < cost;
-    button.onclick = () => { if (recruitWorker(id)) closeRecruitment(); };
-    row.append(title, text, button); list.appendChild(row);
-  }
-  recruitPanel.querySelector('.close').focus({ preventScroll: true });
-}
-recruitBtn.onclick = openRecruitment; recruitPanel.querySelector('.close').onclick = closeRecruitment;
-recruitPanel.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { e.preventDefault(); closeRecruitment(); }
-  if (e.key === 'Tab') {
-    const buttons = [...recruitPanel.querySelectorAll('button:not(:disabled)')], first = buttons[0], end = buttons[buttons.length - 1];
-    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); end.focus(); }
-    else if (!e.shiftKey && document.activeElement === end) { e.preventDefault(); first.focus(); }
-  }
-});
+const recruitHint = document.createElement('div'); recruitHint.id='recruitHint'; recruitHint.className='hud'; recruitHint.hidden=true;
+document.body.appendChild(recruitHint);
 function recruitmentHud() {
-  const tents = crewTents(), missing = tents.reduce((n, id) => n + Math.max(0, tentCapacity(id) - crewCount(id)), 0);
-  const near = tents.some(id => dist(player.x, player.y, DEFS[id].x, DEFS[id].y) < 3);
-  recruitBtn.hidden = paused || !tents.length || (!missing && !near);
-  recruitBtn.textContent = missing ? `⛺ 텐트 충원 · 결원 ${missing}명` : '⛺ 텐트 충원';
-  document.body.classList.toggle('has-recruit', !recruitBtn.hidden);
+  const heroReady = typeof isHeroAvailable === 'function' ? isHeroAvailable() : true;
+  const pad = recruitmentPads().filter(p => dist(player.x,player.y,p.x,p.y)<1.8)
+    .sort((a,b) => dist(player.x,player.y,a.x,a.y)-dist(player.x,player.y,b.x,b.y) || a.id.localeCompare(b.id))[0];
+  recruitHint.hidden = paused || !heroReady || !pad;
+  if (pad) recruitHint.textContent = pad.pending ? `⛺ 모집 중 ${Math.ceil(pad.remaining)}초 · ${pad.live}/${pad.capacity}명`
+    : pad.live>=pad.capacity ? `⛺ ${DEFS[pad.tent].name} · 정원 ${pad.capacity}명 충원 완료`
+    : G.money<30 ? `⛺ 일꾼 충원 $30 · 자금이 부족합니다`
+    : `⛺ 네모 칸에 서 있으면 $30씩 자동 충원 · ${pad.live}/${pad.capacity}명`;
+  document.body.classList.toggle('has-recruit',!recruitHint.hidden);
 }

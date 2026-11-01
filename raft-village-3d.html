@@ -38,11 +38,12 @@ body{background:var(--sea);color:var(--ink);font-family:var(--body);touch-action
 #money{top:calc(10px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));width:126px;height:44px;display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:3px 11px 3px 4px;font-size:24px;font-variant-numeric:tabular-nums;background:#e8ffcf;border-color:#3c663b;transition:transform .12s}
 #money i{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#63ca44;border:2px solid #3d8a30;color:#fff;font-style:normal;font-size:20px;box-shadow:inset 0 2px 0 #b2f080;text-shadow:0 1px 0 #347c29;flex:none}
 #money.pulse{transform:scale(1.08)}
-#level{top:calc(60px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));height:24px;width:126px;padding:0 5px;display:flex;gap:5px;align-items:center;border-width:2px;border-radius:9px;font-size:12px;box-shadow:none}
+#level{top:calc(60px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));height:36px;width:126px;padding:2px 5px;display:flex;flex-direction:column;gap:2px;align-items:center;border-width:2px;border-radius:9px;font-size:12px;box-shadow:none}
 #level b{font-weight:400;color:#7c542c;white-space:nowrap}
+#level>div{display:flex;gap:5px;align-items:center;width:100%}#heroStats{font-size:10px;line-height:1.1;white-space:nowrap}
 #level s{display:block;flex:1;height:7px;background:#e8dcc6;border-radius:4px;overflow:hidden;text-decoration:none}
 #level s i{display:block;height:100%;width:0;background:#f7bc39;transition:width .2s}
-#goal{top:calc(92px + env(safe-area-inset-top,0px));left:10px;right:10px;max-width:none;padding:6px 10px;font-size:14px;line-height:1.35;word-break:keep-all;border-color:#349ca8;background:#edffff;box-shadow:0 3px 0 #227c8b50;text-align:center;white-space:normal}
+#goal{top:calc(102px + env(safe-area-inset-top,0px));left:10px;right:10px;max-width:none;padding:6px 10px;font-size:14px;line-height:1.35;word-break:keep-all;border-color:#349ca8;background:#edffff;box-shadow:0 3px 0 #227c8b50;text-align:center;white-space:normal}
 #goal::before{content:attr(data-label);display:inline-block;margin-right:6px;padding:2px 5px;border-radius:5px;background:#78dbd4;color:#225961;font-size:10px;vertical-align:1px;white-space:nowrap}
 #goal[data-kind=build]{border-color:#9b6b2d;background:#fff6d6}#goal[data-kind=build]::before{background:#ffd86c;color:#765020}
 #goal[data-kind=danger]{border-color:#9a3d36;background:#ffe8de}#goal[data-kind=danger]::before{background:#fa8a75;color:#763029}
@@ -88,7 +89,7 @@ body{background:var(--sea);color:var(--ink);font-family:var(--body);touch-action
 <canvas id="game" aria-label="표류 뗏목 마을 게임 화면"></canvas>
 <div class="hud" id="dayCard"><b>해상 생존 <em id="day">1</em>일차</b><span id="km">항해 거리 0 km</span></div>
 <div class="hud" id="money"><i>$</i><span id="moneyVal">0</span></div>
-<div class="hud" id="level"><b id="lv">Lv.1</b><s><i id="xpBar"></i></s></div>
+<div class="hud" id="level"><div><b id="lv">선장 Lv.1</b><s><i id="xpBar"></i></s></div><small id="heroStats">⚔ 4 · ♥ 40/40</small></div>
 <div class="hud" id="goal" role="status" aria-live="polite">낚시터에서 생선을 챙기세요</div>
 <div class="hud" id="bag" role="button" tabindex="0" aria-label="가방 비우기">🎒 0/10</div>
 <div class="hud" id="quest"><div id="qTitle">📜 퀘스트</div><div id="qText"></div><span id="qBar"><i id="qFill"></i></span></div>
@@ -108,8 +109,8 @@ body{background:var(--sea);color:var(--ink);font-family:var(--body);touch-action
       <li>일꾼 텐트를 지으면 선원 2명이 합류하고, 텐트를 증축할 때마다 2명씩 더 들어옵니다</li>
       <li>🧭 첫 확장 뒤 다음 습격을 확인하고 무역·방어·정찰 중 한 번 준비하세요. 5회 방어 성공 시 항로 확보 보상을 받습니다.</li>
       <li>손님은 15초 넘게 기다리면 그냥 떠납니다</li>
-      <li>1차 뗏목 확장 뒤부터 해적의 습격이 시작됩니다. 뗏목 가장자리에 🗼 망루 포탑을 세워 막으세요. 해적선에 다가가면 주인공도 자동으로 사격합니다</li>
-      <li>해적이 오면 선원들이 일을 멈추고 칼을 들어 상륙한 해적과 맞붙습니다. 일꾼이 전사하면 ⛺ 텐트 충원에서 비용을 내고 새 일꾼을 모집하세요 (기본 $30 · 5초)</li>
+      <li>1차 뗏목 확장 뒤부터 해적의 습격이 시작됩니다. 뗏목 가장자리에 🗼 망루 포탑을 세워 막으세요. 상륙한 해적에게 다가가면 선장도 자동으로 칼을 휘두릅니다. 공격·처치로 전투 경험치를 얻고, 참전한 습격에서 승리하면 레벨이 오릅니다. 레벨마다 공격력 +2, 최대 체력 +6! 해적 Lv.5·10·15마다 보스가 직접 상륙합니다</li>
+      <li>해적이 오면 선원들이 일을 멈추고 칼을 들어 상륙한 해적과 맞붙습니다. 일꾼이 전사하면 ⛺ 텐트 앞 네모 칸에 서 있으세요. 단계와 관계없이 1명당 $30을 내고 5초마다 자동 충원합니다. 칸을 떠나면 추가 결제가 멈춥니다</li>
       <li>해적선이 붙으면 해적이 뗏목에 상륙합니다. 해군과 포탑이 맞서 싸웁니다</li>
       <li>상륙 해적은 선원과 칼로 싸웁니다. 방어 인원이 모두 전사하면 해적은 철수하며, 돈과 시설은 약탈하지 않습니다</li>
     </ul>
@@ -366,6 +367,7 @@ function build(data) {
   G = data;
   G.tactic = G.tactic || null;
   G.level = G.level || 1; G.xp = G.xp || 0; G.strike = false;
+  initializeHeroState();
   if (!G.ws) { G.px *= 1.25; G.py *= 1.25; G.ws = 1; } // 넓어진 뗏목 좌표로 변환
   G.stats = G.stats || {}; G.qi = G.qi || 0; if (!G.qBase) G.qBase = {};
   G.slv = G.slv || {}; G.st.base = G.st.base || { food: 0 };
@@ -384,6 +386,7 @@ function build(data) {
   runtime = {};
   for (const id of STATION_IDS) runtime[id] = { timer: 0, spawn: 1 + Math.random(), queue: [], leaving: [], serveT: 0 };
   player = { x: G.px, y: G.py, bob: 0, moving: false, timer: 0, cd: 0 };
+  restoreHeroRuntime();
   const navy = Array.isArray(G.navyRoster) ? G.navyRoster : null;
   const navyCount = navy ? navy.length : G.soldiers;
   for (let i = 0; i < navyCount; i++) { spawnSoldier(i); if (navy) Object.assign(soldiers[i], navy[i]); }
@@ -418,7 +421,7 @@ function visiblePads() {
 /* ---------- 저장 ---------- */
 const KEY = 'raft-village-3d-v1';
 function serialize() {
-  snapshotCrewRoster();
+  snapshotCrewRoster(); snapshotHero();
   G.combat = { raidOn, looted, enemies, balanceVersion: PIRATE_BALANCE_VERSION };
   G.unlocked = [...unlocked]; G.px = player.x; G.py = player.y;
   return JSON.parse(JSON.stringify(G));
@@ -890,7 +893,7 @@ function killCrew(c) {
   workers.splice(i, 1);
   floatText(c.x, c.y, '선원 쓰러짐', '#ffb0a0'); dust(c.x, c.y, 10);
   c.dead = true; c.fighting = false; c.swingT = 0; c.deathT = 0; fallenCrew.push(c);
-  toast('⛺ 일꾼 전사 · 텐트 충원 버튼에서 새 일꾼을 모집하세요'); save();
+  toast('⛺ 일꾼 전사 · 텐트 앞 칸에 서서 $30씩 자동 충원하세요'); save();
 }
 function killSoldier(s) {
   const i = soldiers.indexOf(s); if (i < 0) return;
@@ -899,7 +902,7 @@ function killSoldier(s) {
   floatText(s.x, s.y, '해군 전사', '#ffb0a0'); dust(s.x, s.y, 8);
 }
 function startRaid() {
-  G.wave++; G.raidHadCrew = workers.length + soldiers.length > 0;
+  G.wave++; G.raidHadCrew = workers.length + soldiers.length > 0 || isHeroAvailable();
   const n = Math.min(14, 2 + Math.floor(G.wave * 0.9) + Math.floor(Math.random() * 2) + (raidPlan(G.wave).type === 'thief' ? 2 : 0)), baseA = rnd(0, 6.28);
   for (let i = 0; i < n; i++) {
     const big = G.wave >= 4 && i % 3 === 2;
@@ -912,6 +915,7 @@ function startRaid() {
   raidIntro = { t: 0, n };
 }
 function sinkEnemy(e) {
+  if (e.boss) spawnBossBoarder(e);
   e.state = 'sink';
   const reward = Math.round((e.boss ? 25 : e.big ? 3 : 1) * (12 + G.wave * 4) * lootMul());
   if (e.boss) toast('☠️ 보스 격침! 큰 현상금을 받았습니다');
@@ -943,7 +947,7 @@ function updateMilitary(dt) {
   // 습격 주기
   const active = enemies.some(alive);
   if (raidOn && !active) { raidOn = false; G.raidT = Math.max(12, 30 - 6 * ck('smuggler'));  if (!looted) { toast('해적을 격퇴했습니다'); offerCards(); } finishStrategyRaid(looted); looted = false; }
-  if (!raidOn) { G.hp = Math.min(hpMax(), G.hp + (1 + 2 * ck('regen')) * dt); if (workers.length || soldiers.length) G.raidT -= dt; else G.raidT = Math.max(10, G.raidT); if (G.raidT <= 0) { startRaid(); raidOn = true; } }
+  if (!raidOn) { G.hp = Math.min(hpMax(), G.hp + (1 + 2 * ck('regen')) * dt); if (workers.length || soldiers.length || isHeroAvailable()) G.raidT -= dt; else G.raidT = Math.max(10, G.raidT); if (G.raidT <= 0) { startRaid(); raidOn = true; } }
   // 해적선
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
@@ -959,6 +963,7 @@ function updateMilitary(dt) {
       e.boardT = (e.boardT ?? rnd(2, 4)) - dt;
       if (e.boardT <= 0) {
         e.boardT = rnd(4, 6) * raidPlan(G.wave).boarding;
+        if (e.boss) spawnBossBoarder(e);
         const budget = e.landingBudget || (e.boss ? 8 : e.big ? 4 : 2);
         const burst = e.boarded ? 1 : e.big ? 3 : 2;
         for (let k = 0; k < burst && (e.boarded || 0) < budget; k++) {
@@ -982,10 +987,7 @@ function updateMilitary(dt) {
     st.yaw = Math.atan2(tgt.x - d.x, tgt.y - d.y);
     if (st.cd <= 0) { st.cd = 1.8 / (1 + 0.2 * (bl - 1)) / (1 + 0.25 * ck('towerRate')); shoot(d, tgt, 'ball', 12 * mult * (1 + 0.3 * ck('towerDmg') + 0.6 * ck('glass')), 0.8, 50, 40); if (ck('towerDouble')) { const t2 = nearestEnemy(tgt.x, tgt.y, 3) || tgt; shoot(d, t2, 'ball', 12 * mult * (1 + 0.3 * ck('towerDmg') + 0.6 * ck('glass')), 0.95, 56, 40); } shake = Math.max(shake, 0.07); booms.push({ x: d.x, y: d.y, t: 0.25, kind: 'ball' }); }
   }
-  // 주인공도 가까운 해적선에 물총
-  player.cd -= dt;
-  const pt = nearestEnemy(player.x, player.y, 3.5 + ck('playerGun'));
-  if (pt && player.cd <= 0) { player.cd = 0.45; shoot(player, pt, 'water', 1 + 2 * ck('playerGun'), 0.3, 4, 24); }
+  updateHeroCombat(dt);
   // 탄환
   for (let i = shots.length - 1; i >= 0; i--) {
     const s = shots[i]; s.t += dt;
@@ -1083,14 +1085,14 @@ function payWages() {
 }
 function removeFromStack(type) { const i = G.stack.lastIndexOf(type); if (i >= 0) { G.stack.splice(i, 1); return true; } return false; }
 function update(dt) {
-  G.t += dt;
+  G.t += dt; tickHeroState(dt);
   const dayNow = 1 + Math.floor(G.t / 40);
   if (G.lastDay && dayNow > G.lastDay) payWages();
   G.lastDay = dayNow;
   tickRecruitment(dt);
   checkQuest();
   // 이동
-  const dir = inputDir(), acc = Math.min(1, dt * (dir ? 12 : 9));
+  const dir = isHeroAvailable() ? inputDir() : null, acc = Math.min(1, dt * (dir ? 12 : 9));
   player.vx = (player.vx || 0) + ((dir ? dir.x * 3.8 * (1 + 0.15 * ck('speed')) : 0) - (player.vx || 0)) * acc;
   player.vy = (player.vy || 0) + ((dir ? dir.y * 3.8 * (1 + 0.15 * ck('speed')) : 0) - (player.vy || 0)) * acc;
   const pnx = player.x + player.vx * dt, pny = player.y + player.vy * dt;
@@ -1119,7 +1121,7 @@ function update(dt) {
   updateMilitary(dt);
   // 상호작용
   player.timer -= dt;
-  if (player.timer <= 0) {
+  if (isHeroAvailable() && player.timer <= 0) {
     player.timer = 0.065;
     if (unlocked.has('base') && G.st.base.food < 30 && dist(player.x, player.y, BASE_ZONE.x, BASE_ZONE.y) < 1.0) {
       const i = G.stack.findLastIndex(t => FOODS.includes(t));
@@ -1140,14 +1142,14 @@ function update(dt) {
   // 돈 줍기
   for (const id of STATION_IDS) {
     const d = DEFS[id], s = G.st[id];
-    if (d.type !== 'shop' || s.cash <= 0 || dist(player.x, player.y, d.cx, d.cy) > 0.9) continue;
+    if (!isHeroAvailable() || d.type !== 'shop' || s.cash <= 0 || dist(player.x, player.y, d.cx, d.cy) > 0.9) continue;
     flyBills(S(d.cx, d.cy), Math.ceil(s.cash / 6), true);
     floatText(d.cx, d.cy, `+$${fmt(s.cash)}`, '#c8ffc8'); earn(0);
     G.money += s.cash; s.cash = 0; setTimeout(bumpMoney, 450);
   }
   // 건설 칸
   for (const p of visiblePads()) {
-    if (dist(player.x, player.y, p.x, p.y) > 0.65 || G.money <= 0) continue;
+    if (!isHeroAvailable() || dist(player.x, player.y, p.x, p.y) > 0.65 || G.money <= 0) continue;
     const paid = G.paid[p.id] || 0, rem = p.cost - paid;
     const amt = Math.min(G.money, rem, Math.max(1, Math.round(p.cost * dt / 1.4)));
     G.money -= amt; G.paid[p.id] = paid + amt;
@@ -1173,9 +1175,10 @@ function update(dt) {
 
 /* ---------- 목표 안내 ---------- */
 function objective() {
+  if (!isHeroAvailable()) return {x:5,y:3.75,text:`💫 선장 회복 중 · ${Math.ceil(G.hero.downT)}초 뒤 전투 복귀`};
   if (raidOn) {
     const e = nearestEnemy(player.x, player.y, 999);
-    if (e) { const p = shorePoint(e.x, e.y); return { x: p.x, y: p.y, text: '⚔️ 갑판 전투 — 선원들이 해적과 칼로 맞서 싸웁니다' }; }
+    if (e) { const p = shorePoint(e.x, e.y); return { x: p.x, y: p.y, text: '⚔️ 해적에게 다가가 검으로 싸우세요 · 참전 후 승리하면 선장 레벨 UP!' }; }
   }
   const pads = visiblePads().sort((a, b) => (a.cost - (G.paid[a.id] || 0)) - (b.cost - (G.paid[b.id] || 0)));
   const p = pads[0];
@@ -1270,6 +1273,7 @@ function strategyHud() {
 }
 function finishStrategyRaid(wasLooted) {
   if (!wasLooted) {
+    awardHeroVictory();
     G.defended = (G.defended || 0) + 1;
     if (G.defended >= 5 && !G.expeditionWon) {
       G.expeditionWon = true; G.money += 200;
@@ -1618,19 +1622,27 @@ function syncPads(vp) {
     o.fill.material.dispose(); o.border.material.dispose(); o.ripple.material.dispose(); padObjs.delete(id);
   }
   for (const p of vp) {
-    const o = padObjs.get(p.id) || buildPad(p), left = p.cost - (G.paid[p.id] || 0), afford = G.money >= left, ratio = (G.paid[p.id] || 0) / p.cost;
+    const o = padObjs.get(p.id) || buildPad(p), left = p.recruit ? 30 : p.cost - (G.paid[p.id] || 0), afford = p.recruit ? p.canRecruit : G.money >= left, ratio = p.recruit ? (p.pending ? 1 - p.remaining / 5 : 0) : (G.paid[p.id] || 0) / p.cost;
     const far = dist(player.x, player.y, p.x, p.y) > 6.5 && !afford;
     o.g.visible = !far || dist(player.x, player.y, p.x, p.y) < 9;
-    o.border.material.color.setHex(afford ? 0xffd84d : 0xffffff); o.border.material.opacity = far ? 0.35 : 0.9;
+    o.border.material.color.setHex(p.recruit ? 0x24b39e : afford ? 0xffd84d : 0xffffff); o.border.material.opacity = far ? 0.35 : 0.9;
     // 패드마다 바뀌는 재질은 공유하지 않아 다른 칸의 상태를 덮어쓰지 않습니다.
     if (!o.base.userData.ownMaterial) { o.base.material = o.base.material.clone(); o.base.userData.ownMaterial = true; }
-    o.base.material.color.setHex(afford ? 0xffec9b : 0xfffbeb);
-    const labelSig = `${p.icon}|${Math.ceil(left)}|${afford}`;
+    o.base.material.color.setHex(p.recruit ? 0xd2fff0 : afford ? 0xffec9b : 0xfffbeb);
+    const labelSig = `${p.icon}|${Math.ceil(left)}|${afford}|${p.live}|${p.capacity}|${p.pending}|${Math.ceil(p.remaining || 0)}`;
     if (o.labelSig !== labelSig && (o.labelSig === '' || G.t - o.labelTime > 0.15 || o.labelTime > G.t)) {
       const c = o.labelCanvas.getContext('2d'); c.clearRect(0, 0, 128, 128);
-      c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = '42px sans-serif'; c.fillText(p.icon, 64, 35);
-      c.font = 'bold 38px sans-serif'; c.fillStyle = afford ? '#348b30' : '#665947';
-      c.fillText('$' + fmt(Math.ceil(left)), 64, 91, 120);
+      c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#415a43';
+      if (p.recruit) {
+        c.font = 'bold 26px sans-serif'; c.fillText(`일꾼 ${p.live}/${p.capacity}`,64,27,120);
+        c.font = 'bold 36px sans-serif'; c.fillStyle = '#178c74';
+        c.fillText(p.pending ? `${Math.ceil(p.remaining)}초` : p.live >= p.capacity ? '완료' : '$30',64,77,120);
+        c.font = 'bold 17px sans-serif'; c.fillText(p.pending ? '모집 중' : p.live >= p.capacity ? '정원 충원' : '서서 자동 충원',64,110,120);
+      } else {
+        c.font = '42px sans-serif'; c.fillText(p.icon, 64, 35);
+        c.font = 'bold 38px sans-serif'; c.fillStyle = afford ? '#348b30' : '#665947';
+        c.fillText('$' + fmt(Math.ceil(left)), 64, 91, 120);
+      }
       o.labelTexture.needsUpdate = true; o.labelSig = labelSig; o.labelTime = G.t;
     }
     o.fill.visible = ratio > 0; o.fill.scale.y = Math.max(0.001, ratio);
@@ -1880,10 +1892,11 @@ function sync3D(dt) {
   world.position.y = raftY;
   playerMarker.position.set(player.x, 0.085, player.y);
   shallow.position.set(raftC.x, -0.2, raftC.y); shallow.scale.setScalar(raftC.r * 2.8);
-  syncRaft(); syncStations(); syncPads(visiblePads()); syncSharks(dt); bossHud();
+  syncRaft(); syncStations(); syncPads([...visiblePads(), ...recruitmentPads()]); syncSharks(dt); bossHud();
   // 캐릭터
   for (const m of models.values()) m.seen = false;
-  const pm = charModel(player, () => mkChar('player', player)); pm.rifle.visible = raidOn; animChar(pm, player, dt); syncStack(pm.carry, G.stack);
+  const pm = charModel(player, () => mkChar('player', player)); pm.rifle.visible = false; animChar(pm, player, dt, { fighting: !!player.fighting, dead: !!player.dead }); syncStack(pm.carry, G.stack);
+  if (!pm.gl) pm.root.rotation.z = player.dead ? Math.min(Math.PI / 2, (8 - G.hero.downT) * 3) : 0;
   for (const w of workers) { const m = charModel(w, () => mkChar('worker', w)); m.rifle.visible = false; m.carry.visible = !raidOn; animChar(m, w, dt, { fighting: !!w.fighting }); syncStack(m.carry, w.carry); }
   const navyModel = s => {
     const m = attachCharacterGear(makeKid3(SOLDIER_LOOKS[(s.ph * 10 | 0) % SOLDIER_LOOKS.length]));
@@ -1906,6 +1919,10 @@ function sync3D(dt) {
     if (e.kind !== 'boarder') continue;
     const m = charModel(e, () => mkChar('boarder', e));
     animChar(m, e, dt, { fighting: e.fighting && alive(e), dead: e.state === 'sink' });
+    if (e.champion) {
+      if (!m.bossRing) { m.bossRing = ringMesh(0.48,0.58,0xffd34d,0.9); m.root.add(m.bossRing); }
+      m.bossRing.position.y = 0.055; m.bossRing.visible = alive(e);
+    }
     if (!m.gl && e.state === 'sink') { m.root.rotation.x = Math.min(1.4, e.sinkT * 2); m.root.position.y = -Math.max(0, e.sinkT - 0.7) * 0.6; }
   }
   for (const [ent, m] of models) if (!m.seen) { world.remove(m.root); models.delete(ent); }
@@ -2115,14 +2132,15 @@ function mkChar(kind, ent) {
         ? { shirt: '#547f91', pants: '#8f7b52', hair: '#354d61', skin: '#7ba6b7' }
         : { shirt: ent.shirt || '#66777b', pants: '#637c86', hair: ent.hair || '#3c291d', skin: '#bf946e' };
     const m = makeAdult3({ ...colors, bandana: true });
-    m.melee = kind === 'worker' || kind === 'boarder';
+    m.melee = kind !== 'customer';
+    if (ent.champion) m.root.scale.multiplyScalar(1.42);
     return attachCharacterGear(m, m.body, 1.08, 0.32);
   }
   const n = Math.floor((ent.ph || 0) * 10);
-  if (kind === 'player') return makeGL('captain', { height: 1.78, weapon: 'always' });
+  if (kind === 'player') { const m = makeGL('captain', { height: 1.78, weapon: 'always' }); m.melee = true; return m; }
   if (kind === 'worker') { const m = makeGL('henry', { height: 1.58, weapon: 'never' }); m.melee = true; return m; }
   if (kind === 'customer') return makeGL(n % 3 === 0 ? 'captain' : 'henry', { height: 1.55, weapon: 'never' });
-  const m = makeGL(n % 2 ? 'mako' : 'sharky', { height: 1.65, weapon: 'always' });
+  const m = makeGL(ent.champion ? 'mako' : n % 2 ? 'mako' : 'sharky', { height: ent.champion ? 2.35 : 1.65, weapon: 'always' });
   m.melee = true;
   return m;
 }
@@ -2154,7 +2172,7 @@ function syncSharks(dt) {
 }
 
 /* ---------- 3D 전용 재미 요소: 강화 카드 · 해적 종류 · 보스 ---------- */
-const PIRATE_BALANCE = Object.freeze({ health: 4, damage: 4, shipSpeed: 2, crewSpeed: 0.5 });
+const PIRATE_BALANCE = Object.freeze({ health: 4, damage: 4 / 3, shipSpeed: 2, crewSpeed: 0.5 });
 const PIRATE_BALANCE_VERSION = 2;
 // 진행 중인 구버전 습격도 남은 체력 비율을 유지해 한 번만 새 난이도로 전환.
 function restorePirateBalance(combat) {
@@ -2177,7 +2195,7 @@ const CARDS = [
   { id: 'towerDouble', icon: '💥', name: '2연발 포탄', desc: '포탑이 한 번에 두 발 발사', max: 1, need: () => TOWERS.some(t => unlocked.has(t)) },
   { id: 'crewPower', icon: '⚔️', name: '선원 훈련', desc: '선원·해군 공격력 +40%', max: 5 },
   { id: 'crewHp', icon: '🛡️', name: '튼튼한 선원', desc: '선원 체력 +50%', max: 4 },
-  { id: 'playerGun', icon: '🔫', name: '왕물총', desc: '주인공 물총 피해 ×3, 사거리 +1', max: 3 },
+  { id: 'playerGun', icon: '⚔️', name: '선장의 검술', desc: '선장 공격력 +2 · 검 사거리 +0.15', max: 3 },
   { id: 'price', icon: '🐟', name: '흥정 달인', desc: '모든 판매가 +20%', max: 5 },
   { id: 'speed', icon: '👟', name: '날쌘 발', desc: '주인공 이동 속도 +15%', max: 3 },
   { id: 'villageHp', icon: '🏰', name: '전투 의무실', desc: '일꾼 최대 체력 +10, 즉시 아군 전원 회복', max: 6 },
@@ -2237,7 +2255,7 @@ function offerCards() {
 function takeCard(c) {
   if (cardPanel.hidden || !G.cardOffer?.includes(c.id) || ck(c.id) >= c.max) return;
   G.cards[c.id] = ck(c.id) + 1; G.cardOffer = null;
-  if (c.id === 'villageHp') { G.hp = hpMax(); for (const w of workers) w.hp = crewHpMax(); for (const s of soldiers) s.hp = 12; }
+  if (c.id === 'villageHp') { if (isHeroAvailable()) { player.hp = heroMaxHp(); snapshotHero(); } G.hp = hpMax(); for (const w of workers) w.hp = crewHpMax(); for (const s of soldiers) s.hp = 12; }
   if (c.id === 'bag') cap += 5;
   cardPanel.hidden = true; paused = false; last = performance.now();
   toast(`${c.icon} ${c.name} 획득!`); save();
@@ -2268,35 +2286,45 @@ function setupBoarder(e) {
 }
 function nearestCrew(e, range) {
   let foe = null, fd = range;
-  for (const s of [...soldiers, ...workers]) { const d = dist(e.x, e.y, s.x, s.y); if (d < fd) { fd = d; foe = s; } }
+  for (const s of [...soldiers, ...workers, ...(isHeroAvailable() ? [player] : [])]) { if (s.hp <= 0 || s.dead) continue; const d = dist(e.x, e.y, s.x, s.y); if (d < fd) { fd = d; foe = s; } }
   return foe;
 }
 function updateBoarder(e, dt) { updateSwordBoarder(e, dt); }
 
-// 5번째 습격마다 해골 선장 보스선: 일제 사격 + 졸개 소환
+// 해적 Lv.5·10·15마다 보스선에서 상어 대장이 직접 상륙합니다.
 function spawnBoss() {
   const a = rnd(0, 6.28), r = raftC.r + 16;
   const hp = PIRATE_BALANCE.health * Math.round(10 * (12 + G.wave * 5) * pirMul());
   enemies.push({ x: raftC.x + Math.cos(a) * r, y: raftC.y + Math.sin(a) * r, hp, max: hp, big: true, boss: true, state: 'approach', fireT: 2, bob: 0, sinkT: 0, ang: 0, salvoT: 4, summonT: 6 });
-  setTimeout(() => toast(`☠️ 보스 등장! 해골 선장 Lv.${G.wave}의 거대 해적선`), 1600);
+  setTimeout(() => toast(`☠️ 보스 침공! 상어 대장 Lv.${G.wave} · 갑판 전투 준비`), 1600);
+}
+
+function spawnBossBoarder(ship) {
+  if (!ship?.boss || ship.kind === 'boarder' || ship.bossBoarded || G.bossBoardedWave === G.wave) return;
+  ship.bossBoarded = true; G.bossBoardedWave = G.wave;
+  const p = shorePoint(ship.x, ship.y), hp = Math.max(140, Math.round(120 * pirMul() + 8 * G.wave));
+  enemies.push({ kind:'boarder', boss:true, champion:true, type:'boss', x:p.x, y:p.y,
+    hp, max:hp, attackMul:2, state:'walk', atkT:1.1, bob:0, vx:0, vy:0, sinkT:0,
+    ang:0, ph:0.1, home:{x:p.x,y:p.y}, goal:{x:p.x,y:p.y} });
+  dust(p.x,p.y,14); toast('☠️ 상어 대장 상륙! 선장과 선원이 함께 맞서 싸우세요');
 }
 function bossTick(e, dt) {
   // 보스도 포격·약탈 대신 상륙 병력을 보내 갑판 전투를 벌입니다.
   e.landingBudget = 8;
 }
 function bossHud() {
-  const b = enemies.find(e => e.boss && alive(e));
+  const b = enemies.find(e => e.champion && alive(e)) || enemies.find(e => e.boss && !e.bossBoarded && alive(e));
   bossBar.hidden = !b; document.body.classList.toggle('has-boss', !!b);
   if (!b) return;
-  bossBar.querySelector('.nm').textContent = `☠️ 해골 선장 Lv.${G.wave} · ${Math.ceil(b.hp)}/${b.max}`;
+  bossBar.querySelector('.nm').textContent = `☠️ ${b.champion ? '상어 대장' : '보스선 접근 중'} Lv.${G.wave} · ${Math.ceil(b.hp)}/${b.max}`;
   bossBar.querySelector('.fill').style.width = `${Math.max(0, b.hp / b.max) * 100}%`;
 }
 
 /* ---------- 갑판 백병전: 약탈 없이 선원을 추격하는 해적 ---------- */
 const MELEE_REACH = 0.95;
 function tickMeleeEffects(dt) {
-  if (raidOn && workers.length + soldiers.length > 0) G.raidHadCrew = true;
-  for (const unit of [...workers, ...soldiers, ...enemies]) {
+  if (raidOn && (workers.length + soldiers.length > 0 || isHeroAvailable())) G.raidHadCrew = true;
+  for (const unit of [player, ...workers, ...soldiers, ...enemies]) {
     unit.swingT = Math.max(0, (unit.swingT || 0) - dt);
     unit.hurtT = Math.max(0, (unit.hurtT || 0) - dt);
   }
@@ -2312,7 +2340,18 @@ function swordStrike(attacker, target, damage, enemy = false) {
   attacker.swingT = 0.4; target.hurtT = 0.25; target.hp -= actual;
   booms.push({ x: (attacker.x + target.x) / 2, y: (attacker.y + target.y) / 2, t: 0, kind: 'water' });
   floaters.push({ x: target.x, y: target.y, text: `-${Math.ceil(actual)}`, color: enemy ? '#ff987c' : '#ffe997', t: 0, combat: true });
-  if (target.hp <= 0) { if (enemy) killCrew(target); else killBoarder(target); }
+  if (attacker === player || target === player) G.hero.engagedWave = G.wave;
+  if (attacker === player) {
+    const defeated = target.hp <= 0;
+    gainCombatXp(2 + (defeated ? target.champion ? 28 : 8 : 0));
+    if (defeated) G.hero.kills++;
+  }
+  if (target.hp <= 0) {
+    if (target === player) knockOutHero();
+    else if (enemy) killCrew(target);
+    else killBoarder(target);
+  }
+  if (target === player) snapshotHero();
 }
 function updateSwordBoarder(e, dt) {
   if (e.state === 'retreat') {
@@ -2332,7 +2371,7 @@ function updateSwordBoarder(e, dt) {
   }
   stopMove(e, dt); e.fighting = true;
   e.atkT = (e.atkT ?? 0.8) - dt;
-  if (e.atkT <= 0) { e.atkT = 1.05; swordStrike(e, foe, (e.type === 'bomber' ? 6 : e.type === 'sniper' ? 3 : 2.5) * pirMul() * PIRATE_BALANCE.damage, true); }
+  if (e.atkT <= 0) { e.atkT = 1.05; swordStrike(e, foe, (e.type === 'bomber' ? 6 : e.type === 'sniper' ? 3 : 2.5) * pirMul() * PIRATE_BALANCE.damage * (e.attackMul || 1), true); }
 }
 function updateDefenders(dt, bl, mult) {
   const foes = enemies.filter(e => e.kind === 'boarder' && alive(e));
@@ -2381,7 +2420,7 @@ function updateDefenders(dt, bl, mult) {
       swordStrike(unit, foe, (worker ? 3 * (1 + 0.1 * (lv() - 1)) : 4.5 * mult) * crewMul());
     }
   }
-  if (raidOn && G.raidHadCrew && !workers.length && !soldiers.length) {
+  if (raidOn && G.raidHadCrew && !workers.length && !soldiers.length && !isHeroAvailable()) {
     looted = true; G.raidHadCrew = false;
     for (const e of enemies) if (alive(e)) {
       e.fighting = false; e.state = e.kind === 'boarder' ? 'retreat' : 'flee'; e.retreatT = 2;
@@ -2390,10 +2429,76 @@ function updateDefenders(dt, bl, mult) {
   }
 }
 
+/* ---------- 선장 백병전·전투 성장 (마을 생산 숙련도와 별도 저장) ---------- */
+const heroLevel = () => G.hero?.level || 1;
+const heroXpNeed = (level = heroLevel()) => 20 + 10 * (level - 1);
+const heroAttack = () => 4 + 2 * (heroLevel() - 1) + 2 * ck('playerGun');
+const heroMaxHp = () => 40 + 6 * (heroLevel() - 1);
+const isHeroAvailable = () => !!player && !player.dead && player.hp > 0 && !(G.hero?.downT > 0);
+function initializeHeroState() {
+  const old = G.hero || {};
+  G.hero = { level: Math.max(1, Math.floor(old.level || G.level || 1)), xp: Math.max(0, old.xp || 0),
+    downT: Math.max(0, old.downT || 0), kills: old.kills || 0,
+    engagedWave: old.engagedWave || 0, rewardedWave: old.rewardedWave || 0 };
+  G.hero.hp = Math.max(0, Math.min(heroMaxHp(), old.hp ?? heroMaxHp()));
+  if (!G.hero.hp && !G.hero.downT) G.hero.downT = 8;
+}
+function restoreHeroRuntime() {
+  player.hp = G.hero.hp; player.dead = G.hero.downT > 0 || player.hp <= 0;
+  player.fighting = false; player.swingT = 0; player.hurtT = 0;
+}
+function snapshotHero() { G.hero.hp = Math.max(0, player.hp); }
+function gainCombatXp(n) {
+  if (!(n > 0)) return;
+  G.hero.xp += n;
+  let gained = 0;
+  while (G.hero.xp >= heroXpNeed()) {
+    G.hero.xp -= heroXpNeed(); G.hero.level++; gained++;
+    if (isHeroAvailable()) player.hp = Math.min(heroMaxHp(), player.hp + 6);
+  }
+  if (gained) {
+    toast(`⚔️ 선장 Lv.${heroLevel()}! 공격력 ${heroAttack()} · 체력 ${heroMaxHp()}`);
+    floatText(player.x, player.y, `Lv.${heroLevel()} ↑`, '#ffe485');
+  }
+  snapshotHero();
+}
+function awardHeroVictory() {
+  if (!G.wave || G.hero.engagedWave !== G.wave || G.hero.rewardedWave === G.wave) return;
+  G.hero.rewardedWave = G.wave;
+  gainCombatXp(Math.max(heroXpNeed() - G.hero.xp, 10 + 2 * G.wave));
+}
+function knockOutHero() {
+  player.hp = 0; player.dead = true; player.fighting = false; player.swingT = 0;
+  player.vx = player.vy = 0; G.hero.downT = 8; snapshotHero();
+  toast('💫 선장이 쓰러졌습니다 · 8초 뒤 회복합니다'); save();
+}
+function tickHeroState(dt) {
+  if (G.hero.downT > 0) {
+    G.hero.downT = Math.max(0, G.hero.downT - dt);
+    player.vx = player.vy = 0; player.moving = false;
+    if (!G.hero.downT) {
+      player.dead = false; player.hp = heroMaxHp(); player.x = 5; player.y = 3.75;
+      player.cd = 0.65; player.hurtT = 0; toast('⚔️ 선장이 회복했습니다!'); save();
+    }
+  } else if (!raidOn && isHeroAvailable()) player.hp = Math.min(heroMaxHp(), player.hp + 3 * dt);
+  snapshotHero();
+}
+function updateHeroCombat(dt) {
+  player.fighting = false; player.aimYaw = undefined;
+  player.cd = Math.max(0, (player.cd || 0) - dt);
+  if (!raidOn || !isHeroAvailable()) return;
+  const foe = nearestEnemy(player.x, player.y, 1.25 + 0.15 * ck('playerGun'), 'boarder');
+  if (!foe) return;
+  player.fighting = true; player.aimYaw = Math.atan2(foe.x - player.x, foe.y - player.y);
+  if (player.cd > 0) return;
+  player.cd = 0.65;
+  swordStrike(player, foe, heroAttack());
+}
+
 /* ---------- 텐트별 유료 일꾼 충원·명부 저장 ---------- */
 const tentCapacity = id => DEFS[id]?.type === 'tent' ? DEFS[id].workers + (slv(id) - 1) * 2 : 0;
 const crewCount = id => workers.filter(w => w.tent === id && w.hp > 0).length;
-const recruitmentCost = id => 30 + (slv(id) - 1) * 10;
+const recruitmentCost = () => 30;
 const crewTents = () => [...unlocked].filter(id => DEFS[id]?.type === 'tent');
 function snapshotCrewRoster() {
   const record = w => ({ x: w.x, y: w.y, hp: w.hp, ph: w.ph, bob: 0,
@@ -2423,77 +2528,91 @@ function restoreCrewRoster(legacyRespawn) {
   }
   G.crewRoster = workers.map(w => ({ tent: w.tent, x: w.x, y: w.y, hp: w.hp, carry: [...w.carry], ph: w.ph, look: w.look }));
 }
+// 후보는 텐트 입구 쪽부터 검사합니다. 향후 건설·증축 칸도 피해 저장 후 위치를 유지합니다.
+function recruitmentPadPosition(id) {
+  G.recruitPadPositions = G.recruitPadPositions || {};
+  const fitsRaft = p => walkable(p.x, p.y) && [-0.62, 0.62].every(dx => [-0.62, 0.62].every(dy => hasTile(Math.floor(p.x + dx), Math.floor(p.y + dy))));
+  const saved = G.recruitPadPositions[id];
+  if (saved && fitsRaft(saved)) return saved;
+  const d = DEFS[id];
+  const blockers = [
+    ...PADS.filter(p => p.id !== id),
+    ...Object.values(UPG),
+    ...Object.entries(DEFS).filter(([other, def]) => other !== id && Number.isFinite(def.x)).map(([, def]) => def),
+    ...Object.entries(G.recruitPadPositions).filter(([other]) => other !== id).map(([, point]) => point),
+  ];
+  const offsets = [[0,1.8],[-2.1,0],[2.1,.5],[0,-2.1],[-1.5,.5],[1.8,0],[-1.8,1],[0,2.4],[-2.4,-.5],[2.4,-.5]];
+  const candidates = offsets.map(([dx,dy]) => ({ x:d.x+dx, y:d.y+dy })).filter(fitsRaft);
+  if (!candidates.length) return null;
+  const clearance = point => Math.min(...blockers.map(other => Math.max(Math.abs(point.x-other.x),Math.abs(point.y-other.y))));
+  const point = candidates.find(candidate => clearance(candidate) >= 1.35)
+    || candidates.reduce((best,candidate) => clearance(candidate)>clearance(best) ? candidate : best);
+  G.recruitPadPositions[id] = point;
+  return point;
+}
+function recruitmentPads() {
+  return crewTents().map(tent => {
+    const point = recruitmentPadPosition(tent);
+    if (!point) return null;
+    const live = crewCount(tent), capacity = tentCapacity(tent), job = G.recruitment?.[tent];
+    return { id:'recruit:'+tent, tent, recruit:true, x:point.x, y:point.y, cost:30,
+      icon:'⛺', live, capacity, remaining:job ? Math.max(0,job.remaining) : 0,
+      pending:!!job, canRecruit:live<capacity && !job && G.money>=30 };
+  }).filter(Boolean);
+}
 function recruitWorker(id) {
-  if (!unlocked.has(id) || !tentCapacity(id) || G.recruitment[id] || crewCount(id) >= tentCapacity(id)) return false;
-  const cost = recruitmentCost(id);
-  if (G.money < cost) { toast(`충원 자금이 부족합니다 · $${cost} 필요`); return false; }
-  G.money -= cost; G.recruitment[id] = { remaining: 5, paid: cost };
-  save(); toast(`⛺ ${DEFS[id].name} · 일꾼 모집 시작 (5초)`); return true;
+  const pad = recruitmentPads().find(p => p.tent === id);
+  const heroReady = typeof isHeroAvailable === 'function' ? isHeroAvailable() : true;
+  if (!heroReady || !pad || dist(player.x,player.y,pad.x,pad.y)>0.6 || !pad.canRecruit) return false;
+  G.money -= 30; G.recruitment[id] = { remaining:5, paid:30 };
+  save(); toast(`⛺ ${DEFS[id].name} · $30 결제, 일꾼 모집 중 (5초)`); return true;
 }
 function tickRecruitment(dt) {
-  for (const [id, job] of Object.entries(G.recruitment || {})) {
+  // 이미 결제한 모집은 칸을 떠나거나 주인공이 쓰러져도 마저 진행합니다.
+  for (const [id,job] of Object.entries(G.recruitment || {})) {
     if (!unlocked.has(id) || !tentCapacity(id)) continue;
-    job.remaining = Math.max(0, job.remaining - dt);
-    if (job.remaining > 0) continue;
+    job.remaining = Math.max(0,job.remaining-dt);
+    if (job.remaining>0) continue;
     delete G.recruitment[id];
-    if (crewCount(id) < tentCapacity(id)) { spawnWorker(id, 1); toast(`⛺ ${DEFS[id].name} · 일꾼 1명 합류`); }
+    if (crewCount(id)<tentCapacity(id)) { spawnWorker(id,1); toast(`⛺ ${DEFS[id].name} · 일꾼 1명 합류`); }
     save();
   }
+  const heroReady = typeof isHeroAvailable === 'function' ? isHeroAvailable() : true;
+  if (!heroReady || paused) return;
+  const pad = recruitmentPads().filter(p => dist(player.x,player.y,p.x,p.y)<=0.6)
+    .sort((a,b) => dist(player.x,player.y,a.x,a.y)-dist(player.x,player.y,b.x,b.y) || a.id.localeCompare(b.id))[0];
+  if (pad?.canRecruit) recruitWorker(pad.tent);
 }
 function crewHealthStatus() {
   const hp = workers.reduce((n, w) => n + Math.max(0, w.hp), 0) + soldiers.reduce((n, s) => n + Math.max(0, s.hp), 0);
   const max = crewTents().reduce((n, id) => n + tentCapacity(id) * crewHpMax(), 0) + soldiers.length * 12;
   return { hp, max, ratio: max ? Math.min(1, hp / max) : 0 };
 }
+// 구버전 build의 참조만 유지합니다. 실제 충원은 텐트 바닥 칸에서만 합니다.
+const recruitPanel = document.createElement('div'); recruitPanel.hidden = true;
 const recruitStyle = document.createElement('style');
 recruitStyle.textContent = `
-#recruitBtn{position:fixed;left:10px;bottom:calc(136px + env(safe-area-inset-bottom,0px));z-index:4;min-height:44px;max-width:170px;padding:8px 12px;border:3px solid #8a663d;border-radius:12px;background:#ffe5a3;color:#624620;font:15px var(--display);box-shadow:0 3px 0 #805a3040;cursor:pointer}
-#recruitBtn:focus-visible{outline:3px solid #fff;outline-offset:3px}
-body.has-recruit #toast{bottom:calc(192px + env(safe-area-inset-bottom,0px))}
-body.has-boss #recruitBtn{bottom:calc(188px + env(safe-area-inset-bottom,0px))}
-body.has-boss.has-recruit #toast{bottom:calc(244px + env(safe-area-inset-bottom,0px))}
-#recruitPanel{z-index:31}#recruitPanel .tent-list{display:grid;gap:12px;margin:14px 0}#recruitPanel article{border:2px solid #c6ae7a;border-radius:12px;padding:12px;background:#fff1cf}#recruitPanel article p{margin:6px 0}#recruitPanel article button{width:100%;font-size:15px}
-@media(max-height:500px) and (orientation:landscape){#recruitBtn{bottom:68px;max-width:170px}body.has-recruit #toast{bottom:120px}}
+#recruitHint{left:10px;bottom:calc(136px + env(safe-area-inset-bottom,0px));z-index:4;max-width:230px;padding:7px 10px;border:2px solid #8a663d;border-radius:11px;background:#fff0beed;color:#624620;font:13px/1.35 var(--display);box-shadow:0 3px 0 #805a3030;pointer-events:none}
+body.has-boss #toast{bottom:calc(216px + env(safe-area-inset-bottom,0px))}
+body.has-recruit #toast{bottom:calc(198px + env(safe-area-inset-bottom,0px))}
+body.has-boss #recruitHint{bottom:calc(216px + env(safe-area-inset-bottom,0px))}
+body.has-boss.has-recruit #toast{bottom:calc(278px + env(safe-area-inset-bottom,0px))}
+@media(max-height:500px) and (orientation:landscape){#recruitHint{bottom:68px;max-width:210px}body.has-boss #toast{bottom:calc(216px + env(safe-area-inset-bottom,0px))}
+body.has-recruit #toast{bottom:132px}}
 `;
 document.head.appendChild(recruitStyle);
-const recruitBtn = document.createElement('button'); recruitBtn.id = 'recruitBtn'; recruitBtn.hidden = true;
-document.body.appendChild(recruitBtn);
-const recruitPanel = document.createElement('div'); recruitPanel.id = 'recruitPanel'; recruitPanel.className = 'panel'; recruitPanel.hidden = true;
-recruitPanel.innerHTML = '<div role="dialog" aria-modal="true" aria-labelledby="recruitTitle"><h2 id="recruitTitle">⛺ 텐트 충원</h2><p>전사한 일꾼은 자동으로 복귀하지 않습니다. 텐트의 빈자리에 한 명씩 모집하세요.</p><p class="funds"></p><div class="tent-list"></div><button class="ghost close">돌아가기</button></div>';
-document.body.appendChild(recruitPanel);
-function closeRecruitment() { recruitPanel.hidden = true; paused = false; last = performance.now(); }
-function openRecruitment() {
-  if (paused || !crewTents().length) return;
-  paused = true; recruitPanel.hidden = false;
-  recruitPanel.querySelector('.funds').textContent = `보유 자금 $${fmt(G.money)} · 모집 시간 5초 · 생산 위치: 각 텐트`;
-  const list = recruitPanel.querySelector('.tent-list'); list.replaceChildren();
-  for (const id of crewTents()) {
-    const live = crewCount(id), capacity = tentCapacity(id), job = G.recruitment[id], cost = recruitmentCost(id);
-    const row = document.createElement('article'); row.dataset.tent = id;
-    const title = document.createElement('b'); title.textContent = `${DEFS[id].name} ★${slv(id)} · ${live}/${capacity}명`;
-    const text = document.createElement('p'); text.textContent = job ? `모집 중 · ${Math.ceil(job.remaining)}초 남음 (결제 완료)` : live >= capacity ? '현재 정원이 모두 근무 중입니다.' : `결원 ${capacity - live}명 · 1명 모집 $${cost}`;
-    const button = document.createElement('button'); button.textContent = job ? '모집 진행 중' : `일꾼 1명 모집 · $${cost}`;
-    button.disabled = !!job || live >= capacity || G.money < cost;
-    button.onclick = () => { if (recruitWorker(id)) closeRecruitment(); };
-    row.append(title, text, button); list.appendChild(row);
-  }
-  recruitPanel.querySelector('.close').focus({ preventScroll: true });
-}
-recruitBtn.onclick = openRecruitment; recruitPanel.querySelector('.close').onclick = closeRecruitment;
-recruitPanel.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { e.preventDefault(); closeRecruitment(); }
-  if (e.key === 'Tab') {
-    const buttons = [...recruitPanel.querySelectorAll('button:not(:disabled)')], first = buttons[0], end = buttons[buttons.length - 1];
-    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); end.focus(); }
-    else if (!e.shiftKey && document.activeElement === end) { e.preventDefault(); first.focus(); }
-  }
-});
+const recruitHint = document.createElement('div'); recruitHint.id='recruitHint'; recruitHint.className='hud'; recruitHint.hidden=true;
+document.body.appendChild(recruitHint);
 function recruitmentHud() {
-  const tents = crewTents(), missing = tents.reduce((n, id) => n + Math.max(0, tentCapacity(id) - crewCount(id)), 0);
-  const near = tents.some(id => dist(player.x, player.y, DEFS[id].x, DEFS[id].y) < 3);
-  recruitBtn.hidden = paused || !tents.length || (!missing && !near);
-  recruitBtn.textContent = missing ? `⛺ 텐트 충원 · 결원 ${missing}명` : '⛺ 텐트 충원';
-  document.body.classList.toggle('has-recruit', !recruitBtn.hidden);
+  const heroReady = typeof isHeroAvailable === 'function' ? isHeroAvailable() : true;
+  const pad = recruitmentPads().filter(p => dist(player.x,player.y,p.x,p.y)<1.8)
+    .sort((a,b) => dist(player.x,player.y,a.x,a.y)-dist(player.x,player.y,b.x,b.y) || a.id.localeCompare(b.id))[0];
+  recruitHint.hidden = paused || !heroReady || !pad;
+  if (pad) recruitHint.textContent = pad.pending ? `⛺ 모집 중 ${Math.ceil(pad.remaining)}초 · ${pad.live}/${pad.capacity}명`
+    : pad.live>=pad.capacity ? `⛺ ${DEFS[pad.tent].name} · 정원 ${pad.capacity}명 충원 완료`
+    : G.money<30 ? `⛺ 일꾼 충원 $30 · 자금이 부족합니다`
+    : `⛺ 네모 칸에 서 있으면 $30씩 자동 충원 · ${pad.live}/${pad.capacity}명`;
+  document.body.classList.toggle('has-recruit',!recruitHint.hidden);
 }
 
 /* ---------- 3D: 화려한 연출 (빛 번짐·폭발·보호막·목책·주변 섬·전투 흔적) ---------- */
@@ -2784,10 +2903,11 @@ function overlayWorld() {
   for (const w of workers) { const em = w.job && w.job.cash ? '💵' : w.idle ? '💤' : null; if (em) { const p = S(w.x, w.y, 82); bubble(p.x, p.y, em, k); } }
   if (G.stack.length >= cap) { const p = S(player.x, player.y, 92); bubble(p.x, p.y, '🎒', k); }
   for (const w of workers) if ((w.hp ?? crewHpMax()) < crewHpMax()) hpBar(w.x, w.y, 76, w.hp / crewHpMax(), '#5fd16b', 24, slv(w.tent));
+  if (isHeroAvailable() && (raidOn || player.hp < heroMaxHp())) hpBar(player.x, player.y, 86, player.hp / heroMaxHp(), '#f3d15c', 32, heroLevel());
   for (const s of soldiers) if ((s.hp ?? 12) < 12) hpBar(s.x, s.y, 76, s.hp / 12, '#5fd16b', 24, blv());
   for (const e of enemies) {
     if (!alive(e)) continue;
-    if (e.kind === 'boarder') hpBar(e.x, e.y, 74, e.hp / e.max, ({ bomber: '#ff9a2e', thief: '#c9a2ff', sniper: '#5ec8ff' })[e.type] || '#ff4d3d', 26, G.wave);
+    if (e.kind === 'boarder') hpBar(e.x, e.y, e.champion ? 110 : 74, e.hp / e.max, ({ bomber: '#ff9a2e', thief: '#c9a2ff', sniper: '#5ec8ff' })[e.type] || '#ff4d3d', e.champion ? 44 : 26, G.wave);
     else if (!e.boss) hpBar(e.x, e.y, e.big ? 120 : 90, e.hp / e.max, '#ff4d3d', e.big ? 50 : 36, G.wave);
   }
 }
@@ -2894,7 +3014,7 @@ function hud(obj) {
   $('goal').dataset.kind = raidOn ? 'danger' : /짓기|업그레이드/.test(obj.text) ? 'build' : 'interact';
   $('goal').dataset.label = raidOn ? '마을 방어' : /짓기|업그레이드/.test(obj.text) ? '건설' : '작업';
   const day = 1 + Math.floor(G.t / 40), km = G.t * 1.7 * (unlocked.has('solar') ? 1.4 : 1);
-  const key = [Math.floor(G.money), day, Math.floor(km), G.stack.length, cap, obj.text, G.level, G.xp,
+  const key = [Math.floor(G.money), day, Math.floor(km), G.stack.length, cap, obj.text, heroLevel(), G.hero.xp, heroAttack(), Math.ceil(player.hp), isHeroAvailable(),
     unlocked.has('tent1'), Math.ceil(G.hp), G.soldiers, workers.length, Math.ceil(crewHealthStatus().hp), raidOn, Math.ceil(G.raidT), enemies.length, wages(), G.strike, phaseInfo(), G.qi, questInfo().cur, Math.round(incomePerMin() / 5)].join('|');
   const q = questInfo();
   $('qText').innerHTML = `${q.text} <b>${Math.min(q.cur, q.n)}/${q.n}</b> · $${fmt(q.reward)}`;
@@ -2905,15 +3025,17 @@ function hud(obj) {
   if (!def.hidden) {
     const hm = hpMax(), alive = enemies.filter(e => e.state === 'approach' || e.state === 'attack').length;
     const ch = crewHealthStatus();
-    $('defTop').textContent = `⚔️ 방어 인원 ${workers.length + soldiers.length}명`;
+    ch.hp += Math.max(0, player.hp); ch.max += heroMaxHp(); ch.ratio = ch.hp / ch.max;
+    $('defTop').textContent = `⚔️ 방어 ${workers.length + soldiers.length + (isHeroAvailable() ? 1 : 0)}명`;
     $('hpFill').style.width = Math.max(0, ch.ratio * 100) + '%';
     $('hpBar').classList.toggle('low', ch.ratio < 0.3);
     $('defInfo').textContent = raidOn ? `⚠️ 해적선 ${alive}척 · 상륙 ${enemies.filter(e => e.kind === 'boarder' && e.state === 'walk').length}명` : `⚔️ 선원 ${workers.length}명 · 다음 습격 ${Math.ceil(G.raidT)}초`;
-    if (!raidOn && !workers.length && !soldiers.length) $('defInfo').textContent = crewTents().length ? '⛺ 텐트에서 충원하면 다음 습격이 시작됩니다' : '⛺ 텐트를 지어 방어 인원을 모으세요';
+    if (!raidOn && !workers.length && !soldiers.length) $('defInfo').textContent = crewTents().length ? '⛺ 텐트 앞 칸에서 $30씩 자동 충원' : '⛺ 텐트를 지어 방어 인원을 모으세요';
     def.classList.toggle('raid', raidOn);
   }
-  $('lv').textContent = `Lv.${G.level}`;
-  $('xpBar').style.width = (G.level >= 20 ? 100 : Math.min(100, G.xp / levelNeed(G.level) * 100)) + '%';
+  $('lv').textContent = `선장 Lv.${heroLevel()}`;
+  $('heroStats').textContent = `⚔ ${heroAttack()} · ♥ ${Math.ceil(player.hp)}/${heroMaxHp()}`;
+  $('xpBar').style.width = Math.min(100, G.hero.xp / heroXpNeed() * 100) + '%';
   moneyEl.textContent = fmt(G.money);
   $('day').textContent = day; $('km').textContent = `${phaseInfo()} · 수입 $${fmt(incomePerMin())}/분`;
   $('bag').innerHTML = `🎒 ${G.stack.length}/${cap}${G.stack.length ? '<em>비우기</em>' : ''}`; $('bag').classList.toggle('full', G.stack.length >= cap);

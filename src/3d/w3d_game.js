@@ -1,5 +1,5 @@
 /* ---------- 3D 전용 재미 요소: 강화 카드 · 해적 종류 · 보스 ---------- */
-const PIRATE_BALANCE = Object.freeze({ health: 4, damage: 4, shipSpeed: 2, crewSpeed: 0.5 });
+const PIRATE_BALANCE = Object.freeze({ health: 4, damage: 4 / 3, shipSpeed: 2, crewSpeed: 0.5 });
 const PIRATE_BALANCE_VERSION = 2;
 // 진행 중인 구버전 습격도 남은 체력 비율을 유지해 한 번만 새 난이도로 전환.
 function restorePirateBalance(combat) {
@@ -22,7 +22,7 @@ const CARDS = [
   { id: 'towerDouble', icon: '💥', name: '2연발 포탄', desc: '포탑이 한 번에 두 발 발사', max: 1, need: () => TOWERS.some(t => unlocked.has(t)) },
   { id: 'crewPower', icon: '⚔️', name: '선원 훈련', desc: '선원·해군 공격력 +40%', max: 5 },
   { id: 'crewHp', icon: '🛡️', name: '튼튼한 선원', desc: '선원 체력 +50%', max: 4 },
-  { id: 'playerGun', icon: '🔫', name: '왕물총', desc: '주인공 물총 피해 ×3, 사거리 +1', max: 3 },
+  { id: 'playerGun', icon: '⚔️', name: '선장의 검술', desc: '선장 공격력 +2 · 검 사거리 +0.15', max: 3 },
   { id: 'price', icon: '🐟', name: '흥정 달인', desc: '모든 판매가 +20%', max: 5 },
   { id: 'speed', icon: '👟', name: '날쌘 발', desc: '주인공 이동 속도 +15%', max: 3 },
   { id: 'villageHp', icon: '🏰', name: '전투 의무실', desc: '일꾼 최대 체력 +10, 즉시 아군 전원 회복', max: 6 },
@@ -82,7 +82,7 @@ function offerCards() {
 function takeCard(c) {
   if (cardPanel.hidden || !G.cardOffer?.includes(c.id) || ck(c.id) >= c.max) return;
   G.cards[c.id] = ck(c.id) + 1; G.cardOffer = null;
-  if (c.id === 'villageHp') { G.hp = hpMax(); for (const w of workers) w.hp = crewHpMax(); for (const s of soldiers) s.hp = 12; }
+  if (c.id === 'villageHp') { if (isHeroAvailable()) { player.hp = heroMaxHp(); snapshotHero(); } G.hp = hpMax(); for (const w of workers) w.hp = crewHpMax(); for (const s of soldiers) s.hp = 12; }
   if (c.id === 'bag') cap += 5;
   cardPanel.hidden = true; paused = false; last = performance.now();
   toast(`${c.icon} ${c.name} 획득!`); save();
@@ -113,26 +113,36 @@ function setupBoarder(e) {
 }
 function nearestCrew(e, range) {
   let foe = null, fd = range;
-  for (const s of [...soldiers, ...workers]) { const d = dist(e.x, e.y, s.x, s.y); if (d < fd) { fd = d; foe = s; } }
+  for (const s of [...soldiers, ...workers, ...(isHeroAvailable() ? [player] : [])]) { if (s.hp <= 0 || s.dead) continue; const d = dist(e.x, e.y, s.x, s.y); if (d < fd) { fd = d; foe = s; } }
   return foe;
 }
 function updateBoarder(e, dt) { updateSwordBoarder(e, dt); }
 
-// 5번째 습격마다 해골 선장 보스선: 일제 사격 + 졸개 소환
+// 해적 Lv.5·10·15마다 보스선에서 상어 대장이 직접 상륙합니다.
 function spawnBoss() {
   const a = rnd(0, 6.28), r = raftC.r + 16;
   const hp = PIRATE_BALANCE.health * Math.round(10 * (12 + G.wave * 5) * pirMul());
   enemies.push({ x: raftC.x + Math.cos(a) * r, y: raftC.y + Math.sin(a) * r, hp, max: hp, big: true, boss: true, state: 'approach', fireT: 2, bob: 0, sinkT: 0, ang: 0, salvoT: 4, summonT: 6 });
-  setTimeout(() => toast(`☠️ 보스 등장! 해골 선장 Lv.${G.wave}의 거대 해적선`), 1600);
+  setTimeout(() => toast(`☠️ 보스 침공! 상어 대장 Lv.${G.wave} · 갑판 전투 준비`), 1600);
+}
+
+function spawnBossBoarder(ship) {
+  if (!ship?.boss || ship.kind === 'boarder' || ship.bossBoarded || G.bossBoardedWave === G.wave) return;
+  ship.bossBoarded = true; G.bossBoardedWave = G.wave;
+  const p = shorePoint(ship.x, ship.y), hp = Math.max(140, Math.round(120 * pirMul() + 8 * G.wave));
+  enemies.push({ kind:'boarder', boss:true, champion:true, type:'boss', x:p.x, y:p.y,
+    hp, max:hp, attackMul:2, state:'walk', atkT:1.1, bob:0, vx:0, vy:0, sinkT:0,
+    ang:0, ph:0.1, home:{x:p.x,y:p.y}, goal:{x:p.x,y:p.y} });
+  dust(p.x,p.y,14); toast('☠️ 상어 대장 상륙! 선장과 선원이 함께 맞서 싸우세요');
 }
 function bossTick(e, dt) {
   // 보스도 포격·약탈 대신 상륙 병력을 보내 갑판 전투를 벌입니다.
   e.landingBudget = 8;
 }
 function bossHud() {
-  const b = enemies.find(e => e.boss && alive(e));
+  const b = enemies.find(e => e.champion && alive(e)) || enemies.find(e => e.boss && !e.bossBoarded && alive(e));
   bossBar.hidden = !b; document.body.classList.toggle('has-boss', !!b);
   if (!b) return;
-  bossBar.querySelector('.nm').textContent = `☠️ 해골 선장 Lv.${G.wave} · ${Math.ceil(b.hp)}/${b.max}`;
+  bossBar.querySelector('.nm').textContent = `☠️ ${b.champion ? '상어 대장' : '보스선 접근 중'} Lv.${G.wave} · ${Math.ceil(b.hp)}/${b.max}`;
   bossBar.querySelector('.fill').style.width = `${Math.max(0, b.hp / b.max) * 100}%`;
 }

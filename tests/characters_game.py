@@ -45,6 +45,7 @@ with sync_playwright() as p:
  browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader'])
  for block_models in [True,False]:
   page=browser.new_page(viewport={'width':390,'height':844},is_mobile=True,has_touch=True,device_scale_factor=2)
+  page.add_init_script('requestAnimationFrame = () => 0')
   errors=[];page.on('pageerror',lambda e:errors.append(e.stack))
   def external(r):
    u=r.request.url
@@ -55,8 +56,8 @@ with sync_playwright() as p:
   page.route('**/raft-village-3d.html',lambda r:r.fulfill(body=(root/'raft-village-3d.html').read_text().replace('})();\n</script>',HOOK+'})();\n</script>'),content_type='text/html'))
   if block_models:page.route('**/models/*.json',lambda r:r.abort())
   page.goto('http://127.0.0.1:8000/raft-village-3d.html',wait_until='networkidle')
-  page.wait_for_function('!!window.characterTest')
-  if not block_models:page.wait_for_function('characterTest.GL.ready',timeout=30000)
+  page.wait_for_function('!!window.characterTest',polling=100)
+  if not block_models:page.wait_for_function('characterTest.GL.ready',polling=100,timeout=30000)
   page.evaluate('characterTest.fixture()')
   data=page.evaluate('characterTest.inspect()')
   assert all(x['gear'] and not x['bunny'] and not x['skull'] for x in data),data

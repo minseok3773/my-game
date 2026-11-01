@@ -16,8 +16,10 @@ HOOK = next(ast.literal_eval(n.value) for n in BASE.body if isinstance(n, ast.As
 HOOK += r'''
 window.crewTest = {
  get workers(){return workers},get corpses(){return fallenCrew},get G(){return G},
- reset(){build(freshState());for(const id of ['tent1','expand1']){unlocked.add(id);applyUnlock(id)}G.money=500;G.raidT=10000;G.wave=1;player.x=5;player.y=4;player.cd=10000;paused=false;},
- cost(id='tent1'){return recruitmentCost(id)},render(){resize();resizeFx();render(.05);hud(objective())},
+ reset(){build(freshState());for(const id of ['tent1','expand1']){unlocked.add(id);applyUnlock(id)}G.money=500;G.raidT=10000;G.wave=1;player.x=5;player.y=4;player.cd=10000;G.hero.downT=8;player.hp=0;player.dead=true;paused=false;floaters.length=0;fx.length=0;confetti.length=0;raidIntro=null;$('toast').style.opacity=0;},
+ stand(){const p=recruitmentPads().find(p=>p.tent==='tent1');G.hero.downT=0;player.hp=heroMaxHp();player.dead=false;player.x=p.x;player.y=p.y;},
+ pads(){sync3D(.01);return recruitmentPads().map(p=>({id:p.id,drawn:!!padObjs.get(p.id),x:p.x,y:p.y}))},
+ cost(id='tent1'){return recruitmentCost(id)},render(){resize();resizeFx();cameraFocus.set(player.x-.45,.3,player.y-.45);render(.05);hud(objective())},
  kill(){killCrew(workers[0])},recruit(id='tent1'){return recruitWorker(id)},tick(dt){tickRecruitment(dt)},
  elapsed(seconds){for(let t=0;t<seconds;t+=.05)update(.05)},
  data(){return{count:workers.length,hps:workers.map(w=>w.hp),money:G.money,job:G.recruitment.tent1,capacity:tentCapacity('tent1'),corpses:fallenCrew.length}},
@@ -33,7 +35,7 @@ window.crewTest = {
  },
  wipe(){this.reset();workers.splice(1);const w=workers[0];Object.assign(w,{x:4,y:4,hp:1});combatTest.boarder('normal',4.5,4);raidOn=true;G.raidHadCrew=true;updateMilitary(.05);updateMilitary(.05);hud(objective());return{...this.data(),raid:raidOn,defended:G.defended||0,card:!!G.cardOffer,hp:G.hp};},
  health(value){workers[0].hp=value},
- renderFixture(){this.reset();player.x=6;player.y=6;workers.forEach((w,i)=>Object.assign(w,{x:5+i*.8,y:6.5,cd:0}));const e=combatTest.boarder('normal',6.5,6.5);e.hp=e.max=1000;raidOn=true;for(let i=0;i<18;i++){updateMilitary(.05);sync3D(.05)}render(.016);hud(objective());},
+ renderFixture(){this.reset();G.hero.downT=0;player.hp=heroMaxHp();player.dead=false;player.x=6;player.y=6;workers.forEach((w,i)=>Object.assign(w,{x:5+i*.8,y:6.5,cd:0}));const e=combatTest.boarder('normal',6.5,6.5);e.hp=e.max=1000;raidOn=true;for(let i=0;i<18;i++){updateMilitary(.05);sync3D(.05)}render(.016);hud(objective());},
  bossUI(){spawnBoss();raidOn=true;crewTest.kill();crewTest.render()},
  deathPose(){this.reset();this.kill();sync3D(.2);render(.1);const m=models.get(fallenCrew[0]);window.deadFixture=fallenCrew[0];return{shown:m.root.parent===world,clip:m.cur?.getClip().name,sword:m.sword.visible,count:fallenCrew.length}},
  clearCorpse(){tickMeleeEffects(2.1);sync3D(.1);return !models.has(window.deadFixture)},
@@ -73,19 +75,19 @@ def main():
         page.evaluate('crewTest.elapsed(46)')
         assert page.evaluate('crewTest.workers.length')==0
         print('Defeat preserves wallet/facilities, no reward and no automatic46s resurrection PASS',flush=True)
-        page.evaluate('crewTest.reset();crewTest.kill();crewTest.health(7);crewTest.ui()')
-        assert page.locator('#recruitBtn').is_visible()
-        page.evaluate('crewTest.G.money=29;crewTest.ui()');page.locator('#recruitBtn').click()
-        button=page.locator('#recruitPanel [data-tent=tent1] button')
-        assert button.is_disabled()
+        page.evaluate('crewTest.reset();crewTest.kill();crewTest.health(7);crewTest.stand();crewTest.ui()')
+        assert page.locator('#recruitHint').is_visible()
+        assert page.locator('#recruitBtn').count() == 0
+        page.evaluate('crewTest.G.money=29;crewTest.tick(.1);crewTest.ui()')
         assert not page.evaluate('crewTest.recruit()')
-        page.locator('#recruitPanel .close').click()
-        page.evaluate('crewTest.G.money=500;crewTest.ui()');page.locator('#recruitBtn').click()
+        assert page.evaluate('crewTest.data().money===29 && !crewTest.data().job')
+        assert '$30' in page.locator('#recruitHint').inner_text()
+        pads=page.evaluate('crewTest.pads()')
+        assert pads and all(p['drawn'] for p in pads),pads
+        page.evaluate('crewTest.G.money=500;crewTest.render()')
         page.screenshot(path=str(output/'recruitment-320.png'))
-        box=page.locator('#recruitPanel > div').bounding_box()
-        assert box['x']>=0 and box['y']>=0 and box['x']+box['width']<=320 and box['y']+box['height']<=568,box
-        button.click()
-        assert page.locator('#recruitPanel').is_hidden()
+        # The automatic trigger, rather than an overlay button, pays once.
+        page.evaluate('crewTest.tick(.1)')
         assert page.evaluate('crewTest.data().money===470 && crewTest.data().count===1 && !crewTest.recruit()')
         page.evaluate('crewTest.tick(3.7);crewTest.save()')
         for _ in range(2):
@@ -97,11 +99,11 @@ def main():
         result=page.evaluate('crewTest.data()')
         assert result['count']==2 and result['money']==470 and not result.get('job'),result
         assert not page.evaluate('crewTest.recruit()')
-        print('Native recruitment UI: insufficient funds, one charge/job,5s completion, preserved wounds/paid timer across2 reloads PASS',flush=True)
+        print('Standing recruitment pad: insufficient funds, one charge/job,5s completion, preserved wounds/paid timer across2 reloads PASS',flush=True)
         page.evaluate('crewTest.kill();crewTest.upgrade()')
         result=page.evaluate('crewTest.data()')
         assert result['count']==3 and result['capacity']==4,result
-        assert page.evaluate("crewTest.cost()") == 40
+        assert page.evaluate("crewTest.cost()") == 30
         result=page.evaluate('crewTest.legacy()')
         assert result['count']==1,result
         page.evaluate('crewTest.elapsed(46)')
@@ -122,14 +124,15 @@ def main():
         area=image.crop((40,190,350,650))
         assert sum(max(p)>30 for p in area.getdata())>area.width*area.height*.8, 'Rendered game scene must not be blank'
         for size in [(320,568),(390,844),(844,390),(1280,800)]:
-            page.set_viewport_size({'width':size[0],'height':size[1]});page.evaluate('crewTest.ui()')
-            a=page.locator('#recruitBtn').bounding_box()
+            page.set_viewport_size({'width':size[0],'height':size[1]});page.evaluate('crewTest.stand();crewTest.ui()')
+            a=page.locator('#recruitHint').bounding_box()
+            assert a and a['x']>=0 and a['y']>=0 and a['x']+a['width']<=size[0] and a['y']+a['height']<=size[1],(size,a)
             for name in ['defense','bag','menuBtn','strategyBtn']:
                 if not page.locator('#'+name).is_visible():continue
                 b=page.locator('#'+name).bounding_box()
                 assert not(min(a['x']+a['width'],b['x']+b['width'])>max(a['x'],b['x']) and min(a['y']+a['height'],b['y']+b['height'])>max(a['y'],b['y'])),(size,name,a,b)
-        page.set_viewport_size({'width':320,'height':568});page.evaluate('crewTest.bossUI()')
-        a=page.locator('#recruitBtn').bounding_box();b=page.locator('#bossBar').bounding_box()
+        page.set_viewport_size({'width':320,'height':568});page.evaluate('crewTest.bossUI();crewTest.stand();crewTest.ui()')
+        a=page.locator('#recruitHint').bounding_box();b=page.locator('#bossBar').bounding_box()
         assert a['y']+a['height']<=b['y'] or b['y']+b['height']<=a['y'],(a,b)
         dead=page.evaluate('crewTest.deathPose()');assert dead['shown'] and not dead['sword'] and dead['count']==1,dead
         assert not dead.get('clip') or 'Death' in dead['clip'],dead

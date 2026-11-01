@@ -337,19 +337,27 @@ function syncPads(vp) {
     o.fill.material.dispose(); o.border.material.dispose(); o.ripple.material.dispose(); padObjs.delete(id);
   }
   for (const p of vp) {
-    const o = padObjs.get(p.id) || buildPad(p), left = p.cost - (G.paid[p.id] || 0), afford = G.money >= left, ratio = (G.paid[p.id] || 0) / p.cost;
+    const o = padObjs.get(p.id) || buildPad(p), left = p.recruit ? 30 : p.cost - (G.paid[p.id] || 0), afford = p.recruit ? p.canRecruit : G.money >= left, ratio = p.recruit ? (p.pending ? 1 - p.remaining / 5 : 0) : (G.paid[p.id] || 0) / p.cost;
     const far = dist(player.x, player.y, p.x, p.y) > 6.5 && !afford;
     o.g.visible = !far || dist(player.x, player.y, p.x, p.y) < 9;
-    o.border.material.color.setHex(afford ? 0xffd84d : 0xffffff); o.border.material.opacity = far ? 0.35 : 0.9;
+    o.border.material.color.setHex(p.recruit ? 0x24b39e : afford ? 0xffd84d : 0xffffff); o.border.material.opacity = far ? 0.35 : 0.9;
     // 패드마다 바뀌는 재질은 공유하지 않아 다른 칸의 상태를 덮어쓰지 않습니다.
     if (!o.base.userData.ownMaterial) { o.base.material = o.base.material.clone(); o.base.userData.ownMaterial = true; }
-    o.base.material.color.setHex(afford ? 0xffec9b : 0xfffbeb);
-    const labelSig = `${p.icon}|${Math.ceil(left)}|${afford}`;
+    o.base.material.color.setHex(p.recruit ? 0xd2fff0 : afford ? 0xffec9b : 0xfffbeb);
+    const labelSig = `${p.icon}|${Math.ceil(left)}|${afford}|${p.live}|${p.capacity}|${p.pending}|${Math.ceil(p.remaining || 0)}`;
     if (o.labelSig !== labelSig && (o.labelSig === '' || G.t - o.labelTime > 0.15 || o.labelTime > G.t)) {
       const c = o.labelCanvas.getContext('2d'); c.clearRect(0, 0, 128, 128);
-      c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = '42px sans-serif'; c.fillText(p.icon, 64, 35);
-      c.font = 'bold 38px sans-serif'; c.fillStyle = afford ? '#348b30' : '#665947';
-      c.fillText('$' + fmt(Math.ceil(left)), 64, 91, 120);
+      c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#415a43';
+      if (p.recruit) {
+        c.font = 'bold 26px sans-serif'; c.fillText(`일꾼 ${p.live}/${p.capacity}`,64,27,120);
+        c.font = 'bold 36px sans-serif'; c.fillStyle = '#178c74';
+        c.fillText(p.pending ? `${Math.ceil(p.remaining)}초` : p.live >= p.capacity ? '완료' : '$30',64,77,120);
+        c.font = 'bold 17px sans-serif'; c.fillText(p.pending ? '모집 중' : p.live >= p.capacity ? '정원 충원' : '서서 자동 충원',64,110,120);
+      } else {
+        c.font = '42px sans-serif'; c.fillText(p.icon, 64, 35);
+        c.font = 'bold 38px sans-serif'; c.fillStyle = afford ? '#348b30' : '#665947';
+        c.fillText('$' + fmt(Math.ceil(left)), 64, 91, 120);
+      }
       o.labelTexture.needsUpdate = true; o.labelSig = labelSig; o.labelTime = G.t;
     }
     o.fill.visible = ratio > 0; o.fill.scale.y = Math.max(0.001, ratio);
@@ -599,10 +607,11 @@ function sync3D(dt) {
   world.position.y = raftY;
   playerMarker.position.set(player.x, 0.085, player.y);
   shallow.position.set(raftC.x, -0.2, raftC.y); shallow.scale.setScalar(raftC.r * 2.8);
-  syncRaft(); syncStations(); syncPads(visiblePads()); syncSharks(dt); bossHud();
+  syncRaft(); syncStations(); syncPads([...visiblePads(), ...recruitmentPads()]); syncSharks(dt); bossHud();
   // 캐릭터
   for (const m of models.values()) m.seen = false;
-  const pm = charModel(player, () => mkChar('player', player)); pm.rifle.visible = raidOn; animChar(pm, player, dt); syncStack(pm.carry, G.stack);
+  const pm = charModel(player, () => mkChar('player', player)); pm.rifle.visible = false; animChar(pm, player, dt, { fighting: !!player.fighting, dead: !!player.dead }); syncStack(pm.carry, G.stack);
+  if (!pm.gl) pm.root.rotation.z = player.dead ? Math.min(Math.PI / 2, (8 - G.hero.downT) * 3) : 0;
   for (const w of workers) { const m = charModel(w, () => mkChar('worker', w)); m.rifle.visible = false; m.carry.visible = !raidOn; animChar(m, w, dt, { fighting: !!w.fighting }); syncStack(m.carry, w.carry); }
   const navyModel = s => {
     const m = attachCharacterGear(makeKid3(SOLDIER_LOOKS[(s.ph * 10 | 0) % SOLDIER_LOOKS.length]));
@@ -625,6 +634,10 @@ function sync3D(dt) {
     if (e.kind !== 'boarder') continue;
     const m = charModel(e, () => mkChar('boarder', e));
     animChar(m, e, dt, { fighting: e.fighting && alive(e), dead: e.state === 'sink' });
+    if (e.champion) {
+      if (!m.bossRing) { m.bossRing = ringMesh(0.48,0.58,0xffd34d,0.9); m.root.add(m.bossRing); }
+      m.bossRing.position.y = 0.055; m.bossRing.visible = alive(e);
+    }
     if (!m.gl && e.state === 'sink') { m.root.rotation.x = Math.min(1.4, e.sinkT * 2); m.root.position.y = -Math.max(0, e.sinkT - 0.7) * 0.6; }
   }
   for (const [ent, m] of models) if (!m.seen) { world.remove(m.root); models.delete(ent); }

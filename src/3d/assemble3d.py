@@ -164,7 +164,7 @@ for c in chunks:
     if c.startswith("function dockRect("):
         out.append(c.replace('a1 = 10;', 'a1 = 6.8;').replace('0 : 0.42', '0 : 0.8')); continue
     if c.startswith("/* ---------- HUD ---------- */"):
-        out.append(B('w3d_world.js')); out.append(B('w3d_chars.js')); out.append(B('w3d_game.js')); out.append(B('w3d_melee.js')); out.append(B('w3d_crew.js')); out.append(B('w3d_fx.js')); out.append(overlay); out.append(c); continue
+        out.append(B('w3d_world.js')); out.append(B('w3d_chars.js')); out.append(B('w3d_game.js')); out.append(B('w3d_melee.js')); out.append(B('w3d_hero.js')); out.append(B('w3d_crew.js')); out.append(B('w3d_fx.js')); out.append(overlay); out.append(c); continue
     if c.startswith("/* ---------- 루프 ---------- */") or c.startswith("let last = performance.now()"):
         continue
     if keep(c): out.append(c)
@@ -242,6 +242,7 @@ old_board = "      if (e.boardT <= 0) { e.boardT = rnd(6, 9) * raidPlan(G.wave).
 assert js.count(old_board) == 1
 js = js.replace(old_board, """      if (e.boardT <= 0) {
         e.boardT = rnd(4, 6) * raidPlan(G.wave).boarding;
+        if (e.boss) spawnBossBoarder(e);
         const budget = e.landingBudget || (e.boss ? 8 : e.big ? 4 : 2);
         const burst = e.boarded ? 1 : e.big ? 3 : 2;
         for (let k = 0; k < burst && (e.boarded || 0) < budget; k++) {
@@ -253,8 +254,8 @@ js = js.replace(old_board, """      if (e.boardT <= 0) {
 js = js.replace('e.sinkT > 1.4', "e.sinkT > (e.kind === 'boarder' ? 2 : 1.4)")
 js = js.replace("e.state = 'sink'; e.sinkT = 0.6;", "e.state = 'sink'; e.sinkT = 0;")
 js = js.replace('function updateMilitary(dt) {', 'function updateMilitary(dt) {\n  tickMeleeEffects(dt);')
-js = js.replace('  G.wave++;', '  G.wave++; G.raidHadCrew = workers.length + soldiers.length > 0;')
-js = js.replace('G.raidT -= dt;', 'if (workers.length || soldiers.length) G.raidT -= dt; else G.raidT = Math.max(10, G.raidT);')
+js = js.replace('  G.wave++;', '  G.wave++; G.raidHadCrew = workers.length + soldiers.length > 0 || isHeroAvailable();')
+js = js.replace('G.raidT -= dt;', 'if (workers.length || soldiers.length || isHeroAvailable()) G.raidT -= dt; else G.raidT = Math.max(10, G.raidT);')
 js = js.replace("state: 'walk', atkT: 0.6", "state: 'walk', atkT: 1.0")
 js = replace_section(js, 'function hitVillage(s) {', 'function shoot(', """function hitVillage(s) {
   // 구버전 투사체 호환용. 새 해적은 선원과만 싸우며 돈과 시설을 약탈하지 않습니다.
@@ -265,6 +266,13 @@ js = replace_section(js, 'function hitVillage(s) {', 'function shoot(', """funct
   booms.push({ x: s.x1, y: s.y1, t: 0, kind: 'fire' });
 }
 """)
+
+# 선장도 갑판에서 근접전: 보스는 배가 침몰해도 반드시 상륙합니다.
+js = replace_section(js, '  // 주인공도 가까운 해적선에 물총', '  // 탄환\n', '  updateHeroCombat(dt);\n')
+js = js.replace('function sinkEnemy(e) {', 'function sinkEnemy(e) {\n  if (e.boss) spawnBossBoarder(e);')
+js = js.replace("  for (const s of soldiers) if ((s.hp ?? 12) < 12)", "  if (isHeroAvailable() && (raidOn || player.hp < heroMaxHp())) hpBar(player.x, player.y, 86, player.hp / heroMaxHp(), '#f3d15c', 32, heroLevel());\n  for (const s of soldiers) if ((s.hp ?? 12) < 12)")
+js = js.replace("hpBar(e.x, e.y, 74,", "hpBar(e.x, e.y, e.champion ? 110 : 74,")
+js = js.replace("|| '#ff4d3d', 26, G.wave);", "|| '#ff4d3d', e.champion ? 44 : 26, G.wave);")
 
 # 저장된 강화 선택을 복구해 새로고침으로 보상을 잃거나 다시 뽑지 않게 함
 js = js.replace("  const go = () => requestAnimationFrame(frame);", "  if (G.cardOffer && G.cardOffer.length) offerCards();\n  const go = () => requestAnimationFrame(frame);")

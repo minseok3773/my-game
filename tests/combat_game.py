@@ -12,7 +12,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
-BASELINE_COMMIT = "d1b1518"
+BASELINE_COMMIT = "2dda007"
 HOOK = r"""
 window.combatTest = {
   get G() { return G; },
@@ -22,6 +22,8 @@ window.combatTest = {
     unlocked.add('expand1'); applyUnlock('expand1');
     G.wave = wave; G.hp = 10000; G.raidT = 180;
     player.x = 5; player.y = 4; player.cd = 10000;
+    // Crew-only regression fixtures isolate the new hero from targeting.
+    if (typeof isHeroAvailable === 'function') { G.hero.downT = 8; player.hp = 0; player.dead = true; }
     workers.length = 0; soldiers.length = 0;
     enemies.length = 0; shots.length = 0;
     raidOn = false; looted = false; paused = false;
@@ -100,7 +102,9 @@ window.combatTest = {
     Object.assign(soldiers[0], {x:4, y:4, hp:1000, cd:10000, vx:0, vy:0});
     const pirate = this.boarder('normal', 7, 4); pirate.goal = {x:9, y:4}; raidOn = true;
     updateMilitary(.1); results['navy/battle'] = Math.hypot(soldiers[0].x - 4, soldiers[0].y - 4);
-    this.reset(); const start = {x: player.x, y: player.y};
+    this.reset();
+    if (typeof isHeroAvailable === 'function') { G.hero.downT = 0; player.hp = heroMaxHp(); player.dead = false; }
+    const start = {x: player.x, y: player.y};
     keys.add('d'); update(.1); keys.delete('d');
     results['hero'] = Math.hypot(player.x - start.x, player.y - start.y);
     return results;
@@ -197,18 +201,18 @@ def main():
         assert len(old_hp) == len(new_hp)
         for before, after in zip(old_hp, new_hp):
             assert before["key"] == after["key"]
-            close(after["hp"], before["hp"] * 2, after["key"])
-            close(after["max"], before["max"] * 2, after["key"])
+            close(after["hp"], before["hp"], after["key"])
+            close(after["max"], before["max"], after["key"])
             if "onDeck" in after:
                 assert after["onDeck"], after
-        print(f"HP x2 after all wave/type/armor rounding PASS ({len(new_hp)} cases)", flush=True)
+        print(f"Existing HP preserved after all wave/type/armor rounding PASS ({len(new_hp)} cases)", flush=True)
 
         old_damage = old.evaluate("combatTest.damageCases()")
         new_damage = new.evaluate("combatTest.damageCases()")
         for name, before in old_damage.items():
-            multiplier = 1 if name.endswith("friendly-shot") else 2
+            multiplier = 1 if name.endswith("friendly-shot") else 1 / 3
             close(new_damage[name], before * multiplier, name)
-        print(f"Enemy damage x2 and friendly damage unchanged PASS ({len(new_damage)} cases)", flush=True)
+        print(f"Enemy damage one third and friendly damage unchanged PASS ({len(new_damage)} cases)", flush=True)
 
         old_speed = old.evaluate("combatTest.movementCases()")
         new_speed = new.evaluate("combatTest.movementCases()")
@@ -226,8 +230,8 @@ def main():
         legacy = old.evaluate("combatTest.legacySave()")
         migrated = new.evaluate("data => combatTest.importSave(data)", legacy)
         for before, after in zip(legacy["combat"]["enemies"], migrated["combat"]["enemies"]):
-            close(after["hp"], before["hp"] * 2, "legacy current HP")
-            close(after["max"], before["max"] * 2, "legacy max HP")
+            close(after["hp"], before["hp"], "current-version saved HP")
+            close(after["max"], before["max"], "current-version saved max HP")
             close(after["hp"] / after["max"], before["hp"] / before["max"], "legacy health ratio")
         assert migrated["combat"]["balanceVersion"] == 2
         expected = [{"hp":e["hp"], "max":e["max"]} for e in migrated["combat"]["enemies"]]
@@ -237,7 +241,16 @@ def main():
             snapshot = new.evaluate("combatTest.snapshot()")
             assert snapshot["enemies"] == expected, snapshot
             assert snapshot["combat"]["balanceVersion"] == 2
-        print("Legacy active-raid HP migration once; two reloads do not redouble PASS", flush=True)
+        print("Current active-raid HP unchanged across migration and two reloads PASS", flush=True)
+        # Earlier version1 saves still need the previous health migration once.
+        legacy["combat"]["balanceVersion"] = 1
+        migrated = new.evaluate("data => combatTest.importSave(data)", legacy)
+        for before, after in zip(legacy["combat"]["enemies"], migrated["combat"]["enemies"]):
+            close(after["hp"], before["hp"] * 2, "version1 current HP")
+            close(after["max"], before["max"] * 2, "version1 max HP")
+        again = new.evaluate("data => combatTest.importSave(data)", migrated)
+        assert again["combat"]["enemies"] == migrated["combat"]["enemies"]
+        print("Version1 health migration still runs exactly once PASS", flush=True)
         assert not errors, errors
         browser.close()
 

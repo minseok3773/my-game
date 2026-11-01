@@ -1,8 +1,8 @@
 /* ---------- 갑판 백병전: 약탈 없이 선원을 추격하는 해적 ---------- */
 const MELEE_REACH = 0.95;
 function tickMeleeEffects(dt) {
-  if (raidOn && workers.length + soldiers.length > 0) G.raidHadCrew = true;
-  for (const unit of [...workers, ...soldiers, ...enemies]) {
+  if (raidOn && (workers.length + soldiers.length > 0 || isHeroAvailable())) G.raidHadCrew = true;
+  for (const unit of [player, ...workers, ...soldiers, ...enemies]) {
     unit.swingT = Math.max(0, (unit.swingT || 0) - dt);
     unit.hurtT = Math.max(0, (unit.hurtT || 0) - dt);
   }
@@ -18,7 +18,18 @@ function swordStrike(attacker, target, damage, enemy = false) {
   attacker.swingT = 0.4; target.hurtT = 0.25; target.hp -= actual;
   booms.push({ x: (attacker.x + target.x) / 2, y: (attacker.y + target.y) / 2, t: 0, kind: 'water' });
   floaters.push({ x: target.x, y: target.y, text: `-${Math.ceil(actual)}`, color: enemy ? '#ff987c' : '#ffe997', t: 0, combat: true });
-  if (target.hp <= 0) { if (enemy) killCrew(target); else killBoarder(target); }
+  if (attacker === player || target === player) G.hero.engagedWave = G.wave;
+  if (attacker === player) {
+    const defeated = target.hp <= 0;
+    gainCombatXp(2 + (defeated ? target.champion ? 28 : 8 : 0));
+    if (defeated) G.hero.kills++;
+  }
+  if (target.hp <= 0) {
+    if (target === player) knockOutHero();
+    else if (enemy) killCrew(target);
+    else killBoarder(target);
+  }
+  if (target === player) snapshotHero();
 }
 function updateSwordBoarder(e, dt) {
   if (e.state === 'retreat') {
@@ -38,7 +49,7 @@ function updateSwordBoarder(e, dt) {
   }
   stopMove(e, dt); e.fighting = true;
   e.atkT = (e.atkT ?? 0.8) - dt;
-  if (e.atkT <= 0) { e.atkT = 1.05; swordStrike(e, foe, (e.type === 'bomber' ? 6 : e.type === 'sniper' ? 3 : 2.5) * pirMul() * PIRATE_BALANCE.damage, true); }
+  if (e.atkT <= 0) { e.atkT = 1.05; swordStrike(e, foe, (e.type === 'bomber' ? 6 : e.type === 'sniper' ? 3 : 2.5) * pirMul() * PIRATE_BALANCE.damage * (e.attackMul || 1), true); }
 }
 function updateDefenders(dt, bl, mult) {
   const foes = enemies.filter(e => e.kind === 'boarder' && alive(e));
@@ -87,7 +98,7 @@ function updateDefenders(dt, bl, mult) {
       swordStrike(unit, foe, (worker ? 3 * (1 + 0.1 * (lv() - 1)) : 4.5 * mult) * crewMul());
     }
   }
-  if (raidOn && G.raidHadCrew && !workers.length && !soldiers.length) {
+  if (raidOn && G.raidHadCrew && !workers.length && !soldiers.length && !isHeroAvailable()) {
     looted = true; G.raidHadCrew = false;
     for (const e of enemies) if (alive(e)) {
       e.fighting = false; e.state = e.kind === 'boarder' ? 'retreat' : 'flee'; e.retreatT = 2;
