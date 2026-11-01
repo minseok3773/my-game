@@ -1,6 +1,9 @@
 /* ---------- 3D 전용 재미 요소: 강화 카드 · 해적 종류 · 보스 ---------- */
 // 습격을 막을 때마다 카드 3장 중 1장을 골라 판마다 다르게 성장
 const CARDS = [
+  { id: 'smuggler', icon: '🏴‍☠️', name: '밀수 항로', desc: '판매가 +35% · 이후 습격 준비 시간 -6초 (최소 12초)', max: 2 },
+  { id: 'glass', icon: '🔥', name: '과충전 포탄', desc: '포탑 피해 +60% · 마을이 받는 피해 +20%', max: 2 },
+  { id: 'bunker', icon: '⚓', name: '요새 경제', desc: '마을이 받는 피해 -20% · 판매가 -15%', max: 2 },
   { id: 'towerDmg', icon: '🎯', name: '포탑 화력', desc: '포탑 피해 +30%', max: 5 },
   { id: 'towerRate', icon: '⚡', name: '포탑 연사', desc: '포탑 발사 속도 +25%', max: 4 },
   { id: 'towerDouble', icon: '💥', name: '2연발 포탄', desc: '포탑이 한 번에 두 발 발사', max: 1, need: () => TOWERS.some(t => unlocked.has(t)) },
@@ -48,8 +51,9 @@ function offerCards() {
   G.cards = G.cards || {};
   const pool = CARDS.filter(c => ck(c.id) < c.max && (!c.need || c.need()));
   if (!pool.length) return;
-  const pick = [];
-  while (pick.length < 3 && pool.length) pick.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  const pick = (G.cardOffer || []).map(id => pool.find(c => c.id === id)).filter(Boolean);
+  if (!pick.length) while (pick.length < 3 && pool.length) pick.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+  G.cardOffer = pick.map(c => c.id);
   cardPanel.querySelector('.sub').textContent = `제${G.wave}파를 막아냈습니다! 하나만 고르세요 · 다음 해적은 Lv.${G.wave + 1}`;
   const box = cardPanel.querySelector('.cards'); box.innerHTML = '';
   for (const c of pick) {
@@ -58,10 +62,11 @@ function offerCards() {
     b.onclick = () => takeCard(c);
     box.appendChild(b);
   }
-  cardPanel.hidden = false; paused = true;
+  cardPanel.hidden = false; paused = true; save();
 }
 function takeCard(c) {
-  G.cards[c.id] = ck(c.id) + 1;
+  if (cardPanel.hidden || !G.cardOffer?.includes(c.id) || ck(c.id) >= c.max) return;
+  G.cards[c.id] = ck(c.id) + 1; G.cardOffer = null;
   if (c.id === 'villageHp') G.hp = hpMax();
   if (c.id === 'bag') cap += 5;
   cardPanel.hidden = true; paused = false; last = performance.now();
@@ -75,6 +80,8 @@ const PIRATE_TYPES = {
   sniper: { from: 4, chance: 0.22, hp: 0.8, intro: '🎯 저격 해적 등장! 멀리서 선원을 노립니다' },
 };
 function pickPirateType() {
+  const forecast = raidPlan(G.wave).type;
+  if (forecast !== 'normal' && Math.random() < 0.65) return forecast;
   const r = Math.random(); let acc = 0;
   for (const [k, t] of Object.entries(PIRATE_TYPES)) { if (G.wave < t.from) continue; acc += t.chance; if (r < acc) return k; }
   return 'normal';

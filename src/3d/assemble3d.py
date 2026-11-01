@@ -202,7 +202,7 @@ R4 = [
     ("dust(p.x, p.y, 8); floatText(p.x, p.y, '해적 상륙!', '#ffb0a0');", "setupBoarder(enemies[enemies.length - 1]); dust(p.x, p.y, 8); floatText(p.x, p.y, '해적 상륙!', '#ffb0a0');"),
     ("if (e.kind === 'boarder') { updateBoarder(e, dt); continue; }", "if (e.kind === 'boarder') { updateBoarder(e, dt); continue; }\n    if (e.boss && e.state === 'attack') bossTick(e, dt);"),
     ("  raidIntro = { t: 0, n };", "  if (G.wave % 5 === 0) spawnBoss();\n  raidIntro = { t: 0, n };"),
-    ("G.raidT = 30; if (!looted) toast('해적을 격퇴했습니다'); looted = false;", "G.raidT = 30; if (!looted) { toast('해적을 격퇴했습니다'); offerCards(); } looted = false;"),
+    ("G.raidT = 30; if (!looted) toast('해적을 격퇴했습니다'); finishStrategyRaid(looted); looted = false;", "G.raidT = 30; if (!looted) { toast('해적을 격퇴했습니다'); offerCards(); } finishStrategyRaid(looted); looted = false;"),
     ("e.hp / e.max, '#ff4d3d', 26, G.wave);", "e.hp / e.max, ({ bomber: '#ff9a2e', thief: '#c9a2ff', sniper: '#5ec8ff' })[e.type] || '#ff4d3d', 26, G.wave);"),
     ("else hpBar(e.x, e.y, e.big ? 120 : 90,", "else if (!e.boss) hpBar(e.x, e.y, e.big ? 120 : 90,"),
 ]
@@ -212,6 +212,13 @@ for a_, b_ in R4:
     assert js.count(a_) == 1, a_
     js = js.replace(a_, b_)
 js = js.replace('CREW_HP', 'crewHpMax()').replace('crewHpMax()_BASE', 'CREW_HP_BASE')
+# 저장된 강화 선택을 복구해 새로고침으로 보상을 잃거나 다시 뽑지 않게 함
+js = js.replace("  const go = () => requestAnimationFrame(frame);", "  if (G.cardOffer && G.cardOffer.length) offerCards();\n  const go = () => requestAnimationFrame(frame);")
+# 선택의 대가: 카드 효과를 실제 경제/전투/습격 시간에 연결
+js = js.replace("strategySale() * d.price", "strategySale() * (1 + 0.35 * ck('smuggler')) * Math.pow(0.85, ck('bunker')) * d.price")
+js = js.replace("s.dmg * strategyDamage()", "s.dmg * strategyDamage() * (1 + 0.2 * ck('glass')) * Math.pow(0.8, ck('bunker'))")
+js = js.replace("(1 + 0.3 * ck('towerDmg'))", "(1 + 0.3 * ck('towerDmg') + 0.6 * ck('glass'))")
+js = js.replace("G.raidT = 30;", "G.raidT = Math.max(12, 30 - 6 * ck('smuggler')); ")
 old = "const a = S(d.x, d.y), c = S(tgt.x, tgt.y); st.ang = Math.atan2(c.y - a.y, c.x - a.x);"
 assert js.count(old) == 1; js = js.replace(old, "st.yaw = Math.atan2(tgt.x - d.x, tgt.y - d.y);")
 # 안내창 링크·제목·캔버스
@@ -220,8 +227,8 @@ h = h.replace('<canvas id="game"', '<div id="world"></div>\n<canvas id="game"')
 # 3D 전용: 왼쪽 위 생존 일차 카드 숨김
 h = h.replace('</style>', '#dayCard{display:none!important}\n</style>', 1)
 h = h.replace("#game{position:fixed;inset:0;width:100%;height:100%;display:block}", "#world,#world canvas{position:fixed;inset:0;width:100%;height:100%;display:block}\n#game{position:fixed;inset:0;width:100%;height:100%;display:block}\n.panel a{color:#e2c27a}")
-h = h.replace('<div class="row"><button id="startBtn">출항하기</button></div>', '<p><a href="https://claude.ai/artifact/U1UfocAvdezpwGo3rWH2ek" target="_blank" rel="noopener">2D 버전으로 하기 ↗</a></p>\n    <div class="row"><button id="startBtn">출항하기</button></div>')
-h = h + '<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>\n' + ''.join(f'<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/{f}"></script>\n' for f in ['shaders/CopyShader.js', 'shaders/LuminosityHighPassShader.js', 'postprocessing/EffectComposer.js', 'postprocessing/RenderPass.js', 'postprocessing/ShaderPass.js', 'postprocessing/UnrealBloomPass.js', 'loaders/GLTFLoader.js', 'utils/SkeletonUtils.js'])
+h = h.replace('<div class="row"><button id="startBtn">출항하기</button></div>', '<p><a href="raft-village-2d.html" target="_blank" rel="noopener">2D 버전으로 하기 ↗</a></p>\n    <div class="row"><button id="startBtn">출항하기</button></div>')
+h = h + '<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>\n' + ''.join(f'<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/{f}"></script>\n' for f in ['shaders/CopyShader.js', 'shaders/LuminosityHighPassShader.js', 'postprocessing/EffectComposer.js', 'postprocessing/RenderPass.js', 'postprocessing/ShaderPass.js', 'postprocessing/UnrealBloomPass.js', 'loaders/GLTFLoader.js', 'utils/SkeletonUtils.js'])
 res = h + "<script>\n(() => {\n" + js + tail
 open(os.path.join(ROOT, 'raft-village-3d.html'), 'w', encoding='utf-8').write(res)
 print('chunks', len(chunks), 'size', len(res))

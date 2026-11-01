@@ -29,9 +29,43 @@ python3 src/3d/assemble3d.py
 
 - **PC:** 2D는 HTML 파일을 브라우저로 열면 바로 실행됩니다. 3D는 캐릭터 파일을 불러와야 해서 간단한 웹 서버로 여는 것이 좋습니다 (예: 저장소 폴더에서 `python3 -m http.server` 실행 후 `http://localhost:8000/raft-village-3d.html`).
 - **휴대폰:** 아래 온라인 링크나 QR코드로 여세요.
-  - 3D: https://claude.ai/artifact/BoAAuADnZZY2Tf1SYMdeg9
-  - 2D: https://claude.ai/artifact/U1UfocAvdezpwGo3rWH2ek
-- GitHub Pages를 켜면 `https://minseok3773.github.io/my-game/raft-village-3d.html` 주소로도 실행할 수 있습니다.
+  - 공개 실행 페이지 (배포 후): https://minseok3773.github.io/my-game/
+  - 3D QR: `assets/qr-3d.png`, 2D QR: `assets/qr-2d.png`
+  - QR은 GitHub Pages 주소를 담습니다. 수정본을 배포하기 전에는 수정된 게임 실행을 보장하지 않습니다.
+
+## 전략 업데이트
+
+- 첫 뗏목 확장 후 🧭 버튼에서 다음 습격을 예측하고 준비합니다. 돌격·폭파·약탈·중장갑 선단이 순환하며 상륙 간격, 포격 빈도, 함선 수와 체력이 달라집니다. 3D는 예고된 특수 해적의 등장 확률도 높아집니다.
+- 한 습격당 준비 선택은 한 번입니다. 기본 태세로 기다리는 것도 가능합니다.
+  - **무역 강행:** 무료. 판매가 +40%, 마을이 받는 피해 +25%.
+  - **방어 태세:** $20 + 완료된 습격 수 × $5. 마을 피해 -30%, 판매가 -20%, 즉시 체력 20 회복.
+  - **정찰 파견:** $15 + 완료된 습격 수 × $5. 준비 시간 20초 추가.
+- 무역·방어 효과는 다음 습격 종료까지 유지됩니다. 함락되지 않고 5회 방어하면 항로 확보 보상 $200을 한 번 받고 무한 항해를 계속합니다.
+- 3D 강화 카드에 밀수 항로(판매가 증가/습격 간격 감소), 과충전 포탄(포탑 화력 증가/마을 피해 증가), 요새 경제(마을 피해 감소/판매가 감소)가 추가됩니다.
+- 기존 브라우저 저장 데이터를 유지합니다. 진행 중인 습격과 아직 고르지 않은 3D 카드도 새로고침 후 복구합니다.
+
+## 공개 배포와 QR코드
+
+1. 변경 파일을 GitHub 저장소에 올립니다.
+2. 저장소 **Settings → Pages → Source**를 **GitHub Actions**로 설정합니다.
+3. **Actions → Publish game to GitHub Pages → Run workflow**를 실행합니다. 이후 `main`에 푸시하면 자동 배포됩니다.
+4. 배포 성공 후 공개 실행 페이지와 두 게임을 휴대폰에서 확인합니다. 그다음 QR코드를 공유하세요. 클라우드 환경 게시와 GitHub Pages 게임 배포는 별개입니다.
+
+주소가 바뀌면 QR을 다시 생성합니다 (Python 패키지 `qrcode==8.2` 필요).
+
+```bash
+python3 src/tools/generate_qr.py --base-url https://minseok3773.github.io/my-game
+```
+
+## 브라우저 회귀 검증
+
+Python Playwright, Chromium(`/usr/bin/chromium`), curl이 필요합니다. 저장소에서 `python3 -m http.server 8000 --bind 127.0.0.1`을 실행한 뒤 별도 터미널에서 실행합니다.
+
+```bash
+python3 tests/smoke_game.py
+```
+
+준비 비용·효과, 중복 선택 방지, 저장·습격 복구, 방어 보상 중복 방지, 3D 카드 선택 복구와 JavaScript 실행 오류를 확인합니다. 테스트는 별도 브라우저 컨텍스트에서 실행되며 실제 사용자의 저장 데이터를 건드리지 않습니다. 외부 글꼴은 테스트에서 제외하며 three.js는 TLS 검증을 유지한 curl을 통해 불러옵니다.
 
 ## 조작
 
