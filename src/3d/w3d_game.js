@@ -1,4 +1,15 @@
 /* ---------- 3D 전용 재미 요소: 강화 카드 · 해적 종류 · 보스 ---------- */
+const PIRATE_BALANCE = Object.freeze({ health: 2, damage: 2, shipSpeed: 2, crewSpeed: 0.5 });
+const PIRATE_BALANCE_VERSION = 1;
+// 진행 중인 구버전 습격도 남은 체력 비율을 유지해 한 번만 새 난이도로 전환.
+function restorePirateBalance(combat) {
+  if ((combat.balanceVersion || 0) >= PIRATE_BALANCE_VERSION) return;
+  for (const e of combat.enemies || []) {
+    if (Number.isFinite(e.hp)) e.hp *= PIRATE_BALANCE.health;
+    if (Number.isFinite(e.max)) e.max *= PIRATE_BALANCE.health;
+  }
+  combat.balanceVersion = PIRATE_BALANCE_VERSION;
+}
 // 습격을 막을 때마다 카드 3장 중 1장을 골라 판마다 다르게 성장
 const CARDS = [
   { id: 'smuggler', icon: '🏴‍☠️', name: '밀수 항로', desc: '판매가 +35% · 이후 습격 준비 시간 -6초 (최소 12초)', max: 2 },
@@ -96,6 +107,7 @@ function setupBoarder(e) {
     G.seenTypes = G.seenTypes || {};
     if (!G.seenTypes[e.type]) { G.seenTypes[e.type] = 1; toast(t.intro); }
   }
+  e.hp *= PIRATE_BALANCE.health; e.max *= PIRATE_BALANCE.health;
 }
 function nearestCrew(e, range) {
   let foe = null, fd = range;
@@ -113,8 +125,8 @@ function updateBomber(e, dt) {
   e.fighting = false;
   if (!crew && d > 0.8) { moveTo(e, tgt.x, tgt.y, 2.3, dt, null, true); return; }
   // 펑!
-  const dmg = 12 * pirMul();
-  for (const s of [...soldiers, ...workers]) if (dist(e.x, e.y, s.x, s.y) < 1.8) { s.hp = (s.hp ?? crewHpMax()) - 6 * pirMul(); if (s.hp <= 0) killCrew(s); }
+  const dmg = 12 * pirMul() * PIRATE_BALANCE.damage;
+  for (const s of [...soldiers, ...workers]) if (dist(e.x, e.y, s.x, s.y) < 1.8) { s.hp = (s.hp ?? crewHpMax()) - 6 * pirMul() * PIRATE_BALANCE.damage; if (s.hp <= 0) killCrew(s); }
   hitVillage({ dmg, x1: e.x, y1: e.y });
   for (let i = 0; i < 4; i++) booms.push({ x: e.x + rnd(-0.6, 0.6), y: e.y + rnd(-0.6, 0.6), t: rnd(0, 0.2), kind: 'fire' });
   shake = Math.max(shake, 0.4); dust(e.x, e.y, 14); floatText(e.x, e.y, `💥 폭발 -${Math.round(dmg)}`, '#ffb070');
@@ -143,13 +155,13 @@ function updateSniper(e, dt) {
   stopMove(e, dt);
   e.atkT -= dt; if (e.atkT > 0) return; e.atkT = 1.7;
   shoot(e, { x: tgt.x, y: tgt.y }, 'enemy', 2 * pirMul(), 0.35, 6, 30);
-  if (foe) { foe.hp = (foe.hp ?? crewHpMax()) - 3 * pirMul(); if (foe.hp <= 0) killCrew(foe); }
+  if (foe) { foe.hp = (foe.hp ?? crewHpMax()) - 3 * pirMul() * PIRATE_BALANCE.damage; if (foe.hp <= 0) killCrew(foe); }
 }
 
 // 5번째 습격마다 해골 선장 보스선: 일제 사격 + 졸개 소환
 function spawnBoss() {
   const a = rnd(0, 6.28), r = raftC.r + 16;
-  const hp = Math.round(10 * (12 + G.wave * 5) * pirMul());
+  const hp = PIRATE_BALANCE.health * Math.round(10 * (12 + G.wave * 5) * pirMul());
   enemies.push({ x: raftC.x + Math.cos(a) * r, y: raftC.y + Math.sin(a) * r, hp, max: hp, big: true, boss: true, state: 'approach', fireT: 2, bob: 0, sinkT: 0, ang: 0, salvoT: 4, summonT: 6 });
   setTimeout(() => toast(`☠️ 보스 등장! 해골 선장 Lv.${G.wave}의 거대 해적선`), 1600);
 }

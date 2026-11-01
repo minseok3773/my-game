@@ -21,21 +21,7 @@ if (THREE.GLTFLoader && THREE.SkeletonUtils) {
     })
     .catch(e => console.warn('캐릭터 모형을 불러오지 못해 도형 캐릭터로 진행합니다', e));
 }
-// 색상표의 특정 칸 색만 바꾼 사본 (주인공: 빨간 두건 → 분홍 / 해골 해적: 피부 → 뼈, 외투·바지 → 검정)
-const _recol = {};
-function recolorTex(map, key, pairs) {
-  if (_recol[key]) return _recol[key];
-  const img = map.image, cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height;
-  const cx = cv.getContext('2d'); cx.drawImage(img, 0, 0);
-  const d = cx.getImageData(0, 0, cv.width, cv.height), a = d.data;
-  for (let i = 0; i < a.length; i += 4) for (const [f, t] of pairs) if (Math.abs(a[i] - f[0]) < 8 && Math.abs(a[i + 1] - f[1]) < 8 && Math.abs(a[i + 2] - f[2]) < 8) { a[i] = t[0]; a[i + 1] = t[1]; a[i + 2] = t[2]; break; }
-  cx.putImageData(d, 0, 0);
-  const tx = new THREE.CanvasTexture(cv); tx.flipY = map.flipY; tx.encoding = THREE.sRGBEncoding; tx.magFilter = THREE.NearestFilter;
-  return (_recol[key] = tx);
-}
-const PINK_PAIRS = [[[139, 30, 31], [244, 169, 191]]];
-const SKEL_PAIRS = [[[192, 154, 119], [232, 224, 206]], [[65, 50, 39], [30, 32, 46]], [[87, 65, 44], [44, 46, 64]], [[139, 30, 31], [26, 26, 32]], [[44, 44, 44], [26, 26, 32]], [[129, 122, 127], [196, 196, 204]], [[131, 119, 94], [196, 196, 204]]];
-// 해골 머리 + 삼각 해적 모자 (v=1: 모자 위 작은 해골·은 장식 / v=2: 금테·해골 문장·주황 두건)
+// 해적선 위의 작은 장식 선원용 해골. 실제 플레이 캐릭터는 아래 원본 모델을 사용합니다.
 function makeSkull(v = 1) {
   const g = new THREE.Group(), bone = mat(0xeee4cf, { roughness: 0.55 }), dark = mat(0x121216, { roughness: 0.9 });
   const cr = mk(sphG(0.27, 20, 14), bone, true, 0, 0.2, 0); cr.scale.set(1, 0.92, 1); g.add(cr);
@@ -71,7 +57,7 @@ function makeSkull(v = 1) {
   return g;
 }
 
-const _hv = new THREE.Vector3(), _hq0 = new THREE.Quaternion(), _hq = new THREE.Quaternion(), _rq = new THREE.Quaternion();
+const _hv = new THREE.Vector3();
 const clipName = c => c.name.split('|').pop();
 // 동작 전환: 새 동작은 서서히 켜고 이전 동작은 서서히 끔
 function playClip(m, name, fade = 0.2) {
@@ -80,6 +66,14 @@ function playClip(m, name, fade = 0.2) {
   a.reset().setEffectiveWeight(1).fadeIn(fade).play();
   if (m.cur) m.cur.fadeOut(fade);
   m.cur = a;
+}
+// 렌더 동기화는 로딩 중인 임시 모형에도 운반물·물총 그룹이 있다고 가정합니다.
+function attachCharacterGear(m, parent, height = 0.95, depth = 0.38) {
+  m.carry = new THREE.Group(); m.carry.position.set(0, height, depth); parent.add(m.carry);
+  m.rifle = new THREE.Group(); m.rifle.position.set(0, height, depth); m.rifle.visible = false; parent.add(m.rifle);
+  m.rifle.add(bx(0.05, 0.06, 0.55, 0x2b2b30, { metalness: 0.5, roughness: 0.35 }, true, 0, 0, 0.12));
+  m.rifle.add(bx(0.06, 0.09, 0.22, 0x7a5232, { roughness: 0.7 }, true, 0, -0.02, -0.12));
+  return m;
 }
 function makeGL(name, o = {}) {
   const src = GL.models[name], root = new THREE.Group(), body = THREE.SkeletonUtils.clone(src.scene);
@@ -95,43 +89,7 @@ function makeGL(name, o = {}) {
   });
   const m = { root, body, gl: true, mixer, actions, cur: null, heading: 0, ph: rnd(0, 6), idleT: 0, weapons, head, hand, weaponMode: o.weapon || 'never', walk: o.walk && actions[o.walk] ? o.walk : 'Walk' };
   playClip(m, 'Idle', 0);
-  if (o.uniform) {
-    const pairs = [[[139, 30, 31], o.uniform], [[65, 50, 39], [43, 82, 108]], [[87, 65, 44], [60, 122, 152]]];
-    body.traverse(x => { if (x.isMesh && x.material.map) { x.material = x.material.clone(); x.material.map = recolorTex(x.material.map, 'crew-' + o.uniform.join('-'), pairs); } });
-  }
-  if (o.bunny) {
-    body.traverse(x => { if (x.isMesh && x.material.map) { x.material = x.material.clone(); x.material.map = recolorTex(x.material.map, 'pink', PINK_PAIRS); } });
-    // 분홍 토끼 모자: 머리를 덮는 둥근 모자 + 흰 테두리 + 솜뭉치 + 귀 두 개
-    m.ears = new THREE.Group(); root.add(m.ears); m.earPiv = [];
-    const pink = mat(0xf4a9bf, { roughness: 0.8 }), inner = mat(0xffe3ec, { roughness: 0.85 }), white = mat(0xfff8f2, { roughness: 0.9 });
-    const hat = new THREE.Group(); hat.rotation.x = -0.28; hat.position.z = 0.02; m.ears.add(hat);
-    const cap = mk(sphG(0.3, 22, 14, 0, Math.PI * 2, 0, Math.PI * 0.6), pink, true, 0, -0.06, -0.05); cap.scale.set(1.12, 1.0, 1.25); hat.add(cap);
-    const rim = mk(new THREE.TorusGeometry(0.3, 0.05, 8, 26), white, true, 0, -0.12, -0.05); rim.rotation.x = Math.PI / 2 - 0.12; rim.scale.set(1.13, 1.27, 1); hat.add(rim);
-    const pom = mk(sphG(0.08, 10, 8), white, true, 0, -0.02, -0.42); hat.add(pom);
-    for (const d of [-1, 1]) {
-      const piv = new THREE.Group(); piv.position.set(d * 0.13, 0.15, -0.06); piv.rotation.z = -d * 0.22; m.ears.add(piv);
-      const e = mk(sphG(0.085, 14, 10), pink, true, 0, 0.24, 0); e.scale.set(1, 3.2, 0.5); piv.add(e);
-      const ei = mk(sphG(0.055, 10, 8), inner, false, 0, 0.23, 0.03); ei.scale.set(1, 3.5, 0.35); piv.add(ei);
-      m.earPiv.push({ piv, d });
-    }
-    m.earA = 0; m.earV = 0; m.hatS = o.hatS || 1; m.ears.scale.setScalar(m.hatS);
-  }
-  if (o.skull) {
-    body.traverse(x => {
-      if (!x.isMesh) return;
-      if (/ernest/i.test(x.name)) x.visible = false; // 앵무새 빼기
-      else if (x.material.map) { x.material = x.material.clone(); x.material.map = recolorTex(x.material.map, 'skel', SKEL_PAIRS); }
-    });
-    m.skull = makeSkull(o.skull); m.skull.scale.setScalar(o.skullS || 1.15); root.add(m.skull);
-    if (head) { // 머리 뼈의 처음 방향을 기준으로 해골이 같이 끄덕이게
-      body.updateMatrixWorld(true); head.getWorldQuaternion(_hq0); m.headQ0 = _hq0.clone().invert();
-    }
-  }
-  m.carry = new THREE.Group(); m.carry.position.set(0, 0.95, 0.38); root.add(m.carry);
-  m.rifle = new THREE.Group(); m.rifle.visible = false; root.add(m.rifle);
-  m.rifle.add(bx(0.05, 0.06, 0.55, 0x2b2b30, { metalness: 0.5, roughness: 0.35 }, true, 0, 0, 0.12));
-  m.rifle.add(bx(0.06, 0.09, 0.22, 0x7a5232, { roughness: 0.7 }, true, 0, -0.02, -0.12));
-  return m;
+  return attachCharacterGear(m, root);
 }
 function animateGL(m, ent, dt, st = {}) {
   const vx = ent.vx || 0, vy = ent.vy || 0, spd = Math.hypot(vx, vy), t = G.t;
@@ -151,46 +109,30 @@ function animateGL(m, ent, dt, st = {}) {
   if (m.walk !== 'Walk') m.actions[m.walk].timeScale = Math.max(0.7, Math.min(2.2, spd / (m.walkSpd || 1.6)));
   if (m.actions.Run) m.actions.Run.timeScale = Math.max(0.7, Math.min(1.5, spd / 3.3));
   m.mixer.update(dt);
-  if (m.skull && m.head) {
-    m.head.scale.setScalar(0.001); // 원래 머리(수염·모자)는 숨기고 해골로
-    m.root.updateMatrixWorld(true);
-    m.head.getWorldPosition(_hv); m.root.worldToLocal(_hv); m.skull.position.set(_hv.x, _hv.y - 0.06, _hv.z);
-    m.head.getWorldQuaternion(_hq).multiply(m.headQ0); m.root.getWorldQuaternion(_rq).invert();
-    m.skull.quaternion.copy(_rq).multiply(_hq);
-  }
   const armed = m.weaponMode === 'always' || (m.weaponMode === 'raid' && raidOn);
   for (const w of m.weapons) w.visible = armed;
-  // 토끼 귀는 머리 뼈를 따라가며 한 박자 늦게 흔들림
-  if (m.ears && m.head) {
-    m.head.getWorldPosition(_hv); m.root.worldToLocal(_hv);
-    m.ears.position.set(_hv.x, _hv.y + (m.hatY ?? 0.22), _hv.z + (m.hatZ ?? 0));
-    const target = -0.5 * Math.min(1, spd / 3) + (spd > 0.15 ? Math.sin(t * 9) * 0.12 : 0) + Math.pow(Math.max(0, Math.sin(t * 0.9 + m.ph * 3)), 14) * 0.3;
-    m.earV += ((target - m.earA) * 80 - m.earV * 8) * dt; m.earA += m.earV * dt;
-    for (const e of m.earPiv) e.piv.rotation.x = m.earA;
-  }
+  if (armed && m.weapons.length) m.rifle.visible = false; // 원본 커틀러스와 물총이 겹치지 않게 함
   if (m.rifle.visible && m.hand) { m.hand.getWorldPosition(_hv); m.root.worldToLocal(_hv); m.rifle.position.copy(_hv); }
 }
-// 역할별 캐릭터: 주인공은 토끼 귀를 단 헨리, 선원은 선장과 헨리, 상륙 해적은 상어 인간
+// 원본 Pirate Kit의 모자·머리·몸 비율과 색을 그대로 사용합니다.
+// Captain Barbarossa: 주인공 / Henry: 선원·손님 / Mako·Sharky: 상륙 해적.
 function mkChar(kind, ent) {
-  // 손님은 무장한 해적 모형 대신, 큰 머리·밝은 옷의 가벼운 마을 주민으로 표시합니다.
-  if (kind === 'customer') {
-    const m = makeAdult3(ent); m.head.scale.setScalar(1.3); m.root.scale.set(1.12, 1.06, 1.12); return m;
-  }
   if (!GL.ready) {
-    if (kind === 'player') return makeKid3(PLAYER_LOOK);
-    if (kind === 'worker') return makeKid3(ent.look);
-    if (kind === 'customer') return makeAdult3(ent);
-    return makeAdult3({ shirt: '#6e2b2b', pants: '#2e2a26', hair: '#1d1d1d', skin: '#d9a87e', bandana: true });
+    // 로딩 중에도 토끼 모자나 동물 후드 대신 단순한 두건 해적 실루엣을 표시합니다.
+    const colors = kind === 'player'
+      ? { shirt: '#634832', pants: '#9e302b', hair: '#b95d28', skin: '#efbd8c' }
+      : kind === 'boarder'
+        ? { shirt: '#547f91', pants: '#8f7b52', hair: '#354d61', skin: '#7ba6b7' }
+        : { shirt: ent.shirt || '#66777b', pants: '#637c86', hair: ent.hair || '#3c291d', skin: '#bf946e' };
+    const m = makeAdult3({ ...colors, bandana: true });
+    return attachCharacterGear(m, m.body, 1.08, 0.32);
   }
-  const n = (ent.ph || 0) * 10 | 0;
-  if (kind === 'player') {
-    const m = makeGL('henry', { bunny: true, height: 1.78, walk: 'WalkHuman' });
-    m.root.scale.set(1.1, 1, 1.1); return m;
-  }
-  if (kind === 'worker') return makeGL(n % 2 ? 'captain' : 'henry', { height: 1.5, weapon: n % 2 ? 'raid' : 'never', uniform: n % 2 ? [40, 137, 185] : [71, 167, 80] });
-  if (kind === 'customer') return makeGL(n % 2 ? 'henry' : 'captain', { height: 1.55 });
+  const n = Math.floor((ent.ph || 0) * 10);
+  if (kind === 'player') return makeGL('captain', { height: 1.78, weapon: 'always' });
+  if (kind === 'worker') return makeGL('henry', { height: 1.58, weapon: 'never' });
+  if (kind === 'customer') return makeGL(n % 3 === 0 ? 'captain' : 'henry', { height: 1.55, weapon: 'never' });
   const ty = ent.type || 'normal';
-  const m = makeGL('captain', { height: 1.6, weapon: ty === 'normal' ? 'always' : 'never', skull: ty === 'bomber' || ty === 'sniper' ? 2 : ty === 'thief' ? 1 : (n % 2 ? 1 : 2) });
+  const m = makeGL(n % 2 ? 'mako' : 'sharky', { height: 1.65, weapon: ty === 'normal' ? 'always' : 'never' });
   if (ty === 'bomber') { // 불붙은 폭탄을 안고 달림
     const bomb = mk(sphG(0.17, 14, 10), mat(0x15151a, { metalness: 0.4, roughness: 0.4 }), true, 0, -0.1, 0.05); m.carry.add(bomb);
     m.carry.add(mk(cylG(0.015, 0.015, 0.12, 6), mat(0x8a6a40), false, 0, 0.1, 0.05));
