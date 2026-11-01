@@ -2174,7 +2174,7 @@ function hud(obj) {
 /* ---------- 루프 ---------- */
 let last = performance.now(), paused = false, saveT = 0;
 function frame(now) {
-  const dt = Math.min(0.05, (now - last) / 1000); last = now;
+  const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
   if (!paused) { update(dt); saveT += dt; if (saveT > 2.5) { saveT = 0; save(); } }
   ctx.clearRect(0, 0, W, H);
   ctx.save();

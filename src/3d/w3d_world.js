@@ -362,7 +362,7 @@ function makeAdult3(o) {
   }
   return m;
 }
-// 걷기 사이클과 귀 스프링 (2D 버전과 같은 동작을 3D 관절로)
+// 걷기 사이클과 귀 스프링 (모형을 불러오기 전 도형 캐릭터용)
 function animate3(m, ent, dt, fighting) {
   const vx = ent.vx || 0, vy = ent.vy || 0, spd = Math.hypot(vx, vy), t = G.t;
   if (spd > 0.12) { m.idleT = 0; m.rest = undefined; } else m.idleT += dt;

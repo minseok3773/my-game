@@ -5,16 +5,16 @@ ROOT=Path(__file__).resolve().parents[1]
 HOOK="""
 window.gameTest = { get G(){return G}, get enemies(){return enemies}, get raidOn(){return raidOn}, get paused(){return paused}, build, freshState, serialize, save, startRaid, updateMilitary, finishStrategyRaid, hitVillage, priceOf, raidPlan, strategyDamage, strategySale, hud, objective,
  unlock(id){if(!unlocked.has(id)){unlocked.add(id);applyUnlock(id)}},
- step(dt){updateMilitary(dt)}, clear(){enemies=[]}, setRaid(v){raidOn=v},
+ skewClock(){last=performance.now()+1000}, step(dt){updateMilitary(dt)}, clear(){enemies=[]}, setRaid(v){raidOn=v},
  get cards(){return typeof CARDS === 'undefined' ? [] : CARDS},
  offer(){offerCards()}, take(c){takeCard(c)}, ck(id){return ck(id)} };
 """
 with sync_playwright() as p:
  browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox','--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'])
- for version in ['2d','3d']:
+ for version in ['3d']:
   print('Testing',version,flush=True)
   page=browser.new_page(viewport={'width':390,'height':844})
-  errors=[]; page.on('pageerror',lambda e:errors.append(str(e)))
+  errors=[]; page.on('pageerror',lambda e:errors.append(e.stack))
   def route(r):
    content=(ROOT/f'raft-village-{version}.html').read_text().replace('})();\n</script>',HOOK+'})();\n</script>')
    r.fulfill(body=content,content_type='text/html')
@@ -28,6 +28,7 @@ with sync_playwright() as p:
   page.route(f'**/raft-village-{version}.html',route)
   page.goto(f'http://127.0.0.1:8000/raft-village-{version}.html',wait_until='networkidle')
   page.wait_for_function('!!window.gameTest',timeout=30000)
+  assert page.evaluate('''async () => { const before=gameTest.G.t; gameTest.skewClock(); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); return gameTest.G.t >= before; }''')
   page.evaluate("""() => { const t=gameTest; t.unlock('expand1'); t.G.money=500; t.G.hp=50; t.hud(t.objective()); }""")
   page.locator('#strategyBtn').click();page.locator('#strategyPanel .choices button').nth(1).click()
   assert page.evaluate("gameTest.G.money === 480 && gameTest.G.hp >= 70 && gameTest.G.hp < 72 && gameTest.strategyDamage() === .7 && gameTest.strategySale() === .8")

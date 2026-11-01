@@ -17,7 +17,7 @@ def main():
         parser.error("Use the public HTTPS deployment URL.")
     assets = Path(__file__).resolve().parents[2] / "assets"
     assets.mkdir(exist_ok=True)
-    for version in ("2d", "3d"):
+    for version in ("3d",):
         url = f"{base}/raft-village-{version}.html"
         code = qrcode.QRCode(
             error_correction=qrcode.constants.ERROR_CORRECT_M,

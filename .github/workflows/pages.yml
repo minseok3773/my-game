@@ -27,7 +27,7 @@ jobs:
       - name: Collect playable files
         run: |
           mkdir -p _site
-          cp index.html raft-village-2d.html raft-village-3d.html _site/
+          cp index.html raft-village-3d.html _site/
           cp -R models assets _site/
       - uses: actions/upload-pages-artifact@v3
         with:
