@@ -51,7 +51,7 @@ const plankIM = new THREE.InstancedMesh(boxG(), new THREE.MeshStandardMaterial({
 const baseIM = new THREE.InstancedMesh(boxG(), mat(0xbea277, { roughness: 1 }), MAXT);
 const logIM = new THREE.InstancedMesh(cylG(1, 1, 1, 10), mat(0x6a4529, { roughness: 0.9 }), MAXT * 2);
 for (const im of [plankIM, baseIM, logIM]) { im.receiveShadow = true; im.instanceMatrix.setUsage(THREE.DynamicDrawUsage); world.add(im); }
-const PLANK3 = [0xc9ad82, 0xc9ad82, 0xc9ad82, 0xc9ad82, 0xc9ad82].map(c => new THREE.Color(c)); // 바닥은 한 가지 베이지색
+const PLANK3 = [0xc9ad82, 0xc5a67a, 0xd0b68e, 0xcbb087, 0xc2a378].map(c => new THREE.Color(c)); // 가까운 색의 판자로 단조로움만 완화
 for (let i = 0; i < MAXT * 3; i++) plankIM.setColorAt(i, PLANK3[i % 5]);
 const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _sv = new THREE.Vector3(), _pv = new THREE.Vector3(), _eu = new THREE.Euler();
 let raftKey = '';
@@ -116,6 +116,59 @@ function syncStack(group, arr) {
 
 /* ---------- 3D: 시설 ---------- */
 const objs = {}, docks = {}, zoneRings = {};
+const DISTRICT_COLORS = { fish: 0x4b9bb0, grilled: 0xd78a50, water: 0x55bcb8, tomato: 0x8fae58 };
+// 시설에 붙는 정적 소품: 길과 상호작용 위치를 바꾸지 않고, 생성할 때만 조립합니다.
+function dressStation(d, parent) {
+  const g = new THREE.Group(); g.name = 'station-details'; parent.add(g);
+  const accent = DISTRICT_COLORS[d.item || d.output] || (d.type === 'tent' ? 0xc4956b : 0x718fac);
+  const wood = 0x8d6040;
+  const barrel = (x, z) => {
+    g.add(mk(cylG(0.18, 0.16, 0.42, 10), mat(wood), false, x, 0.21, z));
+    for (const y of [0.1, 0.32]) g.add(mk(cylG(0.185, 0.185, 0.035, 10), mat(0x45515b), false, x, y, z));
+  };
+  const crate = (x, z) => {
+    g.add(bx(0.36, 0.3, 0.34, 0xb78b5a, {}, false, x, 0.15, z));
+    for (const y of [0.06, 0.24]) g.add(bx(0.38, 0.035, 0.36, wood, {}, false, x, y, z));
+  };
+  const plant = (x, z) => {
+    g.add(mk(cylG(0.13, 0.09, 0.22, 8), mat(0xb86c4c), false, x, 0.11, z));
+    for (let i = 0; i < 3; i++) {
+      const leaf = mk(sphG(0.12, 6, 4), mat(i % 2 ? 0x709449 : 0x91ad5b), false, x + (i - 1) * 0.08, 0.3 + (i % 2) * 0.08, z);
+      leaf.scale.set(0.65, 1.5, 0.7); leaf.rotation.z = (i - 1) * -0.5; g.add(leaf);
+    }
+  };
+  if (['producer', 'converter', 'shop', 'tent'].includes(d.type)) {
+    g.add(bx(d.type === 'tent' ? 2.2 : 1.8, 0.018, 1.65, accent, { roughness: 1 }, false, 0, 0.012, 0));
+    for (const x of [-0.83, 0.83]) g.add(bx(0.035, 0.021, 1.65, 0xeee0ba, {}, false, x, 0.02, 0));
+  }
+  if (d.type === 'shop') {
+    // 시설 색의 차양 장식과 판매 품목을 보여 주는 작은 간판.
+    for (let i = 0; i < 4; i++) g.add(bx(0.3, 0.17, 0.035, i % 2 ? 0xf3e4c8 : accent, {}, false, -0.465 + i * 0.31, 1.28, 0.62));
+    g.add(bx(0.62, 0.34, 0.06, wood, {}, false, 0, 1.02, 0.57));
+    const emblem = ITEM3[d.item](); emblem.scale.setScalar(1.7); emblem.position.set(0, 1.03, 0.63); emblem.rotation.x = Math.PI / 2; g.add(emblem);
+    crate(-0.78, -0.35); plant(0.77, -0.32);
+  } else if (d.item === 'fish') {
+    barrel(0.68, -0.4); crate(0.68, 0.12);
+    const rope = mk(geo('rope-coil', () => new THREE.TorusGeometry(0.19, 0.035, 4, 12)), mat(0xddc292), false, -0.1, 0.05, 0.75);
+    rope.rotation.x = Math.PI / 2; g.add(rope);
+  } else if (d.item === 'water') {
+    barrel(0.6, -0.52); plant(-0.7, 0.52);
+    g.add(bx(0.08, 0.12, 0.3, 0xbcced2, { metalness: 0.3 }, false, -0.2, 0.62, 0.38));
+  } else if (d.item === 'tomato') {
+    crate(-0.68, -0.66);
+    for (const x of [-0.55, 0, 0.55]) g.add(mk(cylG(0.018, 0.018, 0.85, 4), mat(wood), false, x, 0.65, -0.45));
+  } else if (d.type === 'converter') {
+    barrel(-0.7, -0.25);
+    for (let i = 0; i < 4; i++) g.add(bx(0.045, 0.035, 0.72, 0x303f48, { metalness: 0.4 }, false, -0.27 + i * 0.18, 0.54, 0));
+  } else if (d.type === 'tent') {
+    crate(-0.6, -0.65); plant(0.72, -0.63);
+    g.add(bx(0.8, 0.09, 0.28, wood, {}, false, 0, 0.24, 0.98));
+    for (const x of [-0.3, 0.3]) g.add(bx(0.08, 0.24, 0.24, wood, {}, false, x, 0.12, 0.98));
+    const pennant = mk(coneG(0.13, 0.28, 3), mat(accent), false, 0, 1.24, 0); pennant.rotation.z = Math.PI / 2; g.add(pennant);
+  } else if (d.type === 'tower' || d.type === 'base') {
+    for (const x of [-0.35, 0, 0.35]) g.add(bx(0.32, 0.18, 0.22, 0xb8aa80, { roughness: 1 }, false, x, 0.09, 0.68));
+  } else if (d.type === 'lighthouse') { barrel(0.65, -0.5); plant(-0.6, 0.5); }
+}
 function tentGeo() {
   return geo('tent', () => { const s = new THREE.Shape(); s.moveTo(-0.65, 0); s.lineTo(0.65, 0); s.lineTo(0, 1.1); s.lineTo(-0.65, 0);
     const g = new THREE.ExtrudeGeometry(s, { depth: 1.7, bevelEnabled: false }); g.translate(0, 0, -0.85); g.rotateY(Math.PI / 2); return g; });
@@ -203,6 +256,7 @@ function buildStation(id) {
     o.cannon.add(mk(sphG(0.18, 12, 10), mat(0x333333, { metalness: 0.5, roughness: 0.4 })));
     const barrel = mk(cylG(0.08, 0.1, 0.6, 10), mat(0x222222, { metalness: 0.5, roughness: 0.4 }), true, 0, 0.03, 0.3); barrel.rotation.x = Math.PI / 2; o.cannon.add(barrel);
   }
+  dressStation(d, g);
   objs[id] = o;
   return o;
 }
@@ -222,7 +276,13 @@ function syncStations() {
     if (o.crates) syncPile(o.crates, 'crate', Math.ceil(G.st.base.food / 3));
     if (o.cannon && towerSt[id]) o.cannon.rotation.y += Math.atan2(Math.sin((towerSt[id].yaw || 0) - o.cannon.rotation.y), Math.cos((towerSt[id].yaw || 0) - o.cannon.rotation.y)) * Math.min(1, frameDt * 8);
   }
-  for (const id in zoneRings) zoneRings[id].material.opacity = 0.35 + 0.25 * Math.sin(G.t * 3);
+  for (const id in zoneRings) {
+    const d = DEFS[id], x = id === 'base' ? BASE_ZONE.x : d.zx, y = id === 'base' ? BASE_ZONE.y : d.zy;
+    const near = dist(player.x, player.y, x, y) < 2.2;
+    zoneRings[id].material.color.setHex(0x69e0d5);
+    zoneRings[id].material.opacity = near ? 0.75 : 0.23;
+    zoneRings[id].scale.setScalar(near ? 1 + Math.sin(G.t * 3) * 0.06 : 1);
+  }
 }
 
 /* ---------- 3D: 건설·업그레이드 칸 ---------- */
@@ -250,7 +310,8 @@ function syncPads(vp) {
     o.base.material.color.setHex(afford ? 0xffe078 : 0xffffff);
     o.fill.visible = ratio > 0; o.fill.scale.y = Math.max(0.001, ratio);
     const f = (G.t * 0.8 + p.x * 0.13) % 1;
-    o.ripple.scale.setScalar(1 + f * 0.7); o.ripple.material.opacity = (1 - f) * (afford ? 0.8 : 0.4); o.ripple.material.color.setHex(afford ? 0xffdc64 : 0xffffff);
+    o.ripple.visible = afford && dist(player.x, player.y, p.x, p.y) < 4 && !raidOn;
+    o.ripple.scale.setScalar(1 + f * 0.7); o.ripple.material.opacity = (1 - f) * 0.6; o.ripple.material.color.setHex(0xffdc64);
   }
 }
 
@@ -561,10 +622,10 @@ function sync3D(dt) {
   if (unlocked.has('lighthouse')) { const d = DEFS.lighthouse; lampTower.position.set(d.x, 3.6, d.y); lampTower.intensity = n * 2.2; }
   lampPlayer.position.set(player.x, 1.6, player.y); lampPlayer.intensity = n * 1.1;
   // 카메라: 높은 곳에서 내려다보며 부드럽게 따라감 (흔들림 포함)
-  const far = camera.aspect < 0.7 ? 2.6 : 1.8;
+  const far = camera.aspect < 0.7 ? 2.25 : 1.8;
   _pv.set(player.x, 12.5 * far, player.y + 9.5 * far);
   camera.position.lerp(_pv, Math.min(1, dt * 4));
-  if (shake > 0) camera.position.add(new THREE.Vector3(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)).multiplyScalar(shake * 0.5));
+  if (shake > 0) camera.position.add(_pv.set(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)).multiplyScalar(shake * 0.5));
   camera.lookAt(player.x, 0.4, player.y);
   // 밤에는 달빛처럼 머리 위에서 비춰 그림자를 짧게
   sun.position.set(player.x - 7 * (1 - n * 0.85), 14, player.y + 4 * (1 - n * 0.85)); sun.target.position.set(player.x, 0, player.y);

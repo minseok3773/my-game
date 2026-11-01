@@ -41,7 +41,7 @@ body{background:var(--deep);color:var(--paper);font-family:var(--body);touch-act
 #bag.full{background:var(--alert)}
 #menuBtn{position:fixed;bottom:calc(14px + env(safe-area-inset-bottom,0px));right:calc(12px + env(safe-area-inset-right,0px));
   width:42px;height:42px;border-radius:50%;border:0;background:rgba(20,30,40,.55);color:var(--paper);font-size:20px;cursor:pointer}
-#menuBtn:focus-visible,.panel button:focus-visible{outline:3px solid #ffd84d;outline-offset:2px}
+#strategyBtn:focus-visible,#menuBtn:focus-visible,.panel button:focus-visible{outline:3px solid #ffd84d;outline-offset:2px}
 #defense{bottom:calc(10px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:rgba(20,30,40,.6);
   border-radius:12px;padding:5px 12px;font-size:13px;min-width:160px;max-width:calc(100% - 210px);text-align:center;font-variant-numeric:tabular-nums}
 #defense.raid{background:rgba(180,30,20,.8)}
@@ -119,6 +119,27 @@ body{background:var(--deep);color:var(--paper);font-family:var(--body);touch-act
 #goal::after{background:rgba(16,24,32,.82);border-color:rgba(255,255,255,.16)}
 .panel>div{background:rgba(22,28,36,.96);color:#efe7da;border-color:rgba(255,255,255,.18)}
 .panel button.ghost{background:#3a4552;color:#efe7da;box-shadow:0 3px 0 #222a33}
+/* 정보 우선순위: 상단 목표 / 하단 준비·전투 / 맨 아래 조작 */
+.hud,#strategyBtn,#menuBtn{box-sizing:border-box}
+#quest{top:calc(12px + env(safe-area-inset-top,0px));bottom:auto;left:12px;right:auto;width:calc(100% - 176px);max-width:300px;padding:10px 12px;min-height:60px;border-radius:14px;background:rgba(17,38,48,.92)}
+#qTitle{display:block;font-size:10px;color:#a9c6c7;letter-spacing:.12em;margin-bottom:4px}
+#qText{font-size:12px;white-space:normal;line-height:1.45;word-break:keep-all;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}#qBar{margin-top:6px}
+#money{font-size:21px;min-width:132px;justify-content:flex-end;background:rgba(17,38,48,.92)}
+#money i{width:30px;height:28px;border:0;background:#427e57;box-shadow:none}
+#level{top:calc(57px + env(safe-area-inset-top,0px));padding:4px 8px;font-size:12px}#level s{width:70px}
+#goal{top:calc(102px + env(safe-area-inset-top,0px));left:12px;right:12px;transform:none;max-width:none;text-align:left;border-radius:12px;padding:10px 12px;border:1px solid #63cfc4;border-left:4px solid #63cfc4;background:rgba(17,38,48,.93);font-size:13px;line-height:1.5;box-shadow:0 4px 14px #08202a40}
+#goal::before{content:attr(data-label);display:block;font:10px var(--body);letter-spacing:.1em;color:#8ae3d9;margin-bottom:3px}#goal::after{display:none}#goal.pop{animation:none}
+#goal[data-kind=build]{border-color:#e7bd67}#goal[data-kind=build]::before{color:#f4ce81}
+#goal[data-kind=danger]{border-color:#f18a78}#goal[data-kind=danger]::before{color:#ffac9b}
+#defense{bottom:calc(72px + env(safe-area-inset-bottom,0px));left:12px;right:12px;max-width:none;min-width:0;padding:8px 12px;text-align:left;border-radius:12px;background:rgba(17,38,48,.93);font-size:12px}
+#defTop{float:left;margin-right:10px}#hpBar{height:6px;margin:5px 0 7px}#defInfo{font-size:11px;color:#d2e5df}
+#strategyBtn{position:fixed;z-index:4;border:1px solid #c4aa65;border-radius:12px;color:#fff3d1;font:14px var(--display);padding:9px 12px;cursor:pointer;bottom:calc(145px + env(safe-area-inset-bottom,0px));left:12px;right:12px;max-width:none;min-height:50px;background:#173c49f2;border-color:#c4aa65;text-align:left}
+#bag{bottom:calc(14px + env(safe-area-inset-bottom,0px));min-height:40px;display:flex;align-items:center;box-sizing:border-box;font-size:15px;padding:8px 14px;background:rgba(17,38,48,.93)}
+#menuBtn{width:42px;height:42px;background:rgba(17,38,48,.93)}
+#toast{bottom:calc(210px + env(safe-area-inset-bottom,0px));max-width:none;left:12px;right:12px;font-size:12px;line-height:1.5;background:rgba(17,38,48,.96)}
+.panel{z-index:20}.panel>div{box-sizing:border-box;max-height:calc(100dvh - 32px);overflow:auto}.panel button{min-height:44px}
+@media(min-width:700px){#goal{left:50%;right:auto;transform:translateX(-50%);width:420px;top:20px}#quest{width:250px}#defense,#strategyBtn{left:auto;width:300px}#strategyBtn{position:fixed;z-index:4;border:1px solid #c4aa65;border-radius:12px;color:#fff3d1;font:14px var(--display);padding:9px 12px;cursor:pointer;bottom:calc(145px + env(safe-area-inset-bottom,0px))}#toast{right:auto;max-width:360px}}
+@media(max-height:500px) and (orientation:landscape){#goal{top:12px;left:28%;right:26%;width:auto;transform:none;font-size:11px;padding:6px 9px}#quest{width:24%;max-width:190px;min-height:0;padding:7px 9px}#qText{font-size:10px}#defense{left:auto;width:230px;bottom:66px}#strategyBtn{left:auto;width:230px;bottom:138px;font-size:12px}#toast{right:auto;max-width:220px;bottom:66px}}
 </style>
 
 <canvas id="game" aria-label="표류 뗏목 마을 게임 화면"></canvas>
@@ -825,7 +846,10 @@ function drawKid(x, y, L, o) {
 function sign(text, wx, wy, z, bg = 'rgba(255,252,246,.8)', fg = '#4a3020', size = 14) {
   const s = S(wx, wy, z + Math.sin(G.t * 2 + wx) * 1.5);
   ctx.font = `${size * Z}px "Do Hyeon", sans-serif`;
-  const w = ctx.measureText(text).width + (size + 4) * Z, h = (size + 9) * Z, x0 = s.x - w / 2, y0 = s.y - h / 2;
+  if (s.x < -30 || s.x > W + 30 || s.y < 0 || s.y > H) return;
+  const w = ctx.measureText(text).width + (size + 4) * Z, h = (size + 9) * Z;
+  s.x = Math.max(w / 2 + 8, Math.min(W - w / 2 - 8, s.x));
+  const x0 = s.x - w / 2, y0 = s.y - h / 2;
   ctx.save(); ctx.shadowColor = 'rgba(30,20,10,.3)'; ctx.shadowBlur = 8 * Z; ctx.shadowOffsetY = 3 * Z;
   ctx.fillStyle = bg; ctx.beginPath(); ctx.roundRect(x0, y0, w, h, h / 2); ctx.fill();
   ctx.beginPath(); ctx.moveTo(s.x - 5 * Z, y0 + h - 1); ctx.lineTo(s.x, y0 + h + 6 * Z); ctx.lineTo(s.x + 5 * Z, y0 + h - 1); ctx.fill();
@@ -2076,7 +2100,6 @@ const strategySale = () => G.tactic === 'trade' ? 1.4 : G.tactic === 'guard' ? 0
 const strategyDamage = () => G.tactic === 'guard' ? 0.7 : G.tactic === 'trade' ? 1.25 : 1;
 const strategyStyle = document.createElement('style');
 strategyStyle.textContent = `
-#strategyBtn{position:fixed;right:12px;bottom:calc(125px + env(safe-area-inset-bottom,0px));z-index:4;max-width:calc(100vw - 24px);padding:9px 12px;border:1px solid #e9c879;border-radius:12px;background:#182b3deb;color:#fff3d1;font:14px var(--display);text-align:left;cursor:pointer}
 #strategyBtn span{display:block;font-size:12px;opacity:.85;margin-top:3px}
 #strategyPanel{z-index:30;overflow:auto} #strategyPanel>div{max-height:85dvh;overflow:auto;box-sizing:border-box}
 #strategyPanel .choices{display:grid;gap:10px;margin:14px 0} #strategyPanel button{text-align:left;line-height:1.5} #strategyPanel button small{display:block;font-family:inherit;font-size:13px} #strategyPanel button:disabled{opacity:.5;cursor:default}
@@ -2145,6 +2168,8 @@ function finishStrategyRaid(wasLooted) {
 let lastHud = '';
 function hud(obj) {
   strategyHud();
+  $('goal').dataset.kind = raidOn ? 'danger' : /짓기|업그레이드/.test(obj.text) ? 'build' : 'interact';
+  $('goal').dataset.label = raidOn ? '위험 · 마을 방어' : /짓기|업그레이드/.test(obj.text) ? '건설 · 성장' : '작업 · 상호작용';
   const day = 1 + Math.floor(G.t / 40), km = G.t * 1.7 * (unlocked.has('solar') ? 1.4 : 1);
   const key = [Math.floor(G.money), day, Math.floor(km), G.stack.length, cap, obj.text, G.level, G.xp,
     unlocked.has('tent1'), Math.ceil(G.hp), G.soldiers, raidOn, Math.ceil(G.raidT), enemies.length, wages(), G.strike, phaseInfo(), G.qi, questInfo().cur, Math.round(incomePerMin() / 5)].join('|');
@@ -2159,7 +2184,7 @@ function hud(obj) {
     $('defTop').textContent = `🛡️ 마을 체력 ${Math.ceil(G.hp)}/${hm}`;
     $('hpFill').style.width = Math.max(0, G.hp / hm * 100) + '%';
     $('hpBar').classList.toggle('low', G.hp < hm * 0.3);
-    $('defInfo').textContent = raidOn ? `⚠️ 해적선 ${alive}척 공격 중!` : `⚔️ 선원 ${workers.length}명 · 다음 습격 ${Math.ceil(G.raidT)}초`;
+    $('defInfo').textContent = raidOn ? `⚠️ 해적선 ${alive}척 · 상륙 ${enemies.filter(e => e.kind === 'boarder' && e.state === 'walk').length}명` : `⚔️ 선원 ${workers.length}명 · 다음 습격 ${Math.ceil(G.raidT)}초`;
     def.classList.toggle('raid', raidOn);
   }
   $('lv').textContent = `Lv.${G.level}`;

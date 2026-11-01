@@ -78,11 +78,11 @@ function overlayWorld() {
   for (const id of unlocked) {
     const d = DEFS[id]; if (!d || d.x === undefined) continue;
     const up = dropOff(id);
-    if (d.type === 'shop') {
-      sign(`${ICON[d.item]} $${priceOf(d)}${slv(id) > 1 ? ' ★' + slv(id) : ''}`, d.x, d.y, 80 + up);
+    if (d.type === 'shop' && !raidOn && dist(player.x, player.y, d.x, d.y) < 5) {
+      sign(`${ICON[d.item]} ${d.name} · $${priceOf(d)}${slv(id) > 1 ? ' ★' + slv(id) : ''}`, d.x, d.y, 80 + up);
       const c = G.st[id].cash;
-      if (c > 0) sign(`$${fmt(c)}`, d.cx, d.cy, 40 + Math.ceil(Math.min(9, Math.ceil(c / 8)) / 3) * 5, 'rgba(225,255,232,.9)', '#2f7d32', 24);
-    } else if ((d.type === 'producer' || d.type === 'converter') && slv(id) > 1) sign(`★${slv(id)}`, d.x, d.y, 70 + up, '#ffd84d');
+      if (c > 0) sign(`$${fmt(c)}`, d.cx, d.cy, 40 + Math.ceil(Math.min(9, Math.ceil(c / 8)) / 3) * 5, 'rgba(225,255,232,.9)', '#2f7d32', 16);
+    } else if ((d.type === 'producer' || d.type === 'converter') && !raidOn && dist(player.x, player.y, d.x, d.y) < 2.8) sign(`${d.name}${slv(id) > 1 ? ' ★' + slv(id) : ''}`, d.x, d.y, 70 + up, '#ffd84d');
     else if (d.type === 'base') {
       sign(`⚓ 해군 기지 ★${blv()}`, d.x, d.y, 70 + up);
       const b = G.st.base;
@@ -90,8 +90,8 @@ function overlayWorld() {
     }
   }
   const vp = visiblePads();
-  const badges = vp.map(p => [dist(player.x, player.y, p.x, p.y), p]).filter(a => a[0] < 5).sort((a, b) => a[0] - b[0]).slice(0, 3).map(a => a[1]);
-  for (const p of vp) padBadge(p, badges.includes(p));
+  const badges = vp.map(p => [dist(player.x, player.y, p.x, p.y), p]).filter(a => a[0] < 4).sort((a, b) => a[0] - b[0]).slice(0, W < 600 ? 1 : 2).map(a => a[1]);
+  if (!raidOn) for (const p of vp) if (dist(player.x, player.y, p.x, p.y) < 4.5) padBadge(p, badges.includes(p));
   const k = Z;
   for (const id of STATION_IDS) {
     if (!unlocked.has(id) || DEFS[id].type !== 'shop') continue;
@@ -115,7 +115,7 @@ function render(dt) {
   ctx.clearRect(0, 0, W, H);
   overlayWorld();
   const obj = objective();
-""" + guide + raidfx.replace('  ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);\n', '') + """  return obj;
+""" + guide.replace('rgba(110,230,255,${', 'rgba(${raidOn ? "255,130,110" : /짓기|업그레이드/.test(obj.text) ? "255,211,114" : "110,230,220"},${') + raidfx.replace('  ctx.fillStyle = v; ctx.fillRect(0, 0, W, H);\n', '') + """  return obj;
 }
 let last = performance.now(), paused = false, saveT = 0;
 function frame(now) {
