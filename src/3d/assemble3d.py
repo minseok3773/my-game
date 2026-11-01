@@ -156,15 +156,11 @@ for c in chunks:
     if c.startswith("function S("): out.append(newS); continue
     if c.startswith("function inputDir("): out.append(newInput); continue
     if c.startswith("function slotPos("):
-        out.append("""function slotPos(d, k) {
-  const row = k === 0 ? 0 : 1 + Math.floor((k - 1) / 2);
-  const a = 1.05 + row * 0.82, side = k === 0 ? 0 : k % 2 ? -0.36 : 0.36;
-  return { x: d.x + d.dir[0] * a - d.dir[1] * side, y: d.y + d.dir[1] * a + d.dir[0] * side };
-}"""); continue
+        out.append("function slotPos(d, k) { return customerSlotPos(d, k); }\n"); continue
     if c.startswith("function dockRect("):
-        out.append(c.replace('a1 = 10;', 'a1 = 6.8;').replace('0 : 0.42', '0 : 0.8')); continue
+        out.append("function dockRect(id) { return customerDockRect(id); }\n"); continue
     if c.startswith("/* ---------- HUD ---------- */"):
-        out.append(B('w3d_world.js')); out.append(B('w3d_chars.js')); out.append(B('w3d_game.js')); out.append(B('w3d_melee.js')); out.append(B('w3d_hero.js')); out.append(B('w3d_crew.js')); out.append(B('w3d_training.js')); out.append(B('w3d_fx.js')); out.append(overlay); out.append(c); continue
+        out.append(B('w3d_world.js')); out.append(B('w3d_chars.js')); out.append(B('w3d_game.js')); out.append(B('w3d_melee.js')); out.append(B('w3d_hero.js')); out.append(B('w3d_crew.js')); out.append(B('w3d_training.js')); out.append(B('w3d_customers.js')); out.append(B('w3d_fx.js')); out.append(overlay); out.append(c); continue
     if c.startswith("/* ---------- 루프 ---------- */") or c.startswith("let last = performance.now()"):
         continue
     if keep(c): out.append(c)

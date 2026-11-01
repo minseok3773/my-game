@@ -83,7 +83,28 @@ const trainingPanel = document.createElement('div');
 trainingPanel.id = 'trainingPanel'; trainingPanel.className = 'panel'; trainingPanel.hidden = true;
 trainingPanel.innerHTML = '<div role="dialog" aria-modal="true" aria-labelledby="trainingTitle"><h2 id="trainingTitle"></h2><p class="level"></p><div class="stats"></div><p class="description"></p><p class="status" role="status"></p><div class="buttons"><button id="trainingUpgrade" type="button"></button><button class="ghost close" type="button">돌아가기</button></div></div>';
 document.body.appendChild(trainingPanel);
-let activeTrainingKind = null, trainingPanelSignature = '', trainingButtonSignature = '';
+let activeTrainingKind = null, trainingContact = null, trainingPanelSignature = '', trainingButtonSignature = '';
+const TRAINING_PAD_REACH = 0.65;
+function onTrainingPad(facilityOrPad) {
+  const pad = facilityOrPad.pad || facilityOrPad;
+  return Math.abs(player.x - pad.x) <= TRAINING_PAD_REACH && Math.abs(player.y - pad.y) <= TRAINING_PAD_REACH;
+}
+function resetTrainingInteraction() {
+  trainingContact = null; activeTrainingKind = null;
+  trainingPanelSignature = ''; trainingButtonSignature = '';
+  trainingPanel.hidden = true; trainingBtn.hidden = true;
+  document.body.classList.remove('has-training');
+}
+function tickTrainingInteraction() {
+  if (paused) return;
+  if (!isHeroAvailable()) { trainingContact = null; return; }
+  const pad = trainingPads().filter(onTrainingPad)
+    .sort((a, b) => dist(player.x, player.y, a.x, a.y) - dist(player.x, player.y, b.x, b.y))[0];
+  if (!pad) { trainingContact = null; return; }
+  // 화면을 닫은 뒤 같은 칸에 서 있는 동안은 다시 열지 않습니다.
+  // 다른 화면이 열려 진입에 실패하면 접촉을 소비하지 않아 다음 틱에 다시 시도합니다.
+  if (trainingContact !== pad.kind && openTraining(pad.kind)) trainingContact = pad.kind;
+}
 const trainingStatText = n => Number.isInteger(n) ? String(n) : n.toFixed(1);
 function refreshTrainingPanel() {
   const f = trainingFacility(activeTrainingKind);
@@ -120,6 +141,9 @@ function refreshTrainingPanel() {
 }
 function openTraining(kind) {
   if (paused || !canUseTraining(kind)) return false;
+  const f = trainingFacility(kind);
+  if (onTrainingPad(f)) trainingContact = kind;
+  clearMovementInput();
   activeTrainingKind = kind; trainingPanel.hidden = false; paused = true;
   trainingBtn.hidden = true; document.body.classList.remove('has-training');
   refreshTrainingPanel(); trainingPanel.querySelector('.close').focus({ preventScroll: true });
@@ -156,7 +180,7 @@ function trainingHud() {
   trainingButtonSignature = signature;
   trainingBtn.replaceChildren(document.createTextNode(`${near.icon} ${near.name} ›`));
   const sub = document.createElement('small');
-  sub.textContent = maxed ? `${level}단계 · 최대 강화 완료` : `${level} → ${level + 1}단계 · $${fmt(trainingCost(near.kind))}`;
+  sub.textContent = maxed ? `${level}단계 · 최대 강화 완료` : `칸에 올라서 강화 · ${level} → ${level + 1}단계 · $${fmt(trainingCost(near.kind))}`;
   trainingBtn.appendChild(sub);
   trainingBtn.setAttribute('aria-label', `${near.name} 강화 화면 열기, ${level}단계`);
 }

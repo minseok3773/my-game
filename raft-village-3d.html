@@ -104,14 +104,14 @@ body{background:var(--sea);color:var(--ink);font-family:var(--body);touch-action
     <ul>
       <li>화면을 끌어서 이동 (PC: WASD / 방향키)</li>
       <li>시설 옆에 서면 물자를 자동으로 싣고 내립니다. 왼쪽 아래 🎒를 누르면(PC: Q) 가방을 비웁니다</li>
-      <li>판매 대금은 가게 앞에 쌓입니다. 직접 줍거나 선원에게 맡기세요</li>
+      <li>손님은 갑판 바깥 구매 부두에서 물건을 삽니다. 판매 대금은 기존 가게 앞에 쌓입니다. 직접 줍거나 선원에게 맡기세요</li>
       <li>건설 칸에 서 있으면 자금이 투입되고, 다 채우면 완공됩니다</li>
       <li>일꾼 텐트를 지으면 선원 2명이 합류하고, 텐트를 증축할 때마다 2명씩 더 들어옵니다</li>
       <li>🧭 첫 확장 뒤 다음 습격을 확인하고 무역·방어·정찰 중 한 번 준비하세요. 5회 방어 성공 시 항로 확보 보상을 받습니다.</li>
       <li>손님은 15초 넘게 기다리면 그냥 떠납니다</li>
       <li>1차 뗏목 확장 뒤부터 해적의 습격이 시작됩니다. 뗏목 가장자리에 🗼 망루 포탑을 세워 막으세요. 상륙한 해적에게 다가가면 선장도 자동으로 칼을 휘두릅니다. 공격·처치로 전투 경험치를 얻고, 참전한 습격에서 승리하면 레벨이 오릅니다. 레벨마다 공격력 +2, 최대 체력 +6! 해적 Lv.5·10·15마다 보스가 직접 상륙합니다</li>
       <li>해적이 오면 선원들이 일을 멈추고 칼을 들어 상륙한 해적과 맞붙습니다. 일꾼이 전사하면 ⛺ 텐트 앞 네모 칸에 서 있으세요. 단계와 관계없이 1명당 $30을 내고 1초마다 자동 충원합니다. 칸을 떠나면 추가 결제가 멈춥니다</li>
-      <li>첫 확장 뒤 훈련 부두에서 영웅 훈련소($100)와 선원 훈련소($120)를 지으세요. 시설 앞 강화 칸 근처의 버튼으로 비용과 효과를 확인해 최대 10단계까지 강화합니다. 영웅은 단계마다 공격력 +3·체력 +10, 일꾼은 공격력 +1·체력 +5를 얻습니다</li>
+      <li>첫 확장 뒤 훈련 부두에서 영웅 훈련소($100)와 선원 훈련소($120)를 지으세요. 시설 앞 네모 칸에 올라서면 강화 화면이 열립니다. 비용과 효과를 확인해 최대 10단계까지 강화합니다. 영웅은 단계마다 공격력 +3·체력 +10, 일꾼은 공격력 +1·체력 +5를 얻습니다</li>
       <li>습격은 전투 종료 후 게임 시간 60초를 준비하고 시작됩니다. 강화 카드나 정찰로 간격이 바뀌지 않습니다</li>
       <li>해적선이 붙으면 해적이 뗏목에 상륙합니다. 해군과 포탑이 맞서 싸웁니다</li>
       <li>상륙 해적은 선원과 칼로 싸웁니다. 방어 인원이 모두 전사하면 해적은 철수하며, 돈과 시설은 약탈하지 않습니다</li>
@@ -388,7 +388,7 @@ function build(data) {
   runtime = {};
   for (const id of STATION_IDS) runtime[id] = { timer: 0, spawn: 1 + Math.random(), queue: [], leaving: [], serveT: 0 };
   player = { x: G.px, y: G.py, bob: 0, moving: false, timer: 0, cd: 0 };
-  restoreHeroRuntime();
+  restoreHeroRuntime(); resetTrainingInteraction();
   const navy = Array.isArray(G.navyRoster) ? G.navyRoster : null;
   const navyCount = navy ? navy.length : G.soldiers;
   for (let i = 0; i < navyCount; i++) { spawnSoldier(i); if (navy) Object.assign(soldiers[i], navy[i]); }
@@ -654,12 +654,8 @@ function updateSea(dt) {
 }
 const jumping = c => c.kind === 'dolphin' && c.jump >= 0 && c.jump <= 1.1;
 // 뗏목보다 앞쪽(화면 아래)에서 뛰어오르는 돌고래는 뗏목 위에 그림
-function dockRect(id) {
-  const d = DEFS[id], a0 = 0.3, a1 = 6.8;
-  const xs = [d.x + d.dir[0] * a0, d.x + d.dir[0] * a1], ys = [d.y + d.dir[1] * a0, d.y + d.dir[1] * a1];
-  const wx = d.dir[0] ? 0 : 0.8, wy = d.dir[1] ? 0 : 0.8;
-  return [Math.min(...xs) - wx, Math.min(...ys) - wy, Math.max(...xs) + wx, Math.max(...ys) + wy];
-}
+function dockRect(id) { return customerDockRect(id); }
+
 function dockAt(x, y) {
   for (const id of STATION_IDS) if (DEFS[id].type === 'shop' && unlocked.has(id)) { const r = dockRect(id); if (x > r[0] - 0.5 && x < r[2] + 0.5 && y > r[1] - 0.5 && y < r[3] + 0.5) return true; }
   return false;
@@ -675,6 +671,12 @@ cv.addEventListener('pointerdown', e => { joy.on = true; joy.id = e.pointerId; j
 cv.addEventListener('pointermove', e => { if (!joy.on || e.pointerId !== joy.id) return; joy.dx = e.clientX - joy.ox; joy.dy = e.clientY - joy.oy; });
 const endJoy = e => { if (e.pointerId === joy.id) { joy.on = false; joy.dx = joy.dy = 0; } };
 cv.addEventListener('pointerup', endJoy); cv.addEventListener('pointercancel', endJoy);
+function clearMovementInput() {
+  keys.clear();
+  if (joy.id !== null && cv.hasPointerCapture(joy.id)) cv.releasePointerCapture(joy.id);
+  joy.on = false; joy.dx = joy.dy = 0; joy.id = null;
+  player.vx = player.vy = 0; player.moving = false;
+}
 function inputDir() {
   let dx = 0, dy = 0;
   if (keys.has('arrowleft') || keys.has('a')) dx -= 1;
@@ -712,12 +714,10 @@ function bumpMoney() { moneyBox.classList.add('pulse'); pulseT = 0.12; }
 /* ---------- 손님 ---------- */
 const SHIRTS = ['#e85d75', '#6c5ce7', '#00a8a8', '#f2b134', '#8d6e63', '#4d96ff', '#9bc53d', '#c06c84'];
 const HAIRS = ['#3a2414', '#1d1d1d', '#a0522d', '#e2b65c', '#7a7a7a'];
-function slotPos(d, k) {
-  const row = k === 0 ? 0 : 1 + Math.floor((k - 1) / 2);
-  const a = 1.05 + row * 0.82, side = k === 0 ? 0 : k % 2 ? -0.36 : 0.36;
-  return { x: d.x + d.dir[0] * a - d.dir[1] * side, y: d.y + d.dir[1] * a + d.dir[0] * side };
-}
+function slotPos(d, k) { return customerSlotPos(d, k); }
+
 function updateShop(id, dt) {
+  syncCustomerRoutes(id);
   const d = DEFS[id], s = G.st[id], r = runtime[id];
   r.spawn -= dt;
   const qmax = Math.min(10, 6 + Math.floor(lv() / 3));
@@ -737,8 +737,8 @@ function updateShop(id, dt) {
     const c = r.queue[i];
     if (c.wait > 15) { r.queue.splice(i, 1); c.emote = '😡'; c.target = slotPos(d, 11); r.leaving.push(c); }
   }
-  const f = r.queue[0];
-  if (f && !f.moving) {
+  const f = r.queue[0], counter = slotPos(d, 0);
+  if (f && !f.moving && dist(f.x, f.y, counter.x, counter.y) < 0.3) {
     if (s.stock > 0) {
       r.serveT -= dt;
       if (r.serveT <= 0) {
@@ -1121,7 +1121,7 @@ function update(dt) {
   }
   for (const w of workers) updateWorker(w, dt);
   updateSea(dt);
-  updateMilitary(dt);
+  updateMilitary(dt); tickTrainingInteraction();
   // 상호작용
   player.timer -= dt;
   if (isHeroAvailable() && player.timer <= 0) {
@@ -1527,10 +1527,6 @@ function buildStation(id) {
     for (let i = 0; i < 4; i++) { const st = bx(0.32, 0.12, 1.35, i % 2 ? 0xfff6de : shopColor, { roughness: 0.85 }, true, -0.465 + i * 0.31, 1.48, 0); st.rotation.x = -0.1; g.add(st); }
     o.stock = new THREE.Group(); o.stock.position.y = 0.64; g.add(o.stock);
     o.cash = new THREE.Group(); o.cash.position.set(d.cx - d.x, 0.03, d.cy - d.y); g.add(o.cash);
-    const [x0, y0, x1, y1] = dockRect(id), dk = new THREE.Group();
-    dk.add(bx(x1 - x0, 0.12, y1 - y0, 0xa7774a, { roughness: 0.9 }, false, (x0 + x1) / 2, -0.1, (y0 + y1) / 2));
-    for (let a = 1.5; a < 6.6; a += 1.7) dk.add(mk(cylG(0.09, 0.09, 0.6, 6), mat(0x765033), false, d.x + d.dir[0] * a, -0.4, d.y + d.dir[1] * a));
-    world.add(dk); docks[id] = dk;
     const zr = ringMesh(0.42, 0.5, 0xffffff, 0.6); zr.position.set(d.zx, 0.02, d.zy); world.add(zr); zoneRings[id] = zr;
   } else if (d.type === 'tent') {
     g.add(mk(tentGeo(), mat(0xff951f, { roughness: 0.95, side: THREE.DoubleSide })));
@@ -1899,7 +1895,7 @@ function sync3D(dt) {
   world.position.y = raftY;
   playerMarker.position.set(player.x, 0.085, player.y);
   shallow.position.set(raftC.x, -0.2, raftC.y); shallow.scale.setScalar(raftC.r * 2.8);
-  syncRaft(); syncStations(); syncTrainingStations(); syncPads([...visiblePads(), ...recruitmentPads(), ...trainingPads()]); syncSharks(dt); bossHud();
+  syncRaft(); syncStations(); syncCustomerDocks(); syncTrainingStations(); syncPads([...visiblePads(), ...recruitmentPads(), ...trainingPads()]); syncSharks(dt); bossHud();
   // 캐릭터
   for (const m of models.values()) m.seen = false;
   const pm = charModel(player, () => mkChar('player', player)); pm.rifle.visible = false; animChar(pm, player, dt, { fighting: !!player.fighting, dead: !!player.dead }); syncStack(pm.carry, G.stack);
@@ -2732,7 +2728,28 @@ const trainingPanel = document.createElement('div');
 trainingPanel.id = 'trainingPanel'; trainingPanel.className = 'panel'; trainingPanel.hidden = true;
 trainingPanel.innerHTML = '<div role="dialog" aria-modal="true" aria-labelledby="trainingTitle"><h2 id="trainingTitle"></h2><p class="level"></p><div class="stats"></div><p class="description"></p><p class="status" role="status"></p><div class="buttons"><button id="trainingUpgrade" type="button"></button><button class="ghost close" type="button">돌아가기</button></div></div>';
 document.body.appendChild(trainingPanel);
-let activeTrainingKind = null, trainingPanelSignature = '', trainingButtonSignature = '';
+let activeTrainingKind = null, trainingContact = null, trainingPanelSignature = '', trainingButtonSignature = '';
+const TRAINING_PAD_REACH = 0.65;
+function onTrainingPad(facilityOrPad) {
+  const pad = facilityOrPad.pad || facilityOrPad;
+  return Math.abs(player.x - pad.x) <= TRAINING_PAD_REACH && Math.abs(player.y - pad.y) <= TRAINING_PAD_REACH;
+}
+function resetTrainingInteraction() {
+  trainingContact = null; activeTrainingKind = null;
+  trainingPanelSignature = ''; trainingButtonSignature = '';
+  trainingPanel.hidden = true; trainingBtn.hidden = true;
+  document.body.classList.remove('has-training');
+}
+function tickTrainingInteraction() {
+  if (paused) return;
+  if (!isHeroAvailable()) { trainingContact = null; return; }
+  const pad = trainingPads().filter(onTrainingPad)
+    .sort((a, b) => dist(player.x, player.y, a.x, a.y) - dist(player.x, player.y, b.x, b.y))[0];
+  if (!pad) { trainingContact = null; return; }
+  // 화면을 닫은 뒤 같은 칸에 서 있는 동안은 다시 열지 않습니다.
+  // 다른 화면이 열려 진입에 실패하면 접촉을 소비하지 않아 다음 틱에 다시 시도합니다.
+  if (trainingContact !== pad.kind && openTraining(pad.kind)) trainingContact = pad.kind;
+}
 const trainingStatText = n => Number.isInteger(n) ? String(n) : n.toFixed(1);
 function refreshTrainingPanel() {
   const f = trainingFacility(activeTrainingKind);
@@ -2769,6 +2786,9 @@ function refreshTrainingPanel() {
 }
 function openTraining(kind) {
   if (paused || !canUseTraining(kind)) return false;
+  const f = trainingFacility(kind);
+  if (onTrainingPad(f)) trainingContact = kind;
+  clearMovementInput();
   activeTrainingKind = kind; trainingPanel.hidden = false; paused = true;
   trainingBtn.hidden = true; document.body.classList.remove('has-training');
   refreshTrainingPanel(); trainingPanel.querySelector('.close').focus({ preventScroll: true });
@@ -2805,7 +2825,7 @@ function trainingHud() {
   trainingButtonSignature = signature;
   trainingBtn.replaceChildren(document.createTextNode(`${near.icon} ${near.name} ›`));
   const sub = document.createElement('small');
-  sub.textContent = maxed ? `${level}단계 · 최대 강화 완료` : `${level} → ${level + 1}단계 · $${fmt(trainingCost(near.kind))}`;
+  sub.textContent = maxed ? `${level}단계 · 최대 강화 완료` : `칸에 올라서 강화 · ${level} → ${level + 1}단계 · $${fmt(trainingCost(near.kind))}`;
   trainingBtn.appendChild(sub);
   trainingBtn.setAttribute('aria-label', `${near.name} 강화 화면 열기, ${level}단계`);
 }
@@ -2874,6 +2894,91 @@ function syncTrainingStations() {
     c.fillText(f.name, 256, 56, 470); c.fillStyle = f.kind === 'hero' ? '#337da8' : '#4b8538'; c.font = 'bold 38px sans-serif';
     c.fillText(`강화 ${level} / ${TRAINING_MAX_LEVEL}`, 256, 113, 470);
     o.texture.needsUpdate = true; o.level = level;
+  }
+}
+
+/* ---------- 손님은 생활 갑판 밖의 구매 부두만 이용합니다 ---------- */
+let customerBoundsTiles = null, customerBoundsCount = -1, customerBoundsCache = null;
+function customerRaftBounds() {
+  if (customerBoundsTiles === tiles && customerBoundsCount === tiles.size && customerBoundsCache) return customerBoundsCache;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const key of tiles) {
+    const [x, y] = key.split(',').map(Number);
+    x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x + 1); y1 = Math.max(y1, y + 1);
+  }
+  customerBoundsTiles = tiles; customerBoundsCount = tiles.size;
+  customerBoundsCache = { x0, y0, x1, y1, signature: `${x0},${y0},${x1},${y1}` };
+  return customerBoundsCache;
+}
+function customerBerth(d) {
+  const b = customerRaftBounds(), [dx, dy] = d.dir;
+  return { x: dx ? (dx > 0 ? b.x1 : b.x0) : d.x,
+    y: dy ? (dy > 0 ? b.y1 : b.y0) : d.y,
+    dx, dy, signature: `${b.signature}|${d.id}|${d.x},${d.y}|${dx},${dy}` };
+}
+function customerSlotPos(d, k) {
+  const p = customerBerth(d), row = k === 0 ? 0 : 1 + Math.floor((k - 1) / 2);
+  const a = 1.05 + row * 0.82, side = k === 0 ? 0 : k % 2 ? -0.36 : 0.36;
+  return { x: p.x + p.dx * a - p.dy * side, y: p.y + p.dy * a + p.dx * side };
+}
+function customerDockRect(id) {
+  const p = customerBerth(DEFS[id]), a0 = -0.08, a1 = 6.8;
+  const xs = [p.x + p.dx * a0, p.x + p.dx * a1], ys = [p.y + p.dy * a0, p.y + p.dy * a1];
+  const wx = p.dx ? 0 : 0.8, wy = p.dy ? 0 : 0.8;
+  return [Math.min(...xs) - wx, Math.min(...ys) - wy, Math.max(...xs) + wx, Math.max(...ys) + wy];
+}
+function syncCustomerRoutes(id) {
+  const d = DEFS[id], r = runtime[id], berth = customerBerth(d);
+  if (r.customerLayout === berth.signature) return;
+  r.customerLayout = berth.signature;
+  // 확장 직후의 기존 손님도 내부 시설을 가로질러 걷지 않게 새 외부 대기열로 이관합니다.
+  for (const [i, c] of r.queue.entries()) {
+    Object.assign(c, customerSlotPos(d, i), { vx: 0, vy: 0, moving: false });
+  }
+  for (const c of r.leaving) {
+    const exit = customerSlotPos(d, 11);
+    Object.assign(c, exit, { vx: 0, vy: 0, moving: false, target: exit });
+  }
+}
+
+/* ---------- 외부 구매대·대기열: 갑판 위에는 물류 시설만 남깁니다 ---------- */
+const customerDockLayouts = new Map();
+function buildCustomerDock(d) {
+  const p = customerBerth(d), g = new THREE.Group();
+  g.name = 'customer-dock:' + d.id; g.position.set(p.x, 0, p.y); g.rotation.y = Math.atan2(p.dx, p.dy);
+  const wood = 0xaa7c4d, trim = 0xffe6b6, accent = DISTRICT_COLORS[d.item] || 0x59b5c5;
+  g.add(bx(1.6, 0.14, 6.88, wood, { roughness: 0.9 }, false, 0, -0.1, 3.36));
+  for (let z = 0.12; z < 6.8; z += 0.42) {
+    g.add(bx(1.56, 0.025, 0.025, 0xd4a367, {}, false, 0, -0.016, z));
+  }
+  for (const x of [-0.72, 0.72]) {
+    for (const z of [0.35, 2.45, 4.55, 6.55]) {
+      g.add(mk(cylG(0.065, 0.08, 0.65, 7), mat(0x735537), false, x, -0.3, z));
+      g.add(mk(cylG(0.045, 0.055, 0.48, 7), mat(wood), false, x, 0.23, z));
+      g.add(mk(cylG(0.065, 0.065, 0.035, 7), mat(trim), false, x, 0.46, z));
+    }
+    g.add(bx(0.035, 0.035, 6.15, trim, {}, false, x, 0.36, 3.48));
+  }
+  // 가게별 색상의 외부 거래대: 첫 손님이 여기서 구매한 뒤 바깥쪽으로 돌아갑니다.
+  const counter = new THREE.Group(); counter.name = 'purchase-counter'; g.add(counter);
+  counter.add(bx(1.17, 0.52, 0.42, accent, {}, true, 0, 0.26, 0.23));
+  counter.add(bx(1.27, 0.08, 0.53, trim, {}, true, 0, 0.55, 0.23));
+  counter.add(bx(0.8, 0.13, 0.04, 0xfff4d9, {}, false, 0, 0.32, 0.46));
+  for (const x of [-0.55, 0.55]) counter.add(mk(cylG(0.025, 0.025, 0.66, 6), mat(wood), true, x, 0.89, 0.08));
+  counter.add(bx(1.28, 0.07, 0.56, accent, {}, true, 0, 1.24, 0.18));
+  world.add(g); return g;
+}
+function syncCustomerDocks() {
+  for (const id of Object.keys(docks)) if (!unlocked.has(id)) {
+    world.remove(docks[id]); delete docks[id]; customerDockLayouts.delete(id);
+  }
+  for (const id of STATION_IDS) {
+    const d = DEFS[id];
+    if (d.type !== 'shop' || !unlocked.has(id)) continue;
+    const signature = customerBerth(d).signature;
+    if (docks[id]?.parent === world && customerDockLayouts.get(id) === signature) continue;
+    if (docks[id]) world.remove(docks[id]);
+    docks[id] = buildCustomerDock(d); customerDockLayouts.set(id, signature);
   }
 }
 

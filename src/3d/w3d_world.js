@@ -240,10 +240,6 @@ function buildStation(id) {
     for (let i = 0; i < 4; i++) { const st = bx(0.32, 0.12, 1.35, i % 2 ? 0xfff6de : shopColor, { roughness: 0.85 }, true, -0.465 + i * 0.31, 1.48, 0); st.rotation.x = -0.1; g.add(st); }
     o.stock = new THREE.Group(); o.stock.position.y = 0.64; g.add(o.stock);
     o.cash = new THREE.Group(); o.cash.position.set(d.cx - d.x, 0.03, d.cy - d.y); g.add(o.cash);
-    const [x0, y0, x1, y1] = dockRect(id), dk = new THREE.Group();
-    dk.add(bx(x1 - x0, 0.12, y1 - y0, 0xa7774a, { roughness: 0.9 }, false, (x0 + x1) / 2, -0.1, (y0 + y1) / 2));
-    for (let a = 1.5; a < 6.6; a += 1.7) dk.add(mk(cylG(0.09, 0.09, 0.6, 6), mat(0x765033), false, d.x + d.dir[0] * a, -0.4, d.y + d.dir[1] * a));
-    world.add(dk); docks[id] = dk;
     const zr = ringMesh(0.42, 0.5, 0xffffff, 0.6); zr.position.set(d.zx, 0.02, d.zy); world.add(zr); zoneRings[id] = zr;
   } else if (d.type === 'tent') {
     g.add(mk(tentGeo(), mat(0xff951f, { roughness: 0.95, side: THREE.DoubleSide })));
@@ -612,7 +608,7 @@ function sync3D(dt) {
   world.position.y = raftY;
   playerMarker.position.set(player.x, 0.085, player.y);
   shallow.position.set(raftC.x, -0.2, raftC.y); shallow.scale.setScalar(raftC.r * 2.8);
-  syncRaft(); syncStations(); syncTrainingStations(); syncPads([...visiblePads(), ...recruitmentPads(), ...trainingPads()]); syncSharks(dt); bossHud();
+  syncRaft(); syncStations(); syncCustomerDocks(); syncTrainingStations(); syncPads([...visiblePads(), ...recruitmentPads(), ...trainingPads()]); syncSharks(dt); bossHud();
   // 캐릭터
   for (const m of models.values()) m.seen = false;
   const pm = charModel(player, () => mkChar('player', player)); pm.rifle.visible = false; animChar(pm, player, dt, { fighting: !!player.fighting, dead: !!player.dead }); syncStack(pm.carry, G.stack);
