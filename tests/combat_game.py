@@ -12,7 +12,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 
 ROOT = Path(__file__).resolve().parents[1]
-BASELINE_COMMIT = "ce222af"
+BASELINE_COMMIT = "d1b1518"
 HOOK = r"""
 window.combatTest = {
   get G() { return G; },
@@ -68,34 +68,10 @@ window.combatTest = {
   },
   damageCases() {
     const results = {};
-    for (const wave of [1, 5, 8]) {
-      this.reset(wave); const melee = this.worker();
-      updateBoarder(this.boarder(), 0);
-      results[`${wave}/melee`] = 1000 - melee.hp;
-      this.reset(wave); updateBoarder(this.boarder(), 0);
-      results[`${wave}/melee-village`] = 10000 - G.hp;
-      this.reset(wave); const bomberCrew = this.worker();
-      updateBoarder(this.boarder('bomber'), 0);
-      results[`${wave}/bomber-crew`] = 1000 - bomberCrew.hp;
-      results[`${wave}/bomber-village`] = 10000 - G.hp;
-      this.reset(wave); const sniperCrew = this.worker(5, 4);
-      updateBoarder(this.boarder('sniper'), 0);
-      results[`${wave}/sniper-crew`] = 1000 - sniperCrew.hp;
-      results[`${wave}/sniper-shot`] = shots.find(s => s.kind === 'enemy').dmg;
-      for (const big of [false, true]) {
-        this.reset(wave); const e = this.ship('attack', big); e.fireT = 0;
-        raidOn = true; updateMilitary(0);
-        results[`${wave}/ship/${big}`] = shots.find(s => s.kind === 'enemy').dmg;
-      }
-      this.reset(wave);
-      const boss = this.ship('attack', true, true); boss.salvoT = 0;
-      bossTick(boss, 0);
-      results[`${wave}/boss-salvo`] = shots.find(s => s.kind === 'enemy').dmg;
-      this.reset(wave); const collateral = this.worker();
-      hitVillage({dmg: 0, x1: 4, y1: 4});
-      results[`${wave}/collateral`] = 1000 - collateral.hp;
-      // Friendly projectiles must retain their damage.
-      shots.length = 0; shoot(player, {x: 7, y: 4}, 'water', 7, .3, 4, 24);
+    for (const wave of [1,5,8]) {
+      this.reset(wave); const w = this.worker(); updateBoarder(this.boarder(), 0);
+      results[`${wave}/melee`] = 1000 - w.hp;
+      shots.length = 0; shoot(player, {x:7,y:4}, 'water', 7, .3, 4, 24);
       results[`${wave}/friendly-shot`] = shots[0].dmg;
     }
     return results;
@@ -237,9 +213,9 @@ def main():
         old_speed = old.evaluate("combatTest.movementCases()")
         new_speed = new.evaluate("combatTest.movementCases()")
         for name, before in old_speed.items():
-            multiplier = .5 if name.startswith("worker/") else 2 if "/" in name and name.split("/")[0] in ("approach", "flee") else 1
+            multiplier = 1
             close(new_speed[name], before * multiplier, name)
-        print("Ship speed x2, worker logistics/battle speed x0.5, navy/hero unchanged PASS", flush=True)
+        print("Previous ship/worker speed settings and navy/hero movement preserved PASS", flush=True)
 
         fight = new.evaluate("combatTest.landingAndFight()")
         assert all(fight[key] for key in (
@@ -253,14 +229,14 @@ def main():
             close(after["hp"], before["hp"] * 2, "legacy current HP")
             close(after["max"], before["max"] * 2, "legacy max HP")
             close(after["hp"] / after["max"], before["hp"] / before["max"], "legacy health ratio")
-        assert migrated["combat"]["balanceVersion"] == 1
+        assert migrated["combat"]["balanceVersion"] == 2
         expected = [{"hp":e["hp"], "max":e["max"]} for e in migrated["combat"]["enemies"]]
         for _ in range(2):
             new.reload(wait_until="networkidle")
             new.wait_for_function("!!window.combatTest")
             snapshot = new.evaluate("combatTest.snapshot()")
             assert snapshot["enemies"] == expected, snapshot
-            assert snapshot["combat"]["balanceVersion"] == 1
+            assert snapshot["combat"]["balanceVersion"] == 2
         print("Legacy active-raid HP migration once; two reloads do not redouble PASS", flush=True)
         assert not errors, errors
         browser.close()

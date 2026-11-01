@@ -1,20 +1,22 @@
 /* ---------- 3D 전용 재미 요소: 강화 카드 · 해적 종류 · 보스 ---------- */
-const PIRATE_BALANCE = Object.freeze({ health: 2, damage: 2, shipSpeed: 2, crewSpeed: 0.5 });
-const PIRATE_BALANCE_VERSION = 1;
+const PIRATE_BALANCE = Object.freeze({ health: 4, damage: 4, shipSpeed: 2, crewSpeed: 0.5 });
+const PIRATE_BALANCE_VERSION = 2;
 // 진행 중인 구버전 습격도 남은 체력 비율을 유지해 한 번만 새 난이도로 전환.
 function restorePirateBalance(combat) {
   if ((combat.balanceVersion || 0) >= PIRATE_BALANCE_VERSION) return;
+  const ratio = (combat.balanceVersion || 0) >= 1 ? 2 : 4;
   for (const e of combat.enemies || []) {
-    if (Number.isFinite(e.hp)) e.hp *= PIRATE_BALANCE.health;
-    if (Number.isFinite(e.max)) e.max *= PIRATE_BALANCE.health;
+    if (Number.isFinite(e.hp)) e.hp *= ratio;
+    if (Number.isFinite(e.max)) e.max *= ratio;
+    if (e.loot) { G.money += e.loot; e.loot = 0; }
   }
   combat.balanceVersion = PIRATE_BALANCE_VERSION;
 }
 // 습격을 막을 때마다 카드 3장 중 1장을 골라 판마다 다르게 성장
 const CARDS = [
   { id: 'smuggler', icon: '🏴‍☠️', name: '밀수 항로', desc: '판매가 +35% · 이후 습격 준비 시간 -6초 (최소 12초)', max: 2 },
-  { id: 'glass', icon: '🔥', name: '과충전 포탄', desc: '포탑 피해 +60% · 마을이 받는 피해 +20%', max: 2 },
-  { id: 'bunker', icon: '⚓', name: '요새 경제', desc: '마을이 받는 피해 -20% · 판매가 -15%', max: 2 },
+  { id: 'glass', icon: '🔥', name: '과충전 포탄', desc: '포탑 피해 +60% · 아군이 받는 피해 +20%', max: 2 },
+  { id: 'bunker', icon: '⚓', name: '요새 경제', desc: '아군이 받는 피해 -20% · 판매가 -15%', max: 2 },
   { id: 'towerDmg', icon: '🎯', name: '포탑 화력', desc: '포탑 피해 +30%', max: 5 },
   { id: 'towerRate', icon: '⚡', name: '포탑 연사', desc: '포탑 발사 속도 +25%', max: 4 },
   { id: 'towerDouble', icon: '💥', name: '2연발 포탄', desc: '포탑이 한 번에 두 발 발사', max: 1, need: () => TOWERS.some(t => unlocked.has(t)) },
@@ -23,14 +25,14 @@ const CARDS = [
   { id: 'playerGun', icon: '🔫', name: '왕물총', desc: '주인공 물총 피해 ×3, 사거리 +1', max: 3 },
   { id: 'price', icon: '🐟', name: '흥정 달인', desc: '모든 판매가 +20%', max: 5 },
   { id: 'speed', icon: '👟', name: '날쌘 발', desc: '주인공 이동 속도 +15%', max: 3 },
-  { id: 'villageHp', icon: '🏰', name: '성벽 보강', desc: '마을 체력 +50, 즉시 전부 회복', max: 6 },
-  { id: 'regen', icon: '💚', name: '응급 수리', desc: '마을 체력 회복 속도 ×3', max: 2 },
+  { id: 'villageHp', icon: '🏰', name: '전투 의무실', desc: '일꾼 최대 체력 +10, 즉시 아군 전원 회복', max: 6 },
+  { id: 'regen', icon: '💚', name: '휴식 치료', desc: '비전투 중 선원 회복 속도 증가', max: 2 },
   { id: 'loot', icon: '💰', name: '현상금 사냥', desc: '해적 처치 보상 +50%', max: 4 },
   { id: 'bag', icon: '🎒', name: '큰 주머니', desc: '가방 칸 +5', max: 4 },
 ];
 function ck(id) { return (G && G.cards && G.cards[id]) || 0; }
 const lootMul = () => 1 + 0.5 * ck('loot');
-const crewHpMax = () => Math.round(15 * (1 + 0.5 * ck('crewHp')));
+const crewHpMax = () => Math.round(15 * (1 + 0.5 * ck('crewHp'))) + 10 * ck('villageHp');
 const crewMul = () => 1 + 0.4 * ck('crewPower');
 
 const cardStyle = document.createElement('style');
@@ -80,17 +82,17 @@ function offerCards() {
 function takeCard(c) {
   if (cardPanel.hidden || !G.cardOffer?.includes(c.id) || ck(c.id) >= c.max) return;
   G.cards[c.id] = ck(c.id) + 1; G.cardOffer = null;
-  if (c.id === 'villageHp') G.hp = hpMax();
+  if (c.id === 'villageHp') { G.hp = hpMax(); for (const w of workers) w.hp = crewHpMax(); for (const s of soldiers) s.hp = 12; }
   if (c.id === 'bag') cap += 5;
   cardPanel.hidden = true; paused = false; last = performance.now();
   toast(`${c.icon} ${c.name} 획득!`); save();
 }
 
-// 상륙 해적 종류: 일반 · 폭탄(시설에 닿으면 폭발) · 도둑(돈을 훔쳐 배로 도망) · 저격(멀리서 선원을 쏨)
+// 저장 호환용 유형 ID는 유지하되 일반·강습·돌격·정예 검병 모두 근접전을 수행합니다.
 const PIRATE_TYPES = {
-  bomber: { from: 2, chance: 0.25, hp: 0.6, intro: '💣 폭탄 해적 등장! 시설에 닿으면 폭발하니 먼저 쓰러뜨리세요' },
-  thief: { from: 3, chance: 0.22, hp: 0.75, intro: '💰 도둑 해적 등장! 돈을 훔쳐 배로 도망갑니다. 쫓아가 잡으면 돌려받아요' },
-  sniper: { from: 4, chance: 0.22, hp: 0.8, intro: '🎯 저격 해적 등장! 멀리서 선원을 노립니다' },
+  bomber: { from: 2, chance: 0.25, hp: 0.6, intro: '⚔️ 강습 검병 등장! 빠르게 선원에게 달려듭니다' },
+  thief: { from: 3, chance: 0.22, hp: 0.75, intro: '⚔️ 돌격 검병 등장! 일꾼을 향해 달려듭니다' },
+  sniper: { from: 4, chance: 0.22, hp: 0.8, intro: '⚔️ 정예 검병 등장! 갑판에서 선원과 맞붙습니다' },
 };
 function pickPirateType() {
   const forecast = raidPlan(G.wave).type;
@@ -114,49 +116,7 @@ function nearestCrew(e, range) {
   for (const s of [...soldiers, ...workers]) { const d = dist(e.x, e.y, s.x, s.y); if (d < fd) { fd = d; foe = s; } }
   return foe;
 }
-function updateBoarder(e, dt) {
-  if (e.type === 'bomber') return updateBomber(e, dt);
-  if (e.type === 'thief') return updateThief(e, dt);
-  if (e.type === 'sniper') return updateSniper(e, dt);
-  updateBoarderBase(e, dt);
-}
-function updateBomber(e, dt) {
-  const crew = nearestCrew(e, 0.8), tgt = e.goal, d = dist(e.x, e.y, tgt.x, tgt.y);
-  e.fighting = false;
-  if (!crew && d > 0.8) { moveTo(e, tgt.x, tgt.y, 2.3, dt, null, true); return; }
-  // 펑!
-  const dmg = 12 * pirMul() * PIRATE_BALANCE.damage;
-  for (const s of [...soldiers, ...workers]) if (dist(e.x, e.y, s.x, s.y) < 1.8) { s.hp = (s.hp ?? crewHpMax()) - 6 * pirMul() * PIRATE_BALANCE.damage; if (s.hp <= 0) killCrew(s); }
-  hitVillage({ dmg, x1: e.x, y1: e.y });
-  for (let i = 0; i < 4; i++) booms.push({ x: e.x + rnd(-0.6, 0.6), y: e.y + rnd(-0.6, 0.6), t: rnd(0, 0.2), kind: 'fire' });
-  shake = Math.max(shake, 0.4); dust(e.x, e.y, 14); floatText(e.x, e.y, `💥 폭발 -${Math.round(dmg)}`, '#ffb070');
-  e.state = 'sink'; e.sinkT = 1.2; e.blown = true;
-}
-function updateThief(e, dt) {
-  e.fighting = false;
-  if (!e.loot) {
-    const tgt = e.goal;
-    if (dist(e.x, e.y, tgt.x, tgt.y) > 0.7) { moveTo(e, tgt.x, tgt.y, 2.4, dt, null, true); return; }
-    const amt = Math.min(G.money, Math.round(15 * pirMul() + G.money * 0.12));
-    if (amt <= 0) { e.type = 'normal'; return; }
-    G.money -= amt; e.loot = amt;
-    floatText(e.x, e.y, `💰 도둑맞음 -$${fmt(amt)}`, '#ff9a8a'); toast(`💰 도둑 해적이 $${fmt(amt)}를 훔쳐 달아납니다! 잡으세요`);
-    return;
-  }
-  const h = e.home;
-  if (dist(e.x, e.y, h.x, h.y) > 0.5) { moveTo(e, h.x, h.y, 2.1, dt, null, true); return; }
-  floatText(e.x, e.y, `도둑이 $${fmt(e.loot)}를 갖고 도망쳤습니다`, '#ffb0a0');
-  e.loot = 0; const i = enemies.indexOf(e); if (i >= 0) enemies.splice(i, 1);
-}
-function updateSniper(e, dt) {
-  const foe = nearestCrew(e, 6.5), tgt = foe || e.goal, d = dist(e.x, e.y, tgt.x, tgt.y);
-  e.fighting = false; e.aimYaw = Math.atan2(tgt.x - e.x, tgt.y - e.y);
-  if (d > (foe ? 4.2 : 3.5)) { moveTo(e, tgt.x, tgt.y, 1.6, dt, null, true); return; }
-  stopMove(e, dt);
-  e.atkT -= dt; if (e.atkT > 0) return; e.atkT = 1.7;
-  shoot(e, { x: tgt.x, y: tgt.y }, 'enemy', 2 * pirMul(), 0.35, 6, 30);
-  if (foe) { foe.hp = (foe.hp ?? crewHpMax()) - 3 * pirMul() * PIRATE_BALANCE.damage; if (foe.hp <= 0) killCrew(foe); }
-}
+function updateBoarder(e, dt) { updateSwordBoarder(e, dt); }
 
 // 5번째 습격마다 해골 선장 보스선: 일제 사격 + 졸개 소환
 function spawnBoss() {
@@ -166,21 +126,12 @@ function spawnBoss() {
   setTimeout(() => toast(`☠️ 보스 등장! 해골 선장 Lv.${G.wave}의 거대 해적선`), 1600);
 }
 function bossTick(e, dt) {
-  e.salvoT -= dt; e.summonT -= dt;
-  if (e.salvoT <= 0) {
-    e.salvoT = 7;
-    const p = shorePoint(e.x, e.y);
-    for (let i = 0; i < 6; i++) {
-      const t = { x: p.x + rnd(-3, 3), y: p.y + rnd(-3, 3) };
-      shoot(e, walkable(t.x, t.y) ? t : p, 'enemy', 5 * pirMul(), 1.0 + i * 0.12, 80, 14);
-    }
-    floatText(e.x, e.y, '💥 일제 사격!', '#ffb070'); shake = Math.max(shake, 0.2);
-  }
-  if (e.summonT <= 0) { e.summonT = 9; spawnBoarder(e); spawnBoarder(e); }
+  // 보스도 포격·약탈 대신 상륙 병력을 보내 갑판 전투를 벌입니다.
+  e.landingBudget = 8;
 }
 function bossHud() {
   const b = enemies.find(e => e.boss && alive(e));
-  bossBar.hidden = !b;
+  bossBar.hidden = !b; document.body.classList.toggle('has-boss', !!b);
   if (!b) return;
   bossBar.querySelector('.nm').textContent = `☠️ 해골 선장 Lv.${G.wave} · ${Math.ceil(b.hp)}/${b.max}`;
   bossBar.querySelector('.fill').style.width = `${Math.max(0, b.hp / b.max) * 100}%`;

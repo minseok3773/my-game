@@ -68,11 +68,24 @@ function playClip(m, name, fade = 0.2) {
   m.cur = a;
 }
 // 렌더 동기화는 로딩 중인 임시 모형에도 운반물·물총 그룹이 있다고 가정합니다.
-function attachCharacterGear(m, parent, height = 0.95, depth = 0.38) {
-  m.carry = new THREE.Group(); m.carry.position.set(0, height, depth); parent.add(m.carry);
-  m.rifle = new THREE.Group(); m.rifle.position.set(0, height, depth); m.rifle.visible = false; parent.add(m.rifle);
-  m.rifle.add(bx(0.05, 0.06, 0.55, 0x2b2b30, { metalness: 0.5, roughness: 0.35 }, true, 0, 0, 0.12));
-  m.rifle.add(bx(0.06, 0.09, 0.22, 0x7a5232, { roughness: 0.7 }, true, 0, -0.02, -0.12));
+function attachCharacterGear(m, parent = m.root, height = 0.95, depth = 0.38) {
+  if (!m.carry) { m.carry = new THREE.Group(); m.carry.position.set(0, height, depth); parent.add(m.carry); }
+  if (!m.rifle) {
+    m.rifle = new THREE.Group(); m.rifle.position.set(0, height, depth); m.rifle.visible = false; parent.add(m.rifle);
+    m.rifle.add(bx(0.05, 0.06, 0.55, 0x2b2b30, { metalness: 0.5, roughness: 0.35 }, true, 0, 0, 0.12));
+    m.rifle.add(bx(0.06, 0.09, 0.22, 0x7a5232, { roughness: 0.7 }, true, 0, -0.02, -0.12));
+  }
+  if (!m.sword) {
+    m.sword = new THREE.Group(); m.sword.position.set(0.25, height, depth); parent.add(m.sword);
+    m.sword.add(bx(0.065, 0.48, 0.025, 0xe0edf1, { metalness: 0.45, roughness: 0.4 }, true, 0, 0.23, 0));
+    m.sword.add(bx(0.18, 0.035, 0.05, 0xf0bd49, {}, true, 0, 0, 0));
+    m.sword.add(bx(0.045, 0.13, 0.045, 0x775237, {}, true, 0, -0.07, 0));
+    m.sword.visible = false;
+  }
+  if (!m.slash) {
+    m.slash = new THREE.Mesh(geo('sword-arc', () => new THREE.RingGeometry(0.32, 0.39, 14, 1, -1.1, 2.2)), new THREE.MeshBasicMaterial({ color: 0xffe28a, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
+    m.slash.position.set(0, 0.85, 0.4); m.slash.rotation.x = -0.8; m.slash.visible = false; m.root.add(m.slash);
+  }
   return m;
 }
 function makeGL(name, o = {}) {
@@ -96,13 +109,13 @@ function animateGL(m, ent, dt, st = {}) {
   if (spd > 0.12) { m.idleT = 0; m.rest = undefined; } else m.idleT += dt;
   if (m.rest === undefined && spd <= 0.12) m.rest = m.heading;
   const look = m.idleT > 3 && ent.aimYaw === undefined ? m.rest + Math.sin(t * 0.6 + m.ph) * 0.5 : undefined;
-  const tg = spd > 0.12 ? Math.atan2(vx, vy) : ent.aimYaw ?? look;
+  const tg = (st.fighting || ent.fighting) ? ent.aimYaw : spd > 0.12 ? Math.atan2(vx, vy) : ent.aimYaw ?? look;
   if (tg !== undefined) m.heading += Math.atan2(Math.sin(tg - m.heading), Math.cos(tg - m.heading)) * Math.min(1, dt * (spd > 0.12 ? 14 : 5));
   m.root.rotation.y = m.heading;
   m.root.position.set(ent.x, 0, ent.y);
   // 상태에 맞는 동작 고르기: 멈춤 → 걷기 → 달리기, 싸움, 쓰러짐
   let clip = spd < 0.15 ? 'Idle' : spd < 2.1 || m.walk !== 'Walk' ? m.walk : 'Run';
-  if (st.fighting && spd < 0.6) clip = 'Sword';
+  if (st.fighting || ent.fighting || ent.swingT > 0) clip = 'Sword';
   if (st.dead) clip = 'Death';
   playClip(m, clip, st.dead ? 0.1 : 0.22);
   if (m.actions.Walk) m.actions.Walk.timeScale = Math.max(0.6, Math.min(1.6, spd / 1.5));
@@ -111,8 +124,12 @@ function animateGL(m, ent, dt, st = {}) {
   m.mixer.update(dt);
   const armed = m.weaponMode === 'always' || (m.weaponMode === 'raid' && raidOn);
   for (const w of m.weapons) w.visible = armed;
-  if (armed && m.weapons.length) m.rifle.visible = false; // 원본 커틀러스와 물총이 겹치지 않게 함
+  if (m.melee || (armed && m.weapons.length)) m.rifle.visible = false; // 원본 커틀러스와 물총이 겹치지 않게 함
   if (m.rifle.visible && m.hand) { m.hand.getWorldPosition(_hv); m.root.worldToLocal(_hv); m.rifle.position.copy(_hv); }
+  if (m.melee && m.sword && m.hand && m.weaponMode !== 'always') {
+    m.hand.getWorldPosition(_hv); m.root.worldToLocal(_hv); m.sword.position.copy(_hv);
+    m.sword.rotation.set(0.5, 0, -0.55 + Math.sin((1 - Math.min(0.4, ent.swingT || 0) / 0.4) * Math.PI) * 1.3);
+  }
 }
 // 원본 Pirate Kit의 모자·머리·몸 비율과 색을 그대로 사용합니다.
 // Captain Barbarossa: 주인공 / Henry: 선원·손님 / Mako·Sharky: 상륙 해적.
@@ -125,31 +142,28 @@ function mkChar(kind, ent) {
         ? { shirt: '#547f91', pants: '#8f7b52', hair: '#354d61', skin: '#7ba6b7' }
         : { shirt: ent.shirt || '#66777b', pants: '#637c86', hair: ent.hair || '#3c291d', skin: '#bf946e' };
     const m = makeAdult3({ ...colors, bandana: true });
+    m.melee = kind === 'worker' || kind === 'boarder';
     return attachCharacterGear(m, m.body, 1.08, 0.32);
   }
   const n = Math.floor((ent.ph || 0) * 10);
   if (kind === 'player') return makeGL('captain', { height: 1.78, weapon: 'always' });
-  if (kind === 'worker') return makeGL('henry', { height: 1.58, weapon: 'never' });
+  if (kind === 'worker') { const m = makeGL('henry', { height: 1.58, weapon: 'never' }); m.melee = true; return m; }
   if (kind === 'customer') return makeGL(n % 3 === 0 ? 'captain' : 'henry', { height: 1.55, weapon: 'never' });
-  const ty = ent.type || 'normal';
-  const m = makeGL(n % 2 ? 'mako' : 'sharky', { height: 1.65, weapon: ty === 'normal' ? 'always' : 'never' });
-  if (ty === 'bomber') { // 불붙은 폭탄을 안고 달림
-    const bomb = mk(sphG(0.17, 14, 10), mat(0x15151a, { metalness: 0.4, roughness: 0.4 }), true, 0, -0.1, 0.05); m.carry.add(bomb);
-    m.carry.add(mk(cylG(0.015, 0.015, 0.12, 6), mat(0x8a6a40), false, 0, 0.1, 0.05));
-    m.spark = mk(sphG(0.05, 8, 6), mat(0xffd060, { emissive: 0xff9020, emissiveIntensity: 3 }), false, 0, 0.17, 0.05); m.carry.add(m.spark);
-  }
-  if (ty === 'thief') { // 등에 멘 자루, 훔치면 금화 주머니로
-    m.sack = mk(sphG(0.2, 12, 10), mat(0x8a6a3a, { roughness: 0.9 }), true, 0, 0.95, -0.3); m.sack.scale.set(1, 1.1, 0.8); m.root.add(m.sack);
-    m.coin = mk(sphG(0.21, 12, 10), mat(0xf2c240, { metalness: 0.6, roughness: 0.3, emissive: 0x6a4a00, emissiveIntensity: 0.6 }), true, 0, 0.95, -0.3); m.coin.visible = false; m.root.add(m.coin);
-  }
-  if (ty === 'sniper') m.sniper = true;
+  const m = makeGL(n % 2 ? 'mako' : 'sharky', { height: 1.65, weapon: 'always' });
+  m.melee = true;
   return m;
 }
-function animChar(m, ent, dt, st) {
-  if (m.gl) animateGL(m, ent, dt, st); else animate3(m, ent, dt, st && st.fighting);
-  if (m.spark) m.spark.scale.setScalar(0.7 + Math.random() * 0.8);
-  if (m.coin) { m.coin.visible = !!ent.loot; m.sack.visible = !ent.loot; }
-  if (m.sniper) { m.rifle.visible = ent.state !== 'sink'; if (m.hand) m.rifle.rotation.y = 0; }
+function animChar(m, ent, dt, st = {}) {
+  if (m.gl) animateGL(m, ent, dt, st); else animate3(m, ent, dt, !!(st.fighting || ent.fighting));
+  if (m.melee) {
+    m.rifle.visible = false;
+    m.sword.visible = !st.dead && (raidOn || ent.fighting) && !(m.gl && m.weaponMode === 'always');
+  }
+  if (m.slash) {
+    m.slash.visible = !st.dead && (ent.swingT || 0) > 0;
+    m.slash.material.opacity = Math.min(0.85, (ent.swingT || 0) * 2.2);
+    m.slash.rotation.z = (ent.swingT || 0) * 2;
+  }
 }
 // 바다의 상어도 헤엄치는 동작으로
 const sharkGL = [];

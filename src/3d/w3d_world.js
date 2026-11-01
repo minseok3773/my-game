@@ -603,8 +603,20 @@ function sync3D(dt) {
   // 캐릭터
   for (const m of models.values()) m.seen = false;
   const pm = charModel(player, () => mkChar('player', player)); pm.rifle.visible = raidOn; animChar(pm, player, dt); syncStack(pm.carry, G.stack);
-  for (const w of workers) { const m = charModel(w, () => mkChar('worker', w)); m.rifle.visible = raidOn && (!m.gl || m.weaponMode !== 'raid'); m.carry.visible = !raidOn; animChar(m, w, dt, { fighting: raidOn && !!w.foe && w.foe.kind === 'boarder' && dist(w.x, w.y, w.foe.x, w.foe.y) < 2.6 }); syncStack(m.carry, w.carry); }
-  soldiers.forEach((s, i) => animate3(charModel(s, () => makeKid3(SOLDIER_LOOKS[i % SOLDIER_LOOKS.length])), s, dt));
+  for (const w of workers) { const m = charModel(w, () => mkChar('worker', w)); m.rifle.visible = false; m.carry.visible = !raidOn; animChar(m, w, dt, { fighting: !!w.fighting }); syncStack(m.carry, w.carry); }
+  const navyModel = s => {
+    const m = attachCharacterGear(makeKid3(SOLDIER_LOOKS[(s.ph * 10 | 0) % SOLDIER_LOOKS.length]));
+    m.melee = true; m.rifle.visible = false;
+    m.arms[1].add(m.sword); m.sword.position.set(0, -0.42, 0.06); return m;
+  };
+  soldiers.forEach(s => animChar(charModel(s, () => navyModel(s)), s, dt, { fighting: !!s.fighting }));
+  for (const e of fallenCrew) {
+    const m = charModel(e, () => e.tent ? mkChar('worker', e) : navyModel(e));
+    m.rifle.visible = false; m.carry.visible = false;
+    animChar(m, e, dt, { dead: true });
+    if (!m.gl) m.root.rotation.z = Math.min(Math.PI / 2, e.deathT * 3);
+    m.root.position.y -= Math.max(0, e.deathT - 0.9) * 0.2;
+  }
   for (const id of STATION_IDS) {
     if (!unlocked.has(id) || DEFS[id].type !== 'shop') continue;
     for (const c of [...runtime[id].queue, ...runtime[id].leaving]) { const m = charModel(c, () => mkChar('customer', c)); animChar(m, c, dt); m.root.visible = c.alpha > 0.15; }

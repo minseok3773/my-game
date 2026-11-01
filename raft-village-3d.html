@@ -109,9 +109,9 @@ body{background:var(--sea);color:var(--ink);font-family:var(--body);touch-action
       <li>🧭 첫 확장 뒤 다음 습격을 확인하고 무역·방어·정찰 중 한 번 준비하세요. 5회 방어 성공 시 항로 확보 보상을 받습니다.</li>
       <li>손님은 15초 넘게 기다리면 그냥 떠납니다</li>
       <li>1차 뗏목 확장 뒤부터 해적의 습격이 시작됩니다. 뗏목 가장자리에 🗼 망루 포탑을 세워 막으세요. 해적선에 다가가면 주인공도 자동으로 사격합니다</li>
-      <li>해적이 오면 선원들이 일을 멈추고 총을 들어 해적마다 나뉘어 싸웁니다. 선원도 체력이 다 떨어지면 쓰러지고, 45초 뒤 텐트에서 새 선원이 옵니다</li>
+      <li>해적이 오면 선원들이 일을 멈추고 칼을 들어 상륙한 해적과 맞붙습니다. 일꾼이 전사하면 ⛺ 텐트 충원에서 비용을 내고 새 일꾼을 모집하세요 (기본 $30 · 5초)</li>
       <li>해적선이 붙으면 해적이 뗏목에 상륙합니다. 해군과 포탑이 맞서 싸웁니다</li>
-      <li>마을 체력이 0이 되면 함락됩니다. 자금 절반 약탈, 해군 이탈, 시설 하나 파손</li>
+      <li>상륙 해적은 선원과 칼로 싸웁니다. 방어 인원이 모두 전사하면 해적은 철수하며, 돈과 시설은 약탈하지 않습니다</li>
     </ul>
     <div class="row"><button id="startBtn">출항하기</button></div>
     <div class="row" id="resetRow" hidden><button class="danger" id="resetBtn">처음부터 다시</button></div>
@@ -302,6 +302,7 @@ function freshState() {
   return { money: 0, unlocked: ['fishing', 'fishShop'], paid: {}, st, px: 4, py: 3, stack: [], t: 0, won: false, level: 1, xp: 0 };
 }
 let unlocked, tiles, cap, workers, runtime, player, cam;
+let restoringCrewRoster = false, fallenCrew = [];
 function hasTile(i, j) { return tiles.has(i + ',' + j); }
 let raftC = { x: 4, y: 4, r: 5.6 }, edges = [];
 function addRect(r) {
@@ -371,23 +372,31 @@ function build(data) {
   G.soldiers = G.soldiers || 0; G.wave = G.wave || 0; G.raidT = G.raidT ?? 30; G.hp = G.hp ?? 100;
   soldiers = []; enemies = []; shots = []; booms = []; raidOn = false; looted = false; trainT = 0;
   for (const t of TOWERS) towerSt[t] = { cd: 0, ang: 0 };
-  unlocked = new Set(G.unlocked); unlocked.delete('base'); G.soldiers = 0; G.respawn = [];
+  unlocked = new Set(G.unlocked);
+  const legacyRespawn = G.respawn || [];
+  restoringCrewRoster = Array.isArray(G.crewRoster);
+  fallenCrew = []; G.recruitment = G.recruitment || {}; G.respawn = [];
   tiles = new Set(); addRect([0, 0, 10, 10]);
   cap = BASE_CAP + 5 * ck('bag'); workers = [];
   for (const id of unlocked) applyUnlock(id);
+  restoreCrewRoster(legacyRespawn);
+  restoringCrewRoster = false;
   runtime = {};
   for (const id of STATION_IDS) runtime[id] = { timer: 0, spawn: 1 + Math.random(), queue: [], leaving: [], serveT: 0 };
   player = { x: G.px, y: G.py, bob: 0, moving: false, timer: 0, cd: 0 };
-  for (let i = 0; i < G.soldiers; i++) spawnSoldier(i);
+  const navy = Array.isArray(G.navyRoster) ? G.navyRoster : null;
+  const navyCount = navy ? navy.length : G.soldiers;
+  for (let i = 0; i < navyCount; i++) { spawnSoldier(i); if (navy) Object.assign(soldiers[i], navy[i]); }
+  G.soldiers = soldiers.length;
   cam = { x: player.x, y: player.y };
   if (G.combat && G.combat.raidOn) { restorePirateBalance(G.combat); enemies = G.combat.enemies; raidOn = true; looted = !!G.combat.looted; }
-  strategyPanel.hidden = true;
+  strategyPanel.hidden = true; recruitPanel.hidden = true;
 }
 function applyUnlock(id) {
   const d = DEFS[id];
   if (d.type === 'expand') addRect(d.rect);
   if (d.type === 'bag') cap = Math.max(cap, d.cap + 5 * ck('bag'));
-  if (d.type === 'tent') spawnWorker(id, d.workers + (slv(id) - 1) * 2);
+  if (d.type === 'tent' && !restoringCrewRoster) spawnWorker(id, d.workers + (slv(id) - 1) * 2);
 }
 const speedMult = () => unlocked.has('solar') ? 1.6 : 1;
 const lv = () => G.level || 1;
@@ -409,6 +418,7 @@ function visiblePads() {
 /* ---------- 저장 ---------- */
 const KEY = 'raft-village-3d-v1';
 function serialize() {
+  snapshotCrewRoster();
   G.combat = { raidOn, looted, enemies, balanceVersion: PIRATE_BALANCE_VERSION };
   G.unlocked = [...unlocked]; G.px = player.x; G.py = player.y;
   return JSON.parse(JSON.stringify(G));
@@ -850,7 +860,7 @@ function spawnBoarder(ship) {
   const p = shorePoint(ship.x, ship.y), hp = Math.round((ship.big ? 1.6 : 1) * (6 + G.wave * 2) * pirMul());
   const goals = STATION_IDS.filter(id => unlocked.has(id)).map(id => ({ x: DEFS[id].x, y: DEFS[id].y }));
   const goal = goals.length ? goals.reduce((a, b) => dist(p.x, p.y, a.x, a.y) < dist(p.x, p.y, b.x, b.y) ? a : b) : { x: raftC.x, y: raftC.y };
-  enemies.push({ kind: 'boarder', x: p.x, y: p.y, hp, max: hp, state: 'walk', atkT: 0.6, bob: 0, vx: 0, vy: 0, sinkT: 0, ang: 0, ph: rnd(0, 6), goal });
+  enemies.push({ kind: 'boarder', x: p.x, y: p.y, hp, max: hp, state: 'walk', atkT: 1.0, bob: 0, vx: 0, vy: 0, sinkT: 0, ang: 0, ph: rnd(0, 6), goal });
   setupBoarder(enemies[enemies.length - 1]); dust(p.x, p.y, 8); floatText(p.x, p.y, '해적 상륙!', '#ffb0a0');
 }
 function updateBoarderBase(e, dt) {
@@ -867,27 +877,29 @@ function updateBoarderBase(e, dt) {
   } else hitVillage({ dmg: 3 * pirMul() * PIRATE_BALANCE.damage, x1: e.x, y1: e.y });
 }
 function killBoarder(e) {
-  e.state = 'sink'; e.sinkT = 0.6;
+  e.state = 'sink'; e.sinkT = 0;
   const reward = Math.round((6 + G.wave * 2) * lootMul());
   if (e.loot) { G.money += e.loot; floatText(e.x, e.y - 0.6, `💰 되찾음 +$${fmt(e.loot)}`, '#9fffb0'); e.loot = 0; }
   G.money += reward; earn(reward); addXp(reward); setTimeout(bumpMoney, 300);
   floatText(e.x, e.y, `+$${reward}`, '#ffe680'); dust(e.x, e.y, 10);
 }
-// 선원이 쓰러지면 45초 뒤 같은 텐트에서 새 선원이 옴
+// 전사한 일꾼은 결원으로 유지하며 텐트에서 유료 충원합니다.
 function killCrew(c) {
   if (soldiers.includes(c)) return killSoldier(c);
   const i = workers.indexOf(c); if (i < 0) return;
   workers.splice(i, 1);
   floatText(c.x, c.y, '선원 쓰러짐', '#ffb0a0'); dust(c.x, c.y, 10);
-  G.respawn.push({ tent: c.tent, t: G.t + 45 });
+  c.dead = true; c.fighting = false; c.swingT = 0; c.deathT = 0; fallenCrew.push(c);
+  toast('⛺ 일꾼 전사 · 텐트 충원 버튼에서 새 일꾼을 모집하세요'); save();
 }
 function killSoldier(s) {
   const i = soldiers.indexOf(s); if (i < 0) return;
   soldiers.splice(i, 1); G.soldiers = soldiers.length;
-  floatText(s.x, s.y, '해군 부상 후퇴', '#ffb0a0'); dust(s.x, s.y, 8);
+  s.dead = true; s.fighting = false; s.swingT = 0; s.deathT = 0; fallenCrew.push(s);
+  floatText(s.x, s.y, '해군 전사', '#ffb0a0'); dust(s.x, s.y, 8);
 }
 function startRaid() {
-  G.wave++;
+  G.wave++; G.raidHadCrew = workers.length + soldiers.length > 0;
   const n = Math.min(14, 2 + Math.floor(G.wave * 0.9) + Math.floor(Math.random() * 2) + (raidPlan(G.wave).type === 'thief' ? 2 : 0)), baseA = rnd(0, 6.28);
   for (let i = 0; i < n; i++) {
     const big = G.wave >= 4 && i % 3 === 2;
@@ -907,24 +919,18 @@ function sinkEnemy(e) {
   floatText(e.x, e.y, `+$${reward}`, '#ffe680'); addXp(Math.round(reward / 2));
 }
 function hitVillage(s) {
-  G.hp -= s.dmg * strategyDamage() * (1 + 0.2 * ck('glass')) * Math.pow(0.8, ck('bunker')); shake = 0.25;
-  for (const w of [...workers]) if (dist(w.x, w.y, s.x1, s.y1) < 1.1) { w.hp = (w.hp ?? crewHpMax()) - 4 * PIRATE_BALANCE.damage; if (w.hp <= 0) killCrew(w); }
+  // 구버전 투사체 호환용. 새 해적은 선원과만 싸우며 돈과 시설을 약탈하지 않습니다.
+  G.hp = Math.max(0, G.hp - s.dmg * strategyDamage() * (1 + 0.2 * ck('glass')) * Math.pow(0.8, ck('bunker'))); shake = 0.2;
+  for (const w of [...workers]) if (dist(w.x, w.y, s.x1, s.y1) < 1.1) {
+    w.hp -= 4 * PIRATE_BALANCE.damage; if (w.hp <= 0) killCrew(w);
+  }
   booms.push({ x: s.x1, y: s.y1, t: 0, kind: 'fire' });
-  if (G.hp > 0) return;
-  const amt = Math.floor(G.money * 0.5), lost = G.soldiers;
-  G.money -= amt; looted = true; G.hp = Math.round(hpMax() * 0.5);
-  G.soldiers = 0; soldiers.length = 0;
-  const ups = Object.keys(G.slv).filter(id => G.slv[id] > 1);
-  let broke = '';
-  if (ups.length) { const id = ups[Math.floor(Math.random() * ups.length)]; G.slv[id]--; broke = ` · ${DEFS[id].name} ★${G.slv[id] + 1}→★${G.slv[id]} 파손`; }
-  for (const e of enemies) { if (e.kind === 'boarder' && alive(e)) e.state = 'sink'; else if (alive(e)) e.state = 'flee'; }
-  $('fallText').textContent = `약탈 $${fmt(amt)} · 해군 ${lost}명 이탈${broke}. 방어선을 다시 세우세요.`;
-  $('fallPanel').hidden = false; paused = true; save();
 }
 function shoot(from, tgt, kind, dmg, dur, h, z0) {
   shots.push({ x0: from.x, y0: from.y, x1: tgt.x, y1: tgt.y, t: 0, dur, kind, dmg: kind === 'enemy' ? dmg * PIRATE_BALANCE.damage : dmg, target: kind === 'enemy' ? null : tgt, h, z0 });
 }
 function updateMilitary(dt) {
+  tickMeleeEffects(dt);
   if (shake > 0) shake = Math.max(0, shake - dt);
   for (let i = booms.length - 1; i >= 0; i--) { booms[i].t += dt; if (booms[i].t > 0.6) booms.splice(i, 1); }
   if (!unlocked.has('expand1')) return;
@@ -937,12 +943,12 @@ function updateMilitary(dt) {
   // 습격 주기
   const active = enemies.some(alive);
   if (raidOn && !active) { raidOn = false; G.raidT = Math.max(12, 30 - 6 * ck('smuggler'));  if (!looted) { toast('해적을 격퇴했습니다'); offerCards(); } finishStrategyRaid(looted); looted = false; }
-  if (!raidOn) { G.hp = Math.min(hpMax(), G.hp + (1 + 2 * ck('regen')) * dt); G.raidT -= dt; if (G.raidT <= 0) { startRaid(); raidOn = true; } }
+  if (!raidOn) { G.hp = Math.min(hpMax(), G.hp + (1 + 2 * ck('regen')) * dt); if (workers.length || soldiers.length) G.raidT -= dt; else G.raidT = Math.max(10, G.raidT); if (G.raidT <= 0) { startRaid(); raidOn = true; } }
   // 해적선
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
     if (e.kind !== 'boarder') e.bob += dt;
-    if (e.state === 'sink') { e.sinkT += dt; if (e.sinkT > 1.4) enemies.splice(i, 1); continue; }
+    if (e.state === 'sink') { e.sinkT += dt; if (e.sinkT > (e.kind === 'boarder' ? 2 : 1.4)) enemies.splice(i, 1); continue; }
     if (e.kind === 'boarder') { updateBoarder(e, dt); continue; }
     if (e.boss && e.state === 'attack') bossTick(e, dt);
     if (e.state === 'approach') {
@@ -950,70 +956,24 @@ function updateMilitary(dt) {
       e.ang = Math.atan2(dy, dx); e.x += dx / l * v; e.y += dy / l * v;
       if (nearRaft(e.x, e.y, 1.5)) { e.state = 'attack'; e.boardT = 0; } // 도착하면 바로 상륙 준비
     } else if (e.state === 'attack') {
-      e.fireT -= dt;
-      if (e.fireT <= 0) {
-        e.fireT = rnd(2.2, 3.2) / (raidPlan(G.wave).type === 'bomber' ? 1.35 : 1);
-        const p = shorePoint(e.x, e.y), t = { x: p.x + rnd(-1, 1), y: p.y + rnd(-1, 1) };
-        shoot(e, walkable(t.x, t.y) ? t : p, 'enemy', (e.big ? 10 : 5) * pirMul(), 1.0, 60, 10);
-      }
       e.boardT = (e.boardT ?? rnd(2, 4)) - dt;
-      if (e.boardT <= 0) { e.boardT = rnd(6, 9) * raidPlan(G.wave).boarding; if (enemies.filter(b => b.kind === 'boarder' && alive(b)).length < 3 + G.wave) spawnBoarder(e); }
+      if (e.boardT <= 0) {
+        e.boardT = rnd(4, 6) * raidPlan(G.wave).boarding;
+        const budget = e.landingBudget || (e.boss ? 8 : e.big ? 4 : 2);
+        const burst = e.boarded ? 1 : e.big ? 3 : 2;
+        for (let k = 0; k < burst && (e.boarded || 0) < budget; k++) {
+          if (enemies.filter(b => b.kind === 'boarder' && alive(b)).length >= Math.min(16, 4 + G.wave * 2)) break;
+          spawnBoarder(e); e.boarded = (e.boarded || 0) + 1;
+        }
+        if ((e.boarded || 0) >= budget) e.state = 'flee';
+      }
     } else if (e.state === 'flee') {
       const dx = e.x - raftC.x, dy = e.y - raftC.y, l = Math.hypot(dx, dy) || 1;
       e.ang = Math.atan2(dy, dx); e.x += dx / l * 2 * PIRATE_BALANCE.shipSpeed * dt; e.y += dy / l * 2 * PIRATE_BALANCE.shipSpeed * dt;
       if (l > raftC.r + 20) enemies.splice(i, 1);
     }
   }
-  // 해군: 습격 땐 가장 가까운 해적선 쪽 뗏목 끝으로, 평소엔 기지 앞 대열로
-  // 해군 배치: 해적마다 담당 인원을 고르게 나눔 (상륙한 해적 우선, 같은 상대는 계속 맡음)
-  const foes = raidOn ? enemies.filter(alive) : [], foeCount = new Map();
-  const assignFoe = s => {
-    let best = null, bs = 1e9;
-    for (const f of foes) {
-      const c = foeCount.get(f) || 0;
-      const sc = dist(s.x, s.y, f.x, f.y) + c * 7 - (f.kind === 'boarder' ? 4 : 0) - (f === s.foe ? 3 : 0);
-      if (sc < bs) { bs = sc; best = f; }
-    }
-    if (best) { s.slot = foeCount.get(best) || 0; foeCount.set(best, s.slot + 1); }
-    s.foe = best; return best;
-  };
-  soldiers.forEach((s, idx) => {
-    if (!raidOn) s.hp = Math.min(12, (s.hp ?? 12) + dt * 2);
-    const foe = raidOn ? assignFoe(s) : null;
-    const bd = foe && foe.kind === 'boarder' ? foe : null, e = foe && !bd ? foe : null;
-    let tx, ty;
-    // 상륙한 해적과는 총을 쏠 수 있는 거리를 두고 둘러쌈
-    if (bd) {
-      const a = Math.atan2(s.y - bd.y, s.x - bd.x) + ((s.slot || 0) - 1) * 0.6;
-      tx = bd.x + Math.cos(a) * 2.2; ty = bd.y + Math.sin(a) * 2.2;
-      if (!walkable(tx, ty)) { tx = s.x; ty = s.y; }
-    }
-    else if (e) {
-      // 해적선 쪽 뗏목 끝에서 옆으로 나란히 늘어섬
-      const p = shorePoint(e.x, e.y), px = -(e.y - p.y), py = e.x - p.x, pl = Math.hypot(px, py) || 1, o = (((s.slot || 0) % 5) - 2) * 0.6;
-      tx = p.x + px / pl * o; ty = p.y + py / pl * o; if (!walkable(tx, ty)) { tx = p.x; ty = p.y; } }
-    else { const f = formation(idx); tx = f.x; ty = f.y; }
-    const dd = dist(s.x, s.y, tx, ty);
-    if (dd > 0.15) moveTo(s, tx, ty, 3, dt, soldiers, true); else stopMove(s, dt);
-    s.cd -= dt;
-    const tgt = foe && dist(s.x, s.y, foe.x, foe.y) <= 4.8 ? foe : nearestEnemy(s.x, s.y, 4.8);
-    if (tgt) s.aimYaw = Math.atan2(tgt.x - s.x, tgt.y - s.y);
-    if (tgt && s.cd <= 0) { s.cd = 0.7 / (1 + 0.15 * (bl - 1)); shoot(s, tgt, 'water', 4.5 * mult * crewMul(), 0.25, 4, 34); }
-  });
-  // 선원: 습격이 오면 일을 멈추고 해적마다 나뉘어 함께 싸움
-  if (raidOn) workers.forEach(w => {
-    const foe = assignFoe(w);
-    let tx = w.x, ty = w.y;
-    if (foe && foe.kind === 'boarder') { const a = Math.atan2(w.y - foe.y, w.x - foe.x) + ((w.slot || 0) - 1) * 0.6; tx = foe.x + Math.cos(a) * 2; ty = foe.y + Math.sin(a) * 2; }
-    else if (foe) { const p = shorePoint(foe.x, foe.y), px = -(foe.y - p.y), py = foe.x - p.x, pl = Math.hypot(px, py) || 1, o = (((w.slot || 0) % 7) - 3) * 0.55; tx = p.x + px / pl * o; ty = p.y + py / pl * o; }
-    if (!walkable(tx, ty)) { tx = w.x; ty = w.y; }
-    if (dist(w.x, w.y, tx, ty) > 0.15) moveTo(w, tx, ty, workerSpeed() * 1.1, dt, workers, true); else stopMove(w, dt);
-    w.cd = (w.cd ?? rnd(0, 0.5)) - dt;
-    const tgt = foe && dist(w.x, w.y, foe.x, foe.y) <= 4.5 ? foe : nearestEnemy(w.x, w.y, 4.5);
-    if (tgt) w.aimYaw = Math.atan2(tgt.x - w.x, tgt.y - w.y);
-    if (tgt && w.cd <= 0) { w.cd = 0.8; shoot(w, tgt, 'water', 3 * (1 + 0.1 * (lv() - 1)) * crewMul(), 0.25, 4, 34); }
-  });
-  else for (const w of workers) { w.hp = Math.min(crewHpMax(), (w.hp ?? crewHpMax()) + dt * 2); w.aimYaw = undefined; }
+  updateDefenders(dt, bl, mult);
   // 포대
   for (const t of TOWERS) {
     if (!unlocked.has(t)) continue;
@@ -1127,7 +1087,7 @@ function update(dt) {
   const dayNow = 1 + Math.floor(G.t / 40);
   if (G.lastDay && dayNow > G.lastDay) payWages();
   G.lastDay = dayNow;
-  for (let i = G.respawn.length - 1; i >= 0; i--) if (G.t >= G.respawn[i].t) { const r = G.respawn.splice(i, 1)[0]; if (unlocked.has(r.tent)) { spawnWorker(r.tent, 1); toast('새 선원이 합류했습니다'); } }
+  tickRecruitment(dt);
   checkQuest();
   // 이동
   const dir = inputDir(), acc = Math.min(1, dt * (dir ? 12 : 9));
@@ -1215,7 +1175,7 @@ function update(dt) {
 function objective() {
   if (raidOn) {
     const e = nearestEnemy(player.x, player.y, 999);
-    if (e) { const p = shorePoint(e.x, e.y); return { x: p.x, y: p.y, text: '⚠️ 해적 습격 — 해적선에 접근하면 자동 사격합니다' }; }
+    if (e) { const p = shorePoint(e.x, e.y); return { x: p.x, y: p.y, text: '⚔️ 갑판 전투 — 선원들이 해적과 칼로 맞서 싸웁니다' }; }
   }
   const pads = visiblePads().sort((a, b) => (a.cost - (G.paid[a.id] || 0)) - (b.cost - (G.paid[b.id] || 0)));
   const p = pads[0];
@@ -1245,9 +1205,9 @@ function objective() {
 /* ---------- 항해 전략: 예고된 습격과 한 번의 준비 선택 ---------- */
 const RAID_PLANS = [
   { name: '상륙 돌격대', hint: '상륙 간격이 짧습니다 · 선원과 포탑을 준비하세요', type: 'normal', boarding: 0.65, armor: 1 },
-  { name: '폭파 함대', hint: '포격이 잦습니다 · 방어 태세와 수리가 유리합니다', type: 'bomber', boarding: 1.2, armor: 1 },
-  { name: '약탈 선단', hint: '함선 수 증가 · 현금을 건설에 투자하세요', type: 'thief', boarding: 0.85, armor: 0.85 },
-  { name: '중장갑 저격대', hint: '함선 체력 증가 · 화력과 선원 보호가 중요합니다', type: 'sniper', boarding: 1.2, armor: 1.35 },
+  { name: '강습 함대', hint: '빠른 검병이 상륙합니다 · 선원 방어 태세를 준비하세요', type: 'bomber', boarding: 1.2, armor: 1 },
+  { name: '대규모 선단', hint: '상륙 병력 증가 · 일꾼 충원과 방어가 중요합니다', type: 'thief', boarding: 0.85, armor: 0.85 },
+  { name: '중장갑 검병대', hint: '함선 체력 증가 · 칼싸움에 대비해 선원을 보호하세요', type: 'sniper', boarding: 1.2, armor: 1.35 },
 ];
 const raidPlan = (wave = G.wave + 1) => RAID_PLANS[(Math.max(1, wave) - 1) % RAID_PLANS.length];
 const strategySale = () => G.tactic === 'trade' ? 1.4 : G.tactic === 'guard' ? 0.8 : 1;
@@ -1264,8 +1224,8 @@ const strategyPanel = document.createElement('div'); strategyPanel.id = 'strateg
 strategyPanel.innerHTML = '<div role="dialog" aria-modal="true" aria-labelledby="strategyTitle"><h2 id="strategyTitle">🧭 다음 습격 준비</h2><p class="forecast"></p><p class="progress"></p><div class="choices"></div><button class="ghost close">돌아가기</button></div>';
 document.body.appendChild(strategyPanel);
 const TACTICS = [
-  { id: 'trade', name: '💰 무역 강행', desc: '다음 습격 종료까지 판매가 +40% · 마을이 받는 피해 +25%', cost: () => 0 },
-  { id: 'guard', name: '🛡️ 방어 태세', desc: '다음 습격 종료까지 마을이 받는 피해 -30% · 판매가 -20% · 즉시 체력 20 회복', cost: () => 20 + G.wave * 5 },
+  { id: 'trade', name: '💰 무역 강행', desc: '다음 습격 종료까지 판매가 +40% · 선원이 받는 피해 +25%', cost: () => 0 },
+  { id: 'guard', name: '🛡️ 방어 태세', desc: '다음 습격 종료까지 선원이 받는 피해 -30% · 판매가 -20% · 즉시 일꾼 체력 20 회복', cost: () => 20 + G.wave * 5 },
   { id: 'scout', name: '🔭 정찰 파견', desc: '이번 준비 시간 +20초 · 판매가와 피해는 기본값', cost: () => 15 + G.wave * 5 },
 ];
 function closeStrategy() { strategyPanel.hidden = true; paused = false; last = performance.now(); }
@@ -1284,7 +1244,7 @@ strategyBtn.onclick = () => {
     b.onclick = () => {
       if (raidOn || G.preparedWave === G.wave + 1 || G.money < cost) return;
       G.money -= cost; G.tactic = tactic.id; G.preparedWave = G.wave + 1;
-      if (tactic.id === 'guard') G.hp = Math.min(hpMax(), G.hp + 20);
+      if (tactic.id === 'guard') { G.hp = Math.min(hpMax(), G.hp + 20); for (const w of workers) w.hp = Math.min(crewHpMax(), w.hp + 20); }
       if (tactic.id === 'scout') G.raidT += 20;
       closeStrategy(); save(); toast(`${tactic.name} 준비 완료`);
     };
@@ -1924,8 +1884,20 @@ function sync3D(dt) {
   // 캐릭터
   for (const m of models.values()) m.seen = false;
   const pm = charModel(player, () => mkChar('player', player)); pm.rifle.visible = raidOn; animChar(pm, player, dt); syncStack(pm.carry, G.stack);
-  for (const w of workers) { const m = charModel(w, () => mkChar('worker', w)); m.rifle.visible = raidOn && (!m.gl || m.weaponMode !== 'raid'); m.carry.visible = !raidOn; animChar(m, w, dt, { fighting: raidOn && !!w.foe && w.foe.kind === 'boarder' && dist(w.x, w.y, w.foe.x, w.foe.y) < 2.6 }); syncStack(m.carry, w.carry); }
-  soldiers.forEach((s, i) => animate3(charModel(s, () => makeKid3(SOLDIER_LOOKS[i % SOLDIER_LOOKS.length])), s, dt));
+  for (const w of workers) { const m = charModel(w, () => mkChar('worker', w)); m.rifle.visible = false; m.carry.visible = !raidOn; animChar(m, w, dt, { fighting: !!w.fighting }); syncStack(m.carry, w.carry); }
+  const navyModel = s => {
+    const m = attachCharacterGear(makeKid3(SOLDIER_LOOKS[(s.ph * 10 | 0) % SOLDIER_LOOKS.length]));
+    m.melee = true; m.rifle.visible = false;
+    m.arms[1].add(m.sword); m.sword.position.set(0, -0.42, 0.06); return m;
+  };
+  soldiers.forEach(s => animChar(charModel(s, () => navyModel(s)), s, dt, { fighting: !!s.fighting }));
+  for (const e of fallenCrew) {
+    const m = charModel(e, () => e.tent ? mkChar('worker', e) : navyModel(e));
+    m.rifle.visible = false; m.carry.visible = false;
+    animChar(m, e, dt, { dead: true });
+    if (!m.gl) m.root.rotation.z = Math.min(Math.PI / 2, e.deathT * 3);
+    m.root.position.y -= Math.max(0, e.deathT - 0.9) * 0.2;
+  }
   for (const id of STATION_IDS) {
     if (!unlocked.has(id) || DEFS[id].type !== 'shop') continue;
     for (const c of [...runtime[id].queue, ...runtime[id].leaving]) { const m = charModel(c, () => mkChar('customer', c)); animChar(m, c, dt); m.root.visible = c.alpha > 0.15; }
@@ -2069,11 +2041,24 @@ function playClip(m, name, fade = 0.2) {
   m.cur = a;
 }
 // 렌더 동기화는 로딩 중인 임시 모형에도 운반물·물총 그룹이 있다고 가정합니다.
-function attachCharacterGear(m, parent, height = 0.95, depth = 0.38) {
-  m.carry = new THREE.Group(); m.carry.position.set(0, height, depth); parent.add(m.carry);
-  m.rifle = new THREE.Group(); m.rifle.position.set(0, height, depth); m.rifle.visible = false; parent.add(m.rifle);
-  m.rifle.add(bx(0.05, 0.06, 0.55, 0x2b2b30, { metalness: 0.5, roughness: 0.35 }, true, 0, 0, 0.12));
-  m.rifle.add(bx(0.06, 0.09, 0.22, 0x7a5232, { roughness: 0.7 }, true, 0, -0.02, -0.12));
+function attachCharacterGear(m, parent = m.root, height = 0.95, depth = 0.38) {
+  if (!m.carry) { m.carry = new THREE.Group(); m.carry.position.set(0, height, depth); parent.add(m.carry); }
+  if (!m.rifle) {
+    m.rifle = new THREE.Group(); m.rifle.position.set(0, height, depth); m.rifle.visible = false; parent.add(m.rifle);
+    m.rifle.add(bx(0.05, 0.06, 0.55, 0x2b2b30, { metalness: 0.5, roughness: 0.35 }, true, 0, 0, 0.12));
+    m.rifle.add(bx(0.06, 0.09, 0.22, 0x7a5232, { roughness: 0.7 }, true, 0, -0.02, -0.12));
+  }
+  if (!m.sword) {
+    m.sword = new THREE.Group(); m.sword.position.set(0.25, height, depth); parent.add(m.sword);
+    m.sword.add(bx(0.065, 0.48, 0.025, 0xe0edf1, { metalness: 0.45, roughness: 0.4 }, true, 0, 0.23, 0));
+    m.sword.add(bx(0.18, 0.035, 0.05, 0xf0bd49, {}, true, 0, 0, 0));
+    m.sword.add(bx(0.045, 0.13, 0.045, 0x775237, {}, true, 0, -0.07, 0));
+    m.sword.visible = false;
+  }
+  if (!m.slash) {
+    m.slash = new THREE.Mesh(geo('sword-arc', () => new THREE.RingGeometry(0.32, 0.39, 14, 1, -1.1, 2.2)), new THREE.MeshBasicMaterial({ color: 0xffe28a, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
+    m.slash.position.set(0, 0.85, 0.4); m.slash.rotation.x = -0.8; m.slash.visible = false; m.root.add(m.slash);
+  }
   return m;
 }
 function makeGL(name, o = {}) {
@@ -2097,13 +2082,13 @@ function animateGL(m, ent, dt, st = {}) {
   if (spd > 0.12) { m.idleT = 0; m.rest = undefined; } else m.idleT += dt;
   if (m.rest === undefined && spd <= 0.12) m.rest = m.heading;
   const look = m.idleT > 3 && ent.aimYaw === undefined ? m.rest + Math.sin(t * 0.6 + m.ph) * 0.5 : undefined;
-  const tg = spd > 0.12 ? Math.atan2(vx, vy) : ent.aimYaw ?? look;
+  const tg = (st.fighting || ent.fighting) ? ent.aimYaw : spd > 0.12 ? Math.atan2(vx, vy) : ent.aimYaw ?? look;
   if (tg !== undefined) m.heading += Math.atan2(Math.sin(tg - m.heading), Math.cos(tg - m.heading)) * Math.min(1, dt * (spd > 0.12 ? 14 : 5));
   m.root.rotation.y = m.heading;
   m.root.position.set(ent.x, 0, ent.y);
   // 상태에 맞는 동작 고르기: 멈춤 → 걷기 → 달리기, 싸움, 쓰러짐
   let clip = spd < 0.15 ? 'Idle' : spd < 2.1 || m.walk !== 'Walk' ? m.walk : 'Run';
-  if (st.fighting && spd < 0.6) clip = 'Sword';
+  if (st.fighting || ent.fighting || ent.swingT > 0) clip = 'Sword';
   if (st.dead) clip = 'Death';
   playClip(m, clip, st.dead ? 0.1 : 0.22);
   if (m.actions.Walk) m.actions.Walk.timeScale = Math.max(0.6, Math.min(1.6, spd / 1.5));
@@ -2112,8 +2097,12 @@ function animateGL(m, ent, dt, st = {}) {
   m.mixer.update(dt);
   const armed = m.weaponMode === 'always' || (m.weaponMode === 'raid' && raidOn);
   for (const w of m.weapons) w.visible = armed;
-  if (armed && m.weapons.length) m.rifle.visible = false; // 원본 커틀러스와 물총이 겹치지 않게 함
+  if (m.melee || (armed && m.weapons.length)) m.rifle.visible = false; // 원본 커틀러스와 물총이 겹치지 않게 함
   if (m.rifle.visible && m.hand) { m.hand.getWorldPosition(_hv); m.root.worldToLocal(_hv); m.rifle.position.copy(_hv); }
+  if (m.melee && m.sword && m.hand && m.weaponMode !== 'always') {
+    m.hand.getWorldPosition(_hv); m.root.worldToLocal(_hv); m.sword.position.copy(_hv);
+    m.sword.rotation.set(0.5, 0, -0.55 + Math.sin((1 - Math.min(0.4, ent.swingT || 0) / 0.4) * Math.PI) * 1.3);
+  }
 }
 // 원본 Pirate Kit의 모자·머리·몸 비율과 색을 그대로 사용합니다.
 // Captain Barbarossa: 주인공 / Henry: 선원·손님 / Mako·Sharky: 상륙 해적.
@@ -2126,31 +2115,28 @@ function mkChar(kind, ent) {
         ? { shirt: '#547f91', pants: '#8f7b52', hair: '#354d61', skin: '#7ba6b7' }
         : { shirt: ent.shirt || '#66777b', pants: '#637c86', hair: ent.hair || '#3c291d', skin: '#bf946e' };
     const m = makeAdult3({ ...colors, bandana: true });
+    m.melee = kind === 'worker' || kind === 'boarder';
     return attachCharacterGear(m, m.body, 1.08, 0.32);
   }
   const n = Math.floor((ent.ph || 0) * 10);
   if (kind === 'player') return makeGL('captain', { height: 1.78, weapon: 'always' });
-  if (kind === 'worker') return makeGL('henry', { height: 1.58, weapon: 'never' });
+  if (kind === 'worker') { const m = makeGL('henry', { height: 1.58, weapon: 'never' }); m.melee = true; return m; }
   if (kind === 'customer') return makeGL(n % 3 === 0 ? 'captain' : 'henry', { height: 1.55, weapon: 'never' });
-  const ty = ent.type || 'normal';
-  const m = makeGL(n % 2 ? 'mako' : 'sharky', { height: 1.65, weapon: ty === 'normal' ? 'always' : 'never' });
-  if (ty === 'bomber') { // 불붙은 폭탄을 안고 달림
-    const bomb = mk(sphG(0.17, 14, 10), mat(0x15151a, { metalness: 0.4, roughness: 0.4 }), true, 0, -0.1, 0.05); m.carry.add(bomb);
-    m.carry.add(mk(cylG(0.015, 0.015, 0.12, 6), mat(0x8a6a40), false, 0, 0.1, 0.05));
-    m.spark = mk(sphG(0.05, 8, 6), mat(0xffd060, { emissive: 0xff9020, emissiveIntensity: 3 }), false, 0, 0.17, 0.05); m.carry.add(m.spark);
-  }
-  if (ty === 'thief') { // 등에 멘 자루, 훔치면 금화 주머니로
-    m.sack = mk(sphG(0.2, 12, 10), mat(0x8a6a3a, { roughness: 0.9 }), true, 0, 0.95, -0.3); m.sack.scale.set(1, 1.1, 0.8); m.root.add(m.sack);
-    m.coin = mk(sphG(0.21, 12, 10), mat(0xf2c240, { metalness: 0.6, roughness: 0.3, emissive: 0x6a4a00, emissiveIntensity: 0.6 }), true, 0, 0.95, -0.3); m.coin.visible = false; m.root.add(m.coin);
-  }
-  if (ty === 'sniper') m.sniper = true;
+  const m = makeGL(n % 2 ? 'mako' : 'sharky', { height: 1.65, weapon: 'always' });
+  m.melee = true;
   return m;
 }
-function animChar(m, ent, dt, st) {
-  if (m.gl) animateGL(m, ent, dt, st); else animate3(m, ent, dt, st && st.fighting);
-  if (m.spark) m.spark.scale.setScalar(0.7 + Math.random() * 0.8);
-  if (m.coin) { m.coin.visible = !!ent.loot; m.sack.visible = !ent.loot; }
-  if (m.sniper) { m.rifle.visible = ent.state !== 'sink'; if (m.hand) m.rifle.rotation.y = 0; }
+function animChar(m, ent, dt, st = {}) {
+  if (m.gl) animateGL(m, ent, dt, st); else animate3(m, ent, dt, !!(st.fighting || ent.fighting));
+  if (m.melee) {
+    m.rifle.visible = false;
+    m.sword.visible = !st.dead && (raidOn || ent.fighting) && !(m.gl && m.weaponMode === 'always');
+  }
+  if (m.slash) {
+    m.slash.visible = !st.dead && (ent.swingT || 0) > 0;
+    m.slash.material.opacity = Math.min(0.85, (ent.swingT || 0) * 2.2);
+    m.slash.rotation.z = (ent.swingT || 0) * 2;
+  }
 }
 // 바다의 상어도 헤엄치는 동작으로
 const sharkGL = [];
@@ -2168,22 +2154,24 @@ function syncSharks(dt) {
 }
 
 /* ---------- 3D 전용 재미 요소: 강화 카드 · 해적 종류 · 보스 ---------- */
-const PIRATE_BALANCE = Object.freeze({ health: 2, damage: 2, shipSpeed: 2, crewSpeed: 0.5 });
-const PIRATE_BALANCE_VERSION = 1;
+const PIRATE_BALANCE = Object.freeze({ health: 4, damage: 4, shipSpeed: 2, crewSpeed: 0.5 });
+const PIRATE_BALANCE_VERSION = 2;
 // 진행 중인 구버전 습격도 남은 체력 비율을 유지해 한 번만 새 난이도로 전환.
 function restorePirateBalance(combat) {
   if ((combat.balanceVersion || 0) >= PIRATE_BALANCE_VERSION) return;
+  const ratio = (combat.balanceVersion || 0) >= 1 ? 2 : 4;
   for (const e of combat.enemies || []) {
-    if (Number.isFinite(e.hp)) e.hp *= PIRATE_BALANCE.health;
-    if (Number.isFinite(e.max)) e.max *= PIRATE_BALANCE.health;
+    if (Number.isFinite(e.hp)) e.hp *= ratio;
+    if (Number.isFinite(e.max)) e.max *= ratio;
+    if (e.loot) { G.money += e.loot; e.loot = 0; }
   }
   combat.balanceVersion = PIRATE_BALANCE_VERSION;
 }
 // 습격을 막을 때마다 카드 3장 중 1장을 골라 판마다 다르게 성장
 const CARDS = [
   { id: 'smuggler', icon: '🏴‍☠️', name: '밀수 항로', desc: '판매가 +35% · 이후 습격 준비 시간 -6초 (최소 12초)', max: 2 },
-  { id: 'glass', icon: '🔥', name: '과충전 포탄', desc: '포탑 피해 +60% · 마을이 받는 피해 +20%', max: 2 },
-  { id: 'bunker', icon: '⚓', name: '요새 경제', desc: '마을이 받는 피해 -20% · 판매가 -15%', max: 2 },
+  { id: 'glass', icon: '🔥', name: '과충전 포탄', desc: '포탑 피해 +60% · 아군이 받는 피해 +20%', max: 2 },
+  { id: 'bunker', icon: '⚓', name: '요새 경제', desc: '아군이 받는 피해 -20% · 판매가 -15%', max: 2 },
   { id: 'towerDmg', icon: '🎯', name: '포탑 화력', desc: '포탑 피해 +30%', max: 5 },
   { id: 'towerRate', icon: '⚡', name: '포탑 연사', desc: '포탑 발사 속도 +25%', max: 4 },
   { id: 'towerDouble', icon: '💥', name: '2연발 포탄', desc: '포탑이 한 번에 두 발 발사', max: 1, need: () => TOWERS.some(t => unlocked.has(t)) },
@@ -2192,14 +2180,14 @@ const CARDS = [
   { id: 'playerGun', icon: '🔫', name: '왕물총', desc: '주인공 물총 피해 ×3, 사거리 +1', max: 3 },
   { id: 'price', icon: '🐟', name: '흥정 달인', desc: '모든 판매가 +20%', max: 5 },
   { id: 'speed', icon: '👟', name: '날쌘 발', desc: '주인공 이동 속도 +15%', max: 3 },
-  { id: 'villageHp', icon: '🏰', name: '성벽 보강', desc: '마을 체력 +50, 즉시 전부 회복', max: 6 },
-  { id: 'regen', icon: '💚', name: '응급 수리', desc: '마을 체력 회복 속도 ×3', max: 2 },
+  { id: 'villageHp', icon: '🏰', name: '전투 의무실', desc: '일꾼 최대 체력 +10, 즉시 아군 전원 회복', max: 6 },
+  { id: 'regen', icon: '💚', name: '휴식 치료', desc: '비전투 중 선원 회복 속도 증가', max: 2 },
   { id: 'loot', icon: '💰', name: '현상금 사냥', desc: '해적 처치 보상 +50%', max: 4 },
   { id: 'bag', icon: '🎒', name: '큰 주머니', desc: '가방 칸 +5', max: 4 },
 ];
 function ck(id) { return (G && G.cards && G.cards[id]) || 0; }
 const lootMul = () => 1 + 0.5 * ck('loot');
-const crewHpMax = () => Math.round(15 * (1 + 0.5 * ck('crewHp')));
+const crewHpMax = () => Math.round(15 * (1 + 0.5 * ck('crewHp'))) + 10 * ck('villageHp');
 const crewMul = () => 1 + 0.4 * ck('crewPower');
 
 const cardStyle = document.createElement('style');
@@ -2249,17 +2237,17 @@ function offerCards() {
 function takeCard(c) {
   if (cardPanel.hidden || !G.cardOffer?.includes(c.id) || ck(c.id) >= c.max) return;
   G.cards[c.id] = ck(c.id) + 1; G.cardOffer = null;
-  if (c.id === 'villageHp') G.hp = hpMax();
+  if (c.id === 'villageHp') { G.hp = hpMax(); for (const w of workers) w.hp = crewHpMax(); for (const s of soldiers) s.hp = 12; }
   if (c.id === 'bag') cap += 5;
   cardPanel.hidden = true; paused = false; last = performance.now();
   toast(`${c.icon} ${c.name} 획득!`); save();
 }
 
-// 상륙 해적 종류: 일반 · 폭탄(시설에 닿으면 폭발) · 도둑(돈을 훔쳐 배로 도망) · 저격(멀리서 선원을 쏨)
+// 저장 호환용 유형 ID는 유지하되 일반·강습·돌격·정예 검병 모두 근접전을 수행합니다.
 const PIRATE_TYPES = {
-  bomber: { from: 2, chance: 0.25, hp: 0.6, intro: '💣 폭탄 해적 등장! 시설에 닿으면 폭발하니 먼저 쓰러뜨리세요' },
-  thief: { from: 3, chance: 0.22, hp: 0.75, intro: '💰 도둑 해적 등장! 돈을 훔쳐 배로 도망갑니다. 쫓아가 잡으면 돌려받아요' },
-  sniper: { from: 4, chance: 0.22, hp: 0.8, intro: '🎯 저격 해적 등장! 멀리서 선원을 노립니다' },
+  bomber: { from: 2, chance: 0.25, hp: 0.6, intro: '⚔️ 강습 검병 등장! 빠르게 선원에게 달려듭니다' },
+  thief: { from: 3, chance: 0.22, hp: 0.75, intro: '⚔️ 돌격 검병 등장! 일꾼을 향해 달려듭니다' },
+  sniper: { from: 4, chance: 0.22, hp: 0.8, intro: '⚔️ 정예 검병 등장! 갑판에서 선원과 맞붙습니다' },
 };
 function pickPirateType() {
   const forecast = raidPlan(G.wave).type;
@@ -2283,49 +2271,7 @@ function nearestCrew(e, range) {
   for (const s of [...soldiers, ...workers]) { const d = dist(e.x, e.y, s.x, s.y); if (d < fd) { fd = d; foe = s; } }
   return foe;
 }
-function updateBoarder(e, dt) {
-  if (e.type === 'bomber') return updateBomber(e, dt);
-  if (e.type === 'thief') return updateThief(e, dt);
-  if (e.type === 'sniper') return updateSniper(e, dt);
-  updateBoarderBase(e, dt);
-}
-function updateBomber(e, dt) {
-  const crew = nearestCrew(e, 0.8), tgt = e.goal, d = dist(e.x, e.y, tgt.x, tgt.y);
-  e.fighting = false;
-  if (!crew && d > 0.8) { moveTo(e, tgt.x, tgt.y, 2.3, dt, null, true); return; }
-  // 펑!
-  const dmg = 12 * pirMul() * PIRATE_BALANCE.damage;
-  for (const s of [...soldiers, ...workers]) if (dist(e.x, e.y, s.x, s.y) < 1.8) { s.hp = (s.hp ?? crewHpMax()) - 6 * pirMul() * PIRATE_BALANCE.damage; if (s.hp <= 0) killCrew(s); }
-  hitVillage({ dmg, x1: e.x, y1: e.y });
-  for (let i = 0; i < 4; i++) booms.push({ x: e.x + rnd(-0.6, 0.6), y: e.y + rnd(-0.6, 0.6), t: rnd(0, 0.2), kind: 'fire' });
-  shake = Math.max(shake, 0.4); dust(e.x, e.y, 14); floatText(e.x, e.y, `💥 폭발 -${Math.round(dmg)}`, '#ffb070');
-  e.state = 'sink'; e.sinkT = 1.2; e.blown = true;
-}
-function updateThief(e, dt) {
-  e.fighting = false;
-  if (!e.loot) {
-    const tgt = e.goal;
-    if (dist(e.x, e.y, tgt.x, tgt.y) > 0.7) { moveTo(e, tgt.x, tgt.y, 2.4, dt, null, true); return; }
-    const amt = Math.min(G.money, Math.round(15 * pirMul() + G.money * 0.12));
-    if (amt <= 0) { e.type = 'normal'; return; }
-    G.money -= amt; e.loot = amt;
-    floatText(e.x, e.y, `💰 도둑맞음 -$${fmt(amt)}`, '#ff9a8a'); toast(`💰 도둑 해적이 $${fmt(amt)}를 훔쳐 달아납니다! 잡으세요`);
-    return;
-  }
-  const h = e.home;
-  if (dist(e.x, e.y, h.x, h.y) > 0.5) { moveTo(e, h.x, h.y, 2.1, dt, null, true); return; }
-  floatText(e.x, e.y, `도둑이 $${fmt(e.loot)}를 갖고 도망쳤습니다`, '#ffb0a0');
-  e.loot = 0; const i = enemies.indexOf(e); if (i >= 0) enemies.splice(i, 1);
-}
-function updateSniper(e, dt) {
-  const foe = nearestCrew(e, 6.5), tgt = foe || e.goal, d = dist(e.x, e.y, tgt.x, tgt.y);
-  e.fighting = false; e.aimYaw = Math.atan2(tgt.x - e.x, tgt.y - e.y);
-  if (d > (foe ? 4.2 : 3.5)) { moveTo(e, tgt.x, tgt.y, 1.6, dt, null, true); return; }
-  stopMove(e, dt);
-  e.atkT -= dt; if (e.atkT > 0) return; e.atkT = 1.7;
-  shoot(e, { x: tgt.x, y: tgt.y }, 'enemy', 2 * pirMul(), 0.35, 6, 30);
-  if (foe) { foe.hp = (foe.hp ?? crewHpMax()) - 3 * pirMul() * PIRATE_BALANCE.damage; if (foe.hp <= 0) killCrew(foe); }
-}
+function updateBoarder(e, dt) { updateSwordBoarder(e, dt); }
 
 // 5번째 습격마다 해골 선장 보스선: 일제 사격 + 졸개 소환
 function spawnBoss() {
@@ -2335,24 +2281,219 @@ function spawnBoss() {
   setTimeout(() => toast(`☠️ 보스 등장! 해골 선장 Lv.${G.wave}의 거대 해적선`), 1600);
 }
 function bossTick(e, dt) {
-  e.salvoT -= dt; e.summonT -= dt;
-  if (e.salvoT <= 0) {
-    e.salvoT = 7;
-    const p = shorePoint(e.x, e.y);
-    for (let i = 0; i < 6; i++) {
-      const t = { x: p.x + rnd(-3, 3), y: p.y + rnd(-3, 3) };
-      shoot(e, walkable(t.x, t.y) ? t : p, 'enemy', 5 * pirMul(), 1.0 + i * 0.12, 80, 14);
-    }
-    floatText(e.x, e.y, '💥 일제 사격!', '#ffb070'); shake = Math.max(shake, 0.2);
-  }
-  if (e.summonT <= 0) { e.summonT = 9; spawnBoarder(e); spawnBoarder(e); }
+  // 보스도 포격·약탈 대신 상륙 병력을 보내 갑판 전투를 벌입니다.
+  e.landingBudget = 8;
 }
 function bossHud() {
   const b = enemies.find(e => e.boss && alive(e));
-  bossBar.hidden = !b;
+  bossBar.hidden = !b; document.body.classList.toggle('has-boss', !!b);
   if (!b) return;
   bossBar.querySelector('.nm').textContent = `☠️ 해골 선장 Lv.${G.wave} · ${Math.ceil(b.hp)}/${b.max}`;
   bossBar.querySelector('.fill').style.width = `${Math.max(0, b.hp / b.max) * 100}%`;
+}
+
+/* ---------- 갑판 백병전: 약탈 없이 선원을 추격하는 해적 ---------- */
+const MELEE_REACH = 0.95;
+function tickMeleeEffects(dt) {
+  if (raidOn && workers.length + soldiers.length > 0) G.raidHadCrew = true;
+  for (const unit of [...workers, ...soldiers, ...enemies]) {
+    unit.swingT = Math.max(0, (unit.swingT || 0) - dt);
+    unit.hurtT = Math.max(0, (unit.hurtT || 0) - dt);
+  }
+  for (let i = fallenCrew.length - 1; i >= 0; i--) {
+    fallenCrew[i].deathT += dt;
+    if (fallenCrew[i].deathT >= 2) fallenCrew.splice(i, 1);
+  }
+}
+function defenderDamage(dmg) { return dmg * strategyDamage() * (1 + 0.2 * ck('glass')) * Math.pow(0.8, ck('bunker')); }
+function swordStrike(attacker, target, damage, enemy = false) {
+  if (!target || target.hp <= 0 || target.dead) return;
+  const actual = enemy ? defenderDamage(damage) : damage;
+  attacker.swingT = 0.4; target.hurtT = 0.25; target.hp -= actual;
+  booms.push({ x: (attacker.x + target.x) / 2, y: (attacker.y + target.y) / 2, t: 0, kind: 'water' });
+  floaters.push({ x: target.x, y: target.y, text: `-${Math.ceil(actual)}`, color: enemy ? '#ff987c' : '#ffe997', t: 0, combat: true });
+  if (target.hp <= 0) { if (enemy) killCrew(target); else killBoarder(target); }
+}
+function updateSwordBoarder(e, dt) {
+  if (e.state === 'retreat') {
+    e.retreatT -= dt; moveTo(e, e.home?.x ?? e.x, e.home?.y ?? e.y, 2.4, dt, null, true);
+    if (e.retreatT <= 0) { const i = enemies.indexOf(e); if (i >= 0) enemies.splice(i, 1); }
+    return;
+  }
+  if (!alive(e)) return;
+  const foe = nearestCrew(e, Infinity);
+  e.fighting = false;
+  if (!foe) { stopMove(e, dt); return; }
+  e.aimYaw = Math.atan2(foe.x - e.x, foe.y - e.y);
+  const d = dist(e.x, e.y, foe.x, foe.y);
+  if (d > MELEE_REACH) {
+    const speed = e.type === 'bomber' ? 2.3 : e.type === 'thief' ? 2.4 : e.type === 'sniper' ? 1.6 : 1.7;
+    moveTo(e, foe.x, foe.y, speed * Math.min(1.5, 1 + 0.03 * (G.wave - 1)), dt, null, true); return;
+  }
+  stopMove(e, dt); e.fighting = true;
+  e.atkT = (e.atkT ?? 0.8) - dt;
+  if (e.atkT <= 0) { e.atkT = 1.05; swordStrike(e, foe, (e.type === 'bomber' ? 6 : e.type === 'sniper' ? 3 : 2.5) * pirMul() * PIRATE_BALANCE.damage, true); }
+}
+function updateDefenders(dt, bl, mult) {
+  const foes = enemies.filter(e => e.kind === 'boarder' && alive(e));
+  const assigned = new Map();
+  const targetFor = unit => {
+    let target = null, score = Infinity;
+    for (const e of foes) {
+      if (!alive(e) || e.hp <= 0) continue;
+      const next = dist(unit.x, unit.y, e.x, e.y) + (assigned.get(e) || 0) * 1.2;
+      if (next < score) { score = next; target = e; }
+    }
+    if (target) assigned.set(target, (assigned.get(target) || 0) + 1);
+    return target;
+  };
+  for (const unit of [...soldiers, ...workers]) {
+    if (unit.hp <= 0 || unit.dead) continue;
+    const worker = workers.includes(unit);
+    unit.fighting = false;
+    if (!raidOn) {
+      const max = worker ? crewHpMax() : 12;
+      unit.hp = Math.min(max, unit.hp + (2 + 4 * ck('regen')) * dt); unit.foe = null; unit.aimYaw = undefined;
+      if (!worker) { const p = formation(soldiers.indexOf(unit)); moveTo(unit, p.x, p.y, 3, dt, soldiers, true); }
+      continue;
+    }
+    G.raidHadCrew = true;
+    const foe = targetFor(unit); unit.foe = foe;
+    if (!foe) {
+      // 선원은 배를 원거리에서 격침시키지 않고 상륙 지점에서 검병을 기다립니다.
+      const ship = nearestEnemy(unit.x, unit.y, Infinity, 'ship');
+      if (ship) { const p = shorePoint(ship.x, ship.y); moveTo(unit, p.x, p.y, worker ? workerSpeed() * 1.1 : 3, dt, worker ? workers : soldiers, true); }
+      else stopMove(unit, dt);
+      continue;
+    }
+    unit.aimYaw = Math.atan2(foe.x - unit.x, foe.y - unit.y);
+    const d = dist(unit.x, unit.y, foe.x, foe.y);
+    if (d > MELEE_REACH) {
+      const dx = (unit.x - foe.x) / d, dy = (unit.y - foe.y) / d;
+      const tx = foe.x + dx * 0.7, ty = foe.y + dy * 0.7;
+      moveTo(unit, walkable(tx, ty) ? tx : foe.x, walkable(tx, ty) ? ty : foe.y, worker ? workerSpeed() * 1.1 : 3, dt, null, true);
+      continue;
+    }
+    stopMove(unit, dt); unit.fighting = true;
+    unit.cd = (unit.cd ?? 0.3) - dt;
+    if (unit.cd <= 0) {
+      unit.cd = worker ? 0.85 : 0.7 / (1 + 0.15 * (bl - 1));
+      swordStrike(unit, foe, (worker ? 3 * (1 + 0.1 * (lv() - 1)) : 4.5 * mult) * crewMul());
+    }
+  }
+  if (raidOn && G.raidHadCrew && !workers.length && !soldiers.length) {
+    looted = true; G.raidHadCrew = false;
+    for (const e of enemies) if (alive(e)) {
+      e.fighting = false; e.state = e.kind === 'boarder' ? 'retreat' : 'flee'; e.retreatT = 2;
+    }
+    toast('⚔️ 방어 인원 전사 · 돈과 시설은 안전합니다. 텐트에서 충원하세요'); save();
+  }
+}
+
+/* ---------- 텐트별 유료 일꾼 충원·명부 저장 ---------- */
+const tentCapacity = id => DEFS[id]?.type === 'tent' ? DEFS[id].workers + (slv(id) - 1) * 2 : 0;
+const crewCount = id => workers.filter(w => w.tent === id && w.hp > 0).length;
+const recruitmentCost = id => 30 + (slv(id) - 1) * 10;
+const crewTents = () => [...unlocked].filter(id => DEFS[id]?.type === 'tent');
+function snapshotCrewRoster() {
+  const record = w => ({ x: w.x, y: w.y, hp: w.hp, ph: w.ph, bob: 0,
+    ...(w.tent ? { tent: w.tent, carry: [...w.carry], look: w.look } : {}) });
+  G.crewRoster = workers.filter(w => w.hp > 0).map(record);
+  G.navyRoster = soldiers.filter(s => s.hp > 0).map(record);
+  G.crewRosterVersion = 1;
+}
+function restoreCrewRoster(legacyRespawn) {
+  if (restoringCrewRoster) {
+    for (const saved of G.crewRoster) {
+      const id = saved.tent;
+      if (!unlocked.has(id) || !tentCapacity(id) || crewCount(id) >= tentCapacity(id) || saved.hp <= 0) continue;
+      spawnWorker(id, 1); const w = workers[workers.length - 1];
+      if (Number.isFinite(saved.x) && Number.isFinite(saved.y) && walkable(saved.x, saved.y)) { w.x = saved.x; w.y = saved.y; }
+      w.hp = Math.min(crewHpMax(), saved.hp ?? crewHpMax());
+      if (Number.isFinite(saved.ph)) w.ph = saved.ph;
+      if (Array.isArray(saved.carry)) w.carry = saved.carry.filter(t => Object.hasOwn(ITEMS, t)).slice(0, crewCap());
+      if (saved.look) w.look = saved.look;
+    }
+  } else {
+    // 구버전 자동 복귀 대기자는 무료 복귀 대신 해당 텐트의 결원으로 이관.
+    for (const missing of legacyRespawn) {
+      const i = workers.findIndex(w => w.tent === missing.tent);
+      if (i >= 0) workers.splice(i, 1);
+    }
+  }
+  G.crewRoster = workers.map(w => ({ tent: w.tent, x: w.x, y: w.y, hp: w.hp, carry: [...w.carry], ph: w.ph, look: w.look }));
+}
+function recruitWorker(id) {
+  if (!unlocked.has(id) || !tentCapacity(id) || G.recruitment[id] || crewCount(id) >= tentCapacity(id)) return false;
+  const cost = recruitmentCost(id);
+  if (G.money < cost) { toast(`충원 자금이 부족합니다 · $${cost} 필요`); return false; }
+  G.money -= cost; G.recruitment[id] = { remaining: 5, paid: cost };
+  save(); toast(`⛺ ${DEFS[id].name} · 일꾼 모집 시작 (5초)`); return true;
+}
+function tickRecruitment(dt) {
+  for (const [id, job] of Object.entries(G.recruitment || {})) {
+    if (!unlocked.has(id) || !tentCapacity(id)) continue;
+    job.remaining = Math.max(0, job.remaining - dt);
+    if (job.remaining > 0) continue;
+    delete G.recruitment[id];
+    if (crewCount(id) < tentCapacity(id)) { spawnWorker(id, 1); toast(`⛺ ${DEFS[id].name} · 일꾼 1명 합류`); }
+    save();
+  }
+}
+function crewHealthStatus() {
+  const hp = workers.reduce((n, w) => n + Math.max(0, w.hp), 0) + soldiers.reduce((n, s) => n + Math.max(0, s.hp), 0);
+  const max = crewTents().reduce((n, id) => n + tentCapacity(id) * crewHpMax(), 0) + soldiers.length * 12;
+  return { hp, max, ratio: max ? Math.min(1, hp / max) : 0 };
+}
+const recruitStyle = document.createElement('style');
+recruitStyle.textContent = `
+#recruitBtn{position:fixed;left:10px;bottom:calc(136px + env(safe-area-inset-bottom,0px));z-index:4;min-height:44px;max-width:170px;padding:8px 12px;border:3px solid #8a663d;border-radius:12px;background:#ffe5a3;color:#624620;font:15px var(--display);box-shadow:0 3px 0 #805a3040;cursor:pointer}
+#recruitBtn:focus-visible{outline:3px solid #fff;outline-offset:3px}
+body.has-recruit #toast{bottom:calc(192px + env(safe-area-inset-bottom,0px))}
+body.has-boss #recruitBtn{bottom:calc(188px + env(safe-area-inset-bottom,0px))}
+body.has-boss.has-recruit #toast{bottom:calc(244px + env(safe-area-inset-bottom,0px))}
+#recruitPanel{z-index:31}#recruitPanel .tent-list{display:grid;gap:12px;margin:14px 0}#recruitPanel article{border:2px solid #c6ae7a;border-radius:12px;padding:12px;background:#fff1cf}#recruitPanel article p{margin:6px 0}#recruitPanel article button{width:100%;font-size:15px}
+@media(max-height:500px) and (orientation:landscape){#recruitBtn{bottom:68px;max-width:170px}body.has-recruit #toast{bottom:120px}}
+`;
+document.head.appendChild(recruitStyle);
+const recruitBtn = document.createElement('button'); recruitBtn.id = 'recruitBtn'; recruitBtn.hidden = true;
+document.body.appendChild(recruitBtn);
+const recruitPanel = document.createElement('div'); recruitPanel.id = 'recruitPanel'; recruitPanel.className = 'panel'; recruitPanel.hidden = true;
+recruitPanel.innerHTML = '<div role="dialog" aria-modal="true" aria-labelledby="recruitTitle"><h2 id="recruitTitle">⛺ 텐트 충원</h2><p>전사한 일꾼은 자동으로 복귀하지 않습니다. 텐트의 빈자리에 한 명씩 모집하세요.</p><p class="funds"></p><div class="tent-list"></div><button class="ghost close">돌아가기</button></div>';
+document.body.appendChild(recruitPanel);
+function closeRecruitment() { recruitPanel.hidden = true; paused = false; last = performance.now(); }
+function openRecruitment() {
+  if (paused || !crewTents().length) return;
+  paused = true; recruitPanel.hidden = false;
+  recruitPanel.querySelector('.funds').textContent = `보유 자금 $${fmt(G.money)} · 모집 시간 5초 · 생산 위치: 각 텐트`;
+  const list = recruitPanel.querySelector('.tent-list'); list.replaceChildren();
+  for (const id of crewTents()) {
+    const live = crewCount(id), capacity = tentCapacity(id), job = G.recruitment[id], cost = recruitmentCost(id);
+    const row = document.createElement('article'); row.dataset.tent = id;
+    const title = document.createElement('b'); title.textContent = `${DEFS[id].name} ★${slv(id)} · ${live}/${capacity}명`;
+    const text = document.createElement('p'); text.textContent = job ? `모집 중 · ${Math.ceil(job.remaining)}초 남음 (결제 완료)` : live >= capacity ? '현재 정원이 모두 근무 중입니다.' : `결원 ${capacity - live}명 · 1명 모집 $${cost}`;
+    const button = document.createElement('button'); button.textContent = job ? '모집 진행 중' : `일꾼 1명 모집 · $${cost}`;
+    button.disabled = !!job || live >= capacity || G.money < cost;
+    button.onclick = () => { if (recruitWorker(id)) closeRecruitment(); };
+    row.append(title, text, button); list.appendChild(row);
+  }
+  recruitPanel.querySelector('.close').focus({ preventScroll: true });
+}
+recruitBtn.onclick = openRecruitment; recruitPanel.querySelector('.close').onclick = closeRecruitment;
+recruitPanel.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { e.preventDefault(); closeRecruitment(); }
+  if (e.key === 'Tab') {
+    const buttons = [...recruitPanel.querySelectorAll('button:not(:disabled)')], first = buttons[0], end = buttons[buttons.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); end.focus(); }
+    else if (!e.shiftKey && document.activeElement === end) { e.preventDefault(); first.focus(); }
+  }
+});
+function recruitmentHud() {
+  const tents = crewTents(), missing = tents.reduce((n, id) => n + Math.max(0, tentCapacity(id) - crewCount(id)), 0);
+  const near = tents.some(id => dist(player.x, player.y, DEFS[id].x, DEFS[id].y) < 3);
+  recruitBtn.hidden = paused || !tents.length || (!missing && !near);
+  recruitBtn.textContent = missing ? `⛺ 텐트 충원 · 결원 ${missing}명` : '⛺ 텐트 충원';
+  document.body.classList.toggle('has-recruit', !recruitBtn.hidden);
 }
 
 /* ---------- 3D: 화려한 연출 (빛 번짐·폭발·보호막·목책·주변 섬·전투 흔적) ---------- */
@@ -2681,9 +2822,9 @@ function render(dt) {
   drawBooms();
   for (const f of floaters) {
     const e = 1 - Math.pow(1 - Math.min(1, f.t * 2.2), 3), pop = 1 + 0.6 * Math.max(0, 1 - f.t * 7);
-    const s = S(f.x, f.y, 60 + e * 45);
-    ctx.globalAlpha = Math.min(1, (1 - f.t) * 2); ctx.font = `${22 * Z * pop}px "Do Hyeon", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.lineWidth = 3.5 * Z; ctx.strokeStyle = 'rgba(20,40,25,.75)'; ctx.strokeText(f.text, s.x, s.y);
+    const s = S(f.x, f.y, (f.combat ? 90 : 60) + e * (f.combat ? 25 : 45));
+    ctx.globalAlpha = Math.min(1, (1 - f.t) * 2); ctx.font = `${(f.combat ? 13 : 22) * Z * (f.combat ? 1 : pop)}px "Do Hyeon", sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = (f.combat ? 2 : 3.5) * Z; ctx.strokeStyle = 'rgba(20,40,25,.75)'; ctx.strokeText(f.text, s.x, s.y);
     ctx.fillStyle = f.color; ctx.fillText(f.text, s.x, s.y); ctx.globalAlpha = 1;
   }
   // 건설 먼지 구름
@@ -2749,12 +2890,12 @@ function frame(now) {
 /* ---------- HUD ---------- */
 let lastHud = '';
 function hud(obj) {
-  strategyHud();
+  strategyHud(); recruitmentHud();
   $('goal').dataset.kind = raidOn ? 'danger' : /짓기|업그레이드/.test(obj.text) ? 'build' : 'interact';
   $('goal').dataset.label = raidOn ? '마을 방어' : /짓기|업그레이드/.test(obj.text) ? '건설' : '작업';
   const day = 1 + Math.floor(G.t / 40), km = G.t * 1.7 * (unlocked.has('solar') ? 1.4 : 1);
   const key = [Math.floor(G.money), day, Math.floor(km), G.stack.length, cap, obj.text, G.level, G.xp,
-    unlocked.has('tent1'), Math.ceil(G.hp), G.soldiers, raidOn, Math.ceil(G.raidT), enemies.length, wages(), G.strike, phaseInfo(), G.qi, questInfo().cur, Math.round(incomePerMin() / 5)].join('|');
+    unlocked.has('tent1'), Math.ceil(G.hp), G.soldiers, workers.length, Math.ceil(crewHealthStatus().hp), raidOn, Math.ceil(G.raidT), enemies.length, wages(), G.strike, phaseInfo(), G.qi, questInfo().cur, Math.round(incomePerMin() / 5)].join('|');
   const q = questInfo();
   $('qText').innerHTML = `${q.text} <b>${Math.min(q.cur, q.n)}/${q.n}</b> · $${fmt(q.reward)}`;
   $('qFill').style.width = Math.min(100, q.cur / q.n * 100) + '%';
@@ -2763,10 +2904,12 @@ function hud(obj) {
   def.hidden = !unlocked.has('expand1');
   if (!def.hidden) {
     const hm = hpMax(), alive = enemies.filter(e => e.state === 'approach' || e.state === 'attack').length;
-    $('defTop').textContent = `🛡️ 마을 체력 ${Math.ceil(G.hp)}/${hm}`;
-    $('hpFill').style.width = Math.max(0, G.hp / hm * 100) + '%';
-    $('hpBar').classList.toggle('low', G.hp < hm * 0.3);
+    const ch = crewHealthStatus();
+    $('defTop').textContent = `⚔️ 방어 인원 ${workers.length + soldiers.length}명`;
+    $('hpFill').style.width = Math.max(0, ch.ratio * 100) + '%';
+    $('hpBar').classList.toggle('low', ch.ratio < 0.3);
     $('defInfo').textContent = raidOn ? `⚠️ 해적선 ${alive}척 · 상륙 ${enemies.filter(e => e.kind === 'boarder' && e.state === 'walk').length}명` : `⚔️ 선원 ${workers.length}명 · 다음 습격 ${Math.ceil(G.raidT)}초`;
+    if (!raidOn && !workers.length && !soldiers.length) $('defInfo').textContent = crewTents().length ? '⛺ 텐트에서 충원하면 다음 습격이 시작됩니다' : '⛺ 텐트를 지어 방어 인원을 모으세요';
     def.classList.toggle('raid', raidOn);
   }
   $('lv').textContent = `Lv.${G.level}`;

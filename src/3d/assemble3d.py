@@ -164,7 +164,7 @@ for c in chunks:
     if c.startswith("function dockRect("):
         out.append(c.replace('a1 = 10;', 'a1 = 6.8;').replace('0 : 0.42', '0 : 0.8')); continue
     if c.startswith("/* ---------- HUD ---------- */"):
-        out.append(B('w3d_world.js')); out.append(B('w3d_chars.js')); out.append(B('w3d_game.js')); out.append(B('w3d_fx.js')); out.append(overlay); out.append(c); continue
+        out.append(B('w3d_world.js')); out.append(B('w3d_chars.js')); out.append(B('w3d_game.js')); out.append(B('w3d_melee.js')); out.append(B('w3d_crew.js')); out.append(B('w3d_fx.js')); out.append(overlay); out.append(c); continue
     if c.startswith("/* ---------- 루프 ---------- */") or c.startswith("let last = performance.now()"):
         continue
     if keep(c): out.append(c)
@@ -232,6 +232,40 @@ for a_, b_ in R4:
     assert js.count(a_) == 1, a_
     js = js.replace(a_, b_)
 js = js.replace('CREW_HP', 'crewHpMax()').replace('crewHpMax()_BASE', 'CREW_HP_BASE')
+# 갑판 백병전: 약탈·원거리 선원 사격 대신 실제 근접전과 유료 충원으로 전환.
+def replace_section(text, start, end, replacement):
+    i = text.index(start); j = text.index(end, i)
+    return text[:i] + replacement + text[j:]
+js = replace_section(js, '  // 해군: 습격 땐', '  // 포대\n', '  updateDefenders(dt, bl, mult);\n')
+js = replace_section(js, '      e.fireT -= dt;', '      e.boardT =', '')
+old_board = "      if (e.boardT <= 0) { e.boardT = rnd(6, 9) * raidPlan(G.wave).boarding; if (enemies.filter(b => b.kind === 'boarder' && alive(b)).length < 3 + G.wave) spawnBoarder(e); }"
+assert js.count(old_board) == 1
+js = js.replace(old_board, """      if (e.boardT <= 0) {
+        e.boardT = rnd(4, 6) * raidPlan(G.wave).boarding;
+        const budget = e.landingBudget || (e.boss ? 8 : e.big ? 4 : 2);
+        const burst = e.boarded ? 1 : e.big ? 3 : 2;
+        for (let k = 0; k < burst && (e.boarded || 0) < budget; k++) {
+          if (enemies.filter(b => b.kind === 'boarder' && alive(b)).length >= Math.min(16, 4 + G.wave * 2)) break;
+          spawnBoarder(e); e.boarded = (e.boarded || 0) + 1;
+        }
+        if ((e.boarded || 0) >= budget) e.state = 'flee';
+      }""")
+js = js.replace('e.sinkT > 1.4', "e.sinkT > (e.kind === 'boarder' ? 2 : 1.4)")
+js = js.replace("e.state = 'sink'; e.sinkT = 0.6;", "e.state = 'sink'; e.sinkT = 0;")
+js = js.replace('function updateMilitary(dt) {', 'function updateMilitary(dt) {\n  tickMeleeEffects(dt);')
+js = js.replace('  G.wave++;', '  G.wave++; G.raidHadCrew = workers.length + soldiers.length > 0;')
+js = js.replace('G.raidT -= dt;', 'if (workers.length || soldiers.length) G.raidT -= dt; else G.raidT = Math.max(10, G.raidT);')
+js = js.replace("state: 'walk', atkT: 0.6", "state: 'walk', atkT: 1.0")
+js = replace_section(js, 'function hitVillage(s) {', 'function shoot(', """function hitVillage(s) {
+  // 구버전 투사체 호환용. 새 해적은 선원과만 싸우며 돈과 시설을 약탈하지 않습니다.
+  G.hp = Math.max(0, G.hp - s.dmg * strategyDamage()); shake = 0.2;
+  for (const w of [...workers]) if (dist(w.x, w.y, s.x1, s.y1) < 1.1) {
+    w.hp -= 4 * PIRATE_BALANCE.damage; if (w.hp <= 0) killCrew(w);
+  }
+  booms.push({ x: s.x1, y: s.y1, t: 0, kind: 'fire' });
+}
+""")
+
 # 저장된 강화 선택을 복구해 새로고침으로 보상을 잃거나 다시 뽑지 않게 함
 js = js.replace("  const go = () => requestAnimationFrame(frame);", "  if (G.cardOffer && G.cardOffer.length) offerCards();\n  const go = () => requestAnimationFrame(frame);")
 # 선택의 대가: 카드 효과를 실제 경제/전투/습격 시간에 연결
