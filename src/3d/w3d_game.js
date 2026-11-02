@@ -41,9 +41,9 @@ const CARDS = [
 ];
 function ck(id) { return (G && G.cards && G.cards[id]) || 0; }
 const lootMul = () => 1 + 0.5 * ck('loot');
-const crewHpMax = () => Math.round(15 * (1 + 0.5 * ck('crewHp'))) + 10 * ck('villageHp') + 5 * trainingLevel('crew');
+const crewHpMax = () => Math.round((15 + 6 * (pirateLevel() - 1)) * pirateMultiplier() * (1 + 0.5 * ck('crewHp'))) + 10 * ck('villageHp') + 5 * trainingLevel('crew');
 const crewMul = () => 1 + 0.4 * ck('crewPower');
-const crewAttack = () => 3 * (1 + 0.1 * (lv() - 1)) * crewMul() + trainingLevel('crew');
+const crewAttack = () => 3 * (1 + 0.1 * (Math.max(lv(), pirateLevel()) - 1)) * pirateMultiplier() * crewMul() + trainingLevel('crew');
 
 const cardStyle = document.createElement('style');
 cardStyle.textContent = `

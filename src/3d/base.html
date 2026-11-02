@@ -337,6 +337,7 @@ function build(data) {
   cap = BASE_CAP; workers = [];
   for (const id of unlocked) applyUnlock(id);
   restoreCrewRoster(legacyRespawn);
+  initializeAssignments();
   restoringCrewRoster = false;
   runtime = {};
   for (const id of STATION_IDS) runtime[id] = { timer: 0, spawn: 1 + Math.random(), queue: [], leaving: [], serveT: 0 };
@@ -1316,44 +1317,17 @@ const SHIRTS = ['#e85d75', '#6c5ce7', '#00a8a8', '#f2b134', '#8d6e63', '#4d96ff'
 const HAIRS = ['#3a2414', '#1d1d1d', '#a0522d', '#e2b65c', '#7a7a7a'];
 function slotPos(d, k) { const a = 0.95 + k * 0.75; return { x: d.x + d.dir[0] * a, y: d.y + d.dir[1] * a }; }
 function updateShop(id, dt) {
-  syncCustomerRoutes(id);
   const d = DEFS[id], s = G.st[id], r = runtime[id];
-  r.spawn -= dt;
-  const qmax = Math.min(10, 6 + Math.floor(lv() / 3));
-  if (r.spawn <= 0 && r.queue.length < qmax) {
-    r.spawn = rnd(1.1, 2.0) / (1 + 0.1 * (lv() - 1)) / (1 + 0.2 * (slv(id) - 1));
-    const sp = slotPos(d, 11);
-    r.queue.push({ x: sp.x, y: sp.y, want: Math.floor(rnd(d.want[0], d.want[1] + 1)) + Math.floor(lv() / 3), got: 0, wait: 0, bob: 0, moving: true,
-      shirt: SHIRTS[Math.floor(Math.random() * SHIRTS.length)], hair: HAIRS[Math.floor(Math.random() * HAIRS.length)], alpha: 0, ph: rnd(0, 6) });
-  }
-  r.queue.forEach((c, k) => {
-    const tp = slotPos(d, k), dd = dist(c.x, c.y, tp.x, tp.y);
-    c.alpha = Math.min(1, c.alpha + dt * 2);
-    if (dd > 0.04) moveTo(c, tp.x, tp.y, 2.4, dt); else stopMove(c, dt);
-    if (s.stock <= 0 || k > 0) c.wait += dt * (s.stock <= 0 ? 1 : 0.3);
-  });
-  for (let i = r.queue.length - 1; i >= 0; i--) {
-    const c = r.queue[i];
-    if (c.wait > 15) { r.queue.splice(i, 1); c.emote = '😡'; c.target = slotPos(d, 11); r.leaving.push(c); }
-  }
-  const f = r.queue[0], counter = slotPos(d, 0);
-  if (f && !f.moving && dist(f.x, f.y, counter.x, counter.y) < 0.3) {
-    if (s.stock > 0) {
-      r.serveT -= dt;
-      if (r.serveT <= 0) {
-        const pr = priceOf(d);
-        r.serveT = 0.22; s.stock--; f.got++; f.wait = 0; s.cash += pr; addXp(pr); earn(pr);
-        G.stats.sold = (G.stats.sold || 0) + 1; G.stats['sold_' + d.item] = (G.stats['sold_' + d.item] || 0) + 1;
-        floatText(f.x, f.y, `+$${pr}`, '#b8ffbf');
-        if (f.got >= f.want) { r.queue.shift(); f.emote = '❤️'; f.target = slotPos(d, 11); r.leaving.push(f); }
-      }
-    }
-  }
-  for (let i = r.leaving.length - 1; i >= 0; i--) {
-    const c = r.leaving[i], dd = dist(c.x, c.y, c.target.x, c.target.y);
-    moveTo(c, c.target.x, c.target.y, 2.8, dt);
-    if (dd < 2) c.alpha = Math.max(0, dd / 2);
-    if (dd < 0.05) r.leaving.splice(i, 1);
+  r.queue.length = 0; r.leaving.length = 0;
+  s.saleElapsed = Math.max(0, Number.isFinite(s.saleElapsed) ? s.saleElapsed : 0) + dt;
+  while (s.saleElapsed >= 2) {
+    s.saleElapsed -= 2;
+    if (s.stock <= 0) continue;
+    const pr = priceOf(d);
+    s.stock--; s.cash += pr; addXp(pr); earn(pr);
+    G.stats.sold = (G.stats.sold || 0) + 1;
+    G.stats['sold_' + d.item] = (G.stats['sold_' + d.item] || 0) + 1;
+    floatText(d.x, d.y, `+$${pr}`, '#b8ffbf');
   }
 }
 
@@ -1372,6 +1346,7 @@ function pickJob(w, item) {
   const open = ROUTES.filter(r => unlocked.has(r.from) && unlocked.has(r.to) && G.st[r.from][sourceInfo(r.from).key] > 0 && destInfo(r.to).max > G.st[r.to][destInfo(r.to).key]).length;
   const fairShare = Math.max(1, Math.ceil(workers.length / Math.max(1, open)));
   for (const r of ROUTES) {
+    if (!assignmentRoute(w, r)) continue;
     if (!unlocked.has(r.from) || !unlocked.has(r.to)) continue;
     const src = sourceInfo(r.from), dst = destInfo(r.to);
     if (item && src.item !== item) continue;
@@ -1389,7 +1364,7 @@ function pickJob(w, item) {
 function pickCash(w) {
   let best = null, bs = 0;
   for (const id of STATION_IDS) {
-    const d = DEFS[id]; if (d.type !== 'shop' || !unlocked.has(id)) continue;
+    const d = DEFS[id]; if (d.type !== 'shop' || !unlocked.has(id) || w.assignment !== id) continue;
     const c = G.st[id].cash; if (c < 8 || workers.some(o => o !== w && o.job && o.job.cash === id)) continue;
     const sc = c - dist(w.x, w.y, d.cx, d.cy) * 2; if (sc > bs) { bs = sc; best = id; }
   }
@@ -1404,6 +1379,8 @@ function collectCash(w, dt) {
 }
 function updateWorker(w, dt) {
   if (raidOn) return; // 습격 중에는 싸우러 감 (updateMilitary)
+  if (returnUnassignedCargo(w, dt)) return;
+  if (!w.assignment) { w.job = null; stopMove(w, dt); return; }
   if (!w.job) {
     const cid = w.carry.length ? null : pickCash(w);
     w.job = cid ? { cash: cid } : pickJob(w, w.carry[0]);
@@ -1412,7 +1389,7 @@ function updateWorker(w, dt) {
   if (w.job.cash) { collectCash(w, dt); return; }
   const src = sourceInfo(w.job.from), dst = destInfo(w.job.to), s1 = G.st[w.job.from], s2 = G.st[w.job.to];
   const delivering = w.carry.length && (w.carry.length >= crewCap() || s1[src.key] === 0);
-  const target = delivering ? dst : src;
+  const target = workerSlot(w, delivering ? dst : src);
   const dd = dist(w.x, w.y, target.x, target.y);
   if (dd > 0.35) { moveTo(w, target.x, target.y, workerSpeed(), dt, workers); return; }
   stopMove(w, dt); w.timer -= dt; if (w.timer > 0) return; w.timer = 0.12;
@@ -1502,7 +1479,11 @@ function killSoldier(s) {
   floatText(s.x, s.y, '해군 전사', '#ffb0a0'); dust(s.x, s.y, 8);
 }
 function startRaid() {
+  const previousHeroHp = heroMaxHp(), previousCrewHp = crewHpMax();
   G.wave++;
+  G.hero.level = Math.max(heroLevel(), pirateLevel());
+  if (isHeroAvailable()) player.hp += heroMaxHp() - previousHeroHp;
+  for (const w of workers) if (w.hp > 0) w.hp += crewHpMax() - previousCrewHp;
   const n = Math.min(14, 2 + Math.floor(pirateLevel() * 0.9) + Math.floor(Math.random() * 2) + (raidPlan(G.wave).type === 'thief' ? 2 : 0)), baseA = rnd(0, 6.28);
   for (let i = 0; i < n; i++) {
     const big = pirateLevel() >= 4 && i % 3 === 2;
@@ -1876,7 +1857,9 @@ function update(dt) {
       if (s.inPile > 0 && s.outPile < maxPile(id)) { r.timer += dt * spd; if (r.timer >= d.rate / (1 + 0.4 * (slv(id) - 1))) { r.timer = 0; s.inPile--; s.outPile++; } }
     } else if (d.type === 'shop') updateShop(id, dt);
   }
+  balanceAssignments();
   for (const w of workers) updateWorker(w, dt);
+  separateWorkers(dt);
   updateSea(dt);
   updateMilitary(dt); tickTrainingInteraction();
   // 상호작용

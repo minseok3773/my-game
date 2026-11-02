@@ -118,11 +118,11 @@ function syncPile(group, type, n, spread = 0.22) {
   while (group.children.length > n) group.remove(group.children[group.children.length - 1]);
 }
 function syncStack(group, arr) {
-  const n = Math.min(arr.length, 20), sig = arr.slice(0, n).join();
+  const n = arr.length, sig = arr.slice(0, n).join();
   if (group.userData.sig === sig) return;
   group.clear(); group.userData.sig = sig;
   let h = 0;
-  for (let i = 0; i < n; i++) { const m = ITEM3[arr[i]](); m.position.y += h; m.rotation.y = i % 2 ? 0.25 : -0.2; h += ITEM_H3[arr[i]]; group.add(m); }
+  for (let i = 0; i < n; i++) { const m = ITEM3[arr[i]](); m.scale.multiplyScalar(3); m.position.multiplyScalar(3); m.position.y += h; m.rotation.y = i % 2 ? 0.25 : -0.2; h += 3 * ITEM_H3[arr[i]]; group.add(m); }
 }
 
 /* ---------- 3D: 시설 ---------- */
@@ -447,7 +447,7 @@ function makeKid3(L) {
     m.pom = new THREE.Group(); m.pom.position.set(0.23, -0.08, 0.06); head.add(m.pom);
     m.pom.add(mk(sphG(0.055, 12, 8), mat(0xffffff, { roughness: 0.9 }), true, 0, -0.1, 0));
   }
-  m.carry = new THREE.Group(); m.carry.position.set(0, 1.08, 0.32); body.add(m.carry);
+  m.carry = new THREE.Group(); m.carry.position.set(0, 1.95, 0); body.add(m.carry);
   // 총: 해군은 늘 들고, 선원과 주인공은 습격 때만 듦
   m.rifle = new THREE.Group(); m.rifle.position.set(0.1, 1.02, 0.22); m.rifle.visible = !!H.cap; body.add(m.rifle);
   m.rifle.add(bx(0.05, 0.06, 0.55, 0x2b2b30, { metalness: 0.5, roughness: 0.35 }, true, 0, 0, 0.12));

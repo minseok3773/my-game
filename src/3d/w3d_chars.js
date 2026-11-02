@@ -69,7 +69,7 @@ function playClip(m, name, fade = 0.2) {
 }
 // 렌더 동기화는 로딩 중인 임시 모형에도 운반물·물총 그룹이 있다고 가정합니다.
 function attachCharacterGear(m, parent = m.root, height = 0.95, depth = 0.38) {
-  if (!m.carry) { m.carry = new THREE.Group(); m.carry.position.set(0, height, depth); parent.add(m.carry); }
+  if (!m.carry) { m.carry = new THREE.Group(); m.carry.position.set(0, 1.95, 0); parent.add(m.carry); }
   if (!m.rifle) {
     m.rifle = new THREE.Group(); m.rifle.position.set(0, height, depth); m.rifle.visible = false; parent.add(m.rifle);
     m.rifle.add(bx(0.05, 0.06, 0.55, 0x2b2b30, { metalness: 0.5, roughness: 0.35 }, true, 0, 0, 0.12));

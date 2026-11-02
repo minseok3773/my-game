@@ -102,7 +102,7 @@ function overlayWorld() {
   }
   for (const w of workers) { const em = w.job && w.job.cash ? '💵' : w.idle ? '💤' : null; if (em) { const p = S(w.x, w.y, 82); bubble(p.x, p.y, em, k); } }
   if (G.stack.length >= cap) { const p = S(player.x, player.y, 92); bubble(p.x, p.y, '🎒', k); }
-  for (const w of workers) if ((w.hp ?? CREW_HP) < CREW_HP) hpBar(w.x, w.y, 76, w.hp / CREW_HP, '#5fd16b', 24, Math.max(1, trainingLevel('crew')));
+  for (const w of workers) if ((w.hp ?? CREW_HP) < CREW_HP) hpBar(w.x, w.y, 76, w.hp / CREW_HP, '#5fd16b', 24, pirateLevel());
   for (const s of soldiers) if ((s.hp ?? 12) < 12) hpBar(s.x, s.y, 76, s.hp / 12, '#5fd16b', 24, blv());
   for (const e of enemies) {
     if (!alive(e)) continue;
@@ -160,7 +160,7 @@ for c in chunks:
     if c.startswith("function dockRect("):
         out.append("function dockRect(id) { return customerDockRect(id); }\n"); continue
     if c.startswith("/* ---------- HUD ---------- */"):
-        out.append(B('w3d_world.js')); out.append(B('w3d_chars.js')); out.append(B('w3d_game.js')); out.append(B('w3d_progression.js')); out.append(B('w3d_melee.js')); out.append(B('w3d_hero.js')); out.append(B('w3d_crew.js')); out.append(B('w3d_training.js')); out.append(B('w3d_customers.js')); out.append(B('w3d_fx.js')); out.append(overlay); out.append(c); continue
+        out.append(B('w3d_world.js')); out.append(B('w3d_chars.js')); out.append(B('w3d_game.js')); out.append(B('w3d_progression.js')); out.append(B('w3d_melee.js')); out.append(B('w3d_hero.js')); out.append(B('w3d_crew.js')); out.append(B('w3d_training.js')); out.append(B('w3d_customers.js')); out.append(B('w3d_fx.js')); out.append(B('w3d_logistics.js')); out.append(overlay); out.append(c); continue
     if c.startswith("/* ---------- 루프 ---------- */") or c.startswith("let last = performance.now()"):
         continue
     if keep(c): out.append(c)
@@ -170,7 +170,7 @@ js = js.replace("const KEY = 'raft-village-v1';", "const KEY = 'raft-village-3d-
 js = re.sub(r"const phaseInfo = \(\) => \{[^\n]*\n", "const phaseInfo = () => '☀️ 낮';\n", js)
 js = re.sub(r"function nightAmt\(\) \{[^\n]*\n", "function nightAmt() { return 0; }\n", js)
 js = re.sub(r"function duskAmt\(\) \{[^\n]*\n", "function duskAmt() { return 0; }\n", js)
-# 3D 전용: 전투 종료 후 60초 준비, 침공 3회당 해적 1레벨 성장
+# 3D 전용: 전투 종료 후 60초 준비, 침공마다 해적 1레벨 성장 (최대 50)
 R3 = [
     ("G.raidT = G.raidT ?? 60;", "G.raidT = G.raidT ?? RAID_INTERVAL;"),
     ("G.raidT = rnd(55, 80);", "G.raidT = 60;"),

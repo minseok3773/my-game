@@ -1,10 +1,10 @@
-/* ---------- 해적 성장: 침공 3회마다 1레벨, 5레벨마다 보스 1회 ---------- */
-const PIRATE_RAIDS_PER_LEVEL = 3;
-const PIRATE_PROGRESSION_VERSION = 1;
+/* ---------- 해적 성장: 침공마다 1레벨 (최대 50), 5레벨마다 보스 1회 ---------- */
+const PIRATE_RAIDS_PER_LEVEL = 1;
+const PIRATE_PROGRESSION_VERSION = 2;
 const BOSS_POWER_MULTIPLIER = 5;
 function pirateLevel(wave = G.wave) {
   const count = Number.isFinite(Number(wave)) ? Math.max(1, Math.floor(Number(wave))) : 1;
-  return Math.max(1, Math.ceil(count / PIRATE_RAIDS_PER_LEVEL));
+  return Math.min(50, Math.max(1, Math.ceil(count / PIRATE_RAIDS_PER_LEVEL)));
 }
 const pirateMultiplier = (level = pirateLevel()) => Math.pow(1.1, Math.max(0, level - 1));
 const normalPirateHp = (level = pirateLevel()) => PIRATE_BALANCE.health * Math.round((6 + 2 * level) * pirateMultiplier(level));

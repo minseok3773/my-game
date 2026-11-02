@@ -2,13 +2,13 @@
 const HERO_MAX_LEVEL = 50;
 const heroLevel = () => G.hero?.level || 1;
 const heroXpNeed = (level = heroLevel()) => 20 + 10 * (level - 1);
-const heroAttack = () => 4 + 2 * (heroLevel() - 1) + 2 * ck('playerGun') + 3 * trainingLevel('hero');
-const heroMaxHp = () => 40 + 6 * (heroLevel() - 1) + 10 * trainingLevel('hero');
+const heroAttack = () => (4 + 2 * (heroLevel() - 1)) * pirateMultiplier(heroLevel()) + 2 * ck('playerGun') + 3 * trainingLevel('hero');
+const heroMaxHp = () => (40 + 6 * (heroLevel() - 1)) * pirateMultiplier(heroLevel()) + 10 * trainingLevel('hero');
 const isHeroAvailable = () => !!player && !player.dead && player.hp > 0 && !(G.hero?.downT > 0);
 function initializeHeroState() {
   const old = G.hero || {};
   const savedLevel = Number(old.level ?? G.level ?? 1);
-  const level = Number.isFinite(savedLevel) ? Math.min(HERO_MAX_LEVEL, Math.max(1, Math.floor(savedLevel))) : 1;
+  const level = Number.isFinite(savedLevel) ? Math.min(HERO_MAX_LEVEL, Math.max(1, Math.max(pirateLevel(), Math.floor(savedLevel)))) : 1;
   G.hero = { level, xp: level >= HERO_MAX_LEVEL ? 0 : Math.max(0, Number.isFinite(old.xp) ? old.xp : 0),
     downT: Math.max(0, old.downT || 0), kills: old.kills || 0,
     engagedWave: old.engagedWave || 0, rewardedWave: old.rewardedWave || 0 };

@@ -14,7 +14,7 @@ function restoreRecruitmentJobs() {
 }
 function snapshotCrewRoster() {
   const record = w => ({ x: w.x, y: w.y, hp: w.hp, ph: w.ph, bob: 0,
-    ...(w.tent ? { tent: w.tent, carry: [...w.carry], look: w.look } : {}) });
+    ...(w.tent ? { tent: w.tent, carry: [...w.carry], look: w.look, assignment: w.assignment } : {}) });
   G.crewRoster = workers.filter(w => w.hp > 0).map(record);
   G.navyRoster = soldiers.filter(s => s.hp > 0).map(record);
   G.crewRosterVersion = 1;
@@ -29,6 +29,7 @@ function restoreCrewRoster(legacyRespawn) {
       w.hp = Math.min(crewHpMax(), saved.hp ?? crewHpMax());
       if (Number.isFinite(saved.ph)) w.ph = saved.ph;
       if (Array.isArray(saved.carry)) w.carry = saved.carry.filter(t => Object.hasOwn(ITEMS, t)).slice(0, crewCap());
+      w.assignment = saved.assignment || null;
       if (saved.look) w.look = saved.look;
     }
   } else {
