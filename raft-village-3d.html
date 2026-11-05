@@ -2189,8 +2189,58 @@ function makeHero() {
   return m;
 }
 
+// 일꾼: 오리지널 "뼈다귀 곰 선원". Henry 몸을 매끈한 연회색 한 색으로 칠하고, 원래 머리는 숨긴 뒤
+// 둥근 곰 해골 머리·하얀 뼈 무늬·청록 선원 스카프를 뼈대에 붙여 원본 동작을 그대로 따라갑니다.
+function makeBoneBear(height = 1.58) {
+  const m = makeGL('henry', { height, weapon: 'never' });
+  // 원래 재질을 복사해 색만 바꿈 (뼈대를 따라 변형되는 skinning 설정 유지)
+  m.body.traverse(x => { if (x.isMesh && !/weapon/i.test(x.name)) { x.material = x.material.clone(); x.material.map = null; x.material.color.setHex(0x6a6380); x.material.roughness = 0.45; x.material.metalness = 0; x.material.needsUpdate = true; } });
+  const B = {}; m.body.traverse(x => { if (x.isBone) B[x.name] = x; });
+  m.root.updateMatrixWorld(true);
+  const bone = mat(0xfbf9f4, { roughness: 0.4 }), white = mat(0xf6f4f1, { roughness: 0.35 }), dark = mat(0x2b2631, { roughness: 0.6 });
+  const earIn = mat(0xa79cae, { roughness: 0.6 }), scarf = mat(0x2fb7b0, { roughness: 0.7 });
+  const H = (n, f) => B[n] && boneMount(B[n], f);
+  const cap = (g, x, y, z, sx, sy, sz, rz = 0) => { const c = mk(sphG(1, 12, 8), bone, false, x, y, z); c.scale.set(sx, sy, sz); c.rotation.z = rz; g.add(c); return c; };
+  // 곰 해골 머리 (목에 붙임: 원래 머리 뼈는 매 프레임 숨김)
+  H('Neck', g => {
+    const head = mk(sphG(0.33, 24, 18), white, true, 0, 0.3, 0.05); head.scale.set(1.06, 0.96, 0.96); g.add(head);
+    const muzzle = mk(sphG(0.17, 18, 12), white, true, 0, 0.13, 0.2); muzzle.scale.set(1.25, 0.7, 0.85); g.add(muzzle);
+    for (const d of [-1, 1]) {
+      const ear = mk(sphG(0.13, 16, 12), white, true, d * 0.27, 0.56, 0.0); ear.scale.set(1, 1, 0.6); g.add(ear);
+      const inner = mk(sphG(0.08, 12, 10), earIn, false, d * 0.27, 0.55, 0.06); inner.scale.set(1, 1, 0.35); g.add(inner);
+      const eye = mk(sphG(0.088, 16, 12), dark, false, d * 0.125, 0.3, 0.33); eye.scale.set(1, 1.05, 0.45); g.add(eye);
+    }
+    const nose = mk(coneG(0.04, 0.07, 3), dark, false, 0, 0.18, 0.36); nose.rotation.set(-0.3, 0, Math.PI); nose.scale.z = 0.6; g.add(nose);
+    for (const x of [-0.07, 0, 0.07]) g.add(bx(0.012, 0.055, 0.02, 0x8f8697, {}, false, x, 0.06, 0.335));
+    const knot = mk(new THREE.TorusGeometry(0.11, 0.04, 8, 18), scarf, true, 0, 0.0, 0.0); knot.rotation.x = Math.PI / 2; g.add(knot);
+    const tip = mk(coneG(0.07, 0.12, 4), scarf, true, 0, -0.05, 0.11); tip.rotation.x = Math.PI; g.add(tip);
+  });
+  // 갈비뼈·척추
+  H('Torso', g => {
+    cap(g, 0, 0.03, 0.2, 0.022, 0.11, 0.022);
+    for (let i = 0; i < 3; i++) for (const d of [-1, 1]) cap(g, d * 0.08, 0.11 - i * 0.065, 0.19 - i * 0.006, 0.065, 0.022, 0.024, d * 0.12);
+  });
+  // 골반 (가운데 구멍 두 개)
+  H('Hips', g => {
+    cap(g, 0, 0.09, 0.22, 0.03, 0.035, 0.02);
+    for (const d of [-1, 1]) { cap(g, d * 0.065, 0.02, 0.22, 0.065, 0.045, 0.02); const hole = mk(sphG(0.018, 8, 6), mat(0x6f6880), false, d * 0.065, 0.02, 0.237); hole.scale.z = 0.4; g.add(hole); }
+  });
+  // 팔뼈·손가락 마디 (처음 자세에서 팔은 옆으로 뻗어 있음)
+  for (const [n, d] of [['UpperArmL', 1], ['UpperArmR', -1]]) H(n, g => cap(g, d * 0.1, 0.0, 0.085, 0.075, 0.022, 0.022));
+  for (const [n, d] of [['LowerArmL', 1], ['LowerArmR', -1]]) H(n, g => {
+    cap(g, d * 0.12, 0.0, 0.08, 0.09, 0.02, 0.02);
+    for (const z of [-0.02, 0.02]) cap(g, d * 0.29, 0.0, 0.06 + z, 0.03, 0.016, 0.016);
+  });
+  // 다리뼈·발가락 마디
+  for (const n of ['UpperLegL', 'UpperLegR']) H(n, g => cap(g, 0, -0.12, 0.11, 0.022, 0.09, 0.022));
+  for (const n of ['LowerLegL', 'LowerLegR']) H(n, g => cap(g, 0, -0.13, 0.1, 0.02, 0.09, 0.02));
+  for (const n of ['FootL', 'FootR']) H(n, g => { for (const x of [-0.03, 0.03]) cap(g, x, 0.03, 0.15, 0.025, 0.018, 0.03); });
+  m.hideHead = true; m.boneBear = true;
+  return m;
+}
+
 // 원본 Pirate Kit 모형을 사용합니다.
-// 주인공: 바다 수호 기사(Henry 바탕) / Henry: 선원 / Mako·Sharky: 상륙 해적.
+// 주인공: 바다 수호 기사 / 일꾼: 뼈다귀 곰 선원 (둘 다 Henry 바탕) / 손님: Henry / Mako·Sharky: 상륙 해적.
 function mkChar(kind, ent) {
   if (!GL.ready) {
     // 로딩 중에도 토끼 모자나 동물 후드 대신 단순한 두건 해적 실루엣을 표시합니다.
@@ -2198,6 +2248,7 @@ function mkChar(kind, ent) {
       ? { shirt: '#26407a', pants: '#2a4076', hair: '#603e26', skin: '#eec6a2' }
       : kind === 'boarder'
         ? { shirt: '#547f91', pants: '#8f7b52', hair: '#354d61', skin: '#7ba6b7' }
+        : kind === 'worker' ? { shirt: '#cfcad8', pants: '#cfcad8', hair: '#f6f4f1', skin: '#f6f4f1' }
         : { shirt: ent.shirt || '#66777b', pants: '#637c86', hair: ent.hair || '#3c291d', skin: '#bf946e' };
     const m = makeAdult3({ ...colors, bandana: true });
     m.melee = kind !== 'customer';
@@ -2206,7 +2257,7 @@ function mkChar(kind, ent) {
   }
   const n = Math.floor((ent.ph || 0) * 10);
   if (kind === 'player') { const m = makeHero(); m.melee = true; return m; }
-  if (kind === 'worker') { const m = makeGL('henry', { height: 1.58, weapon: 'never' }); m.melee = true; return m; }
+  if (kind === 'worker') { const m = makeBoneBear(1.58); m.melee = true; return m; }
   if (kind === 'customer') return makeGL(n % 3 === 0 ? 'captain' : 'henry', { height: 1.55, weapon: 'never' });
   const m = makeGL(ent.champion ? 'mako' : n % 2 ? 'mako' : 'sharky', { height: ent.champion ? 2.35 : 1.65, weapon: 'always' });
   m.melee = true;
@@ -2214,6 +2265,7 @@ function mkChar(kind, ent) {
 }
 function animChar(m, ent, dt, st = {}) {
   if (m.gl) animateGL(m, ent, dt, st); else animate3(m, ent, dt, !!(st.fighting || ent.fighting));
+  if (m.hideHead && m.head) m.head.scale.setScalar(0.001); // 원래 머리(두건·얼굴)는 숨기고 곰 해골 머리로
   if (m.melee) {
     m.rifle.visible = false;
     m.sword.visible = !st.dead && (raidOn || ent.fighting) && !(m.gl && m.weaponMode === 'always');
