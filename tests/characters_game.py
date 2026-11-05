@@ -5,6 +5,7 @@ fixture into the browser response; application files and user saves stay intact.
 """
 from pathlib import Path
 import argparse
+import os
 import subprocess
 import tempfile
 from playwright.sync_api import sync_playwright
@@ -35,14 +36,14 @@ window.characterTest = {
     return [player,...workers,...enemies].map(ent=>{
       const m=models.get(ent);const meshes=[];m.body.traverse(o=>{if(o.isMesh)meshes.push(o.name)});
       return {kind:ent===player?'player':workers.includes(ent)?'worker':'boarder',gl:!!m.gl,gear:!!m.carry&&!!m.rifle,
-        meshes,bunny:!!m.earPiv,skull:!!m.skull,rifleVisible:m.rifle.visible,nativeVisible:!!m.weapons?.some(w=>w.visible)};
+        meshes,bunny:!!m.earPiv,skull:!!m.skull,rifleVisible:m.rifle.visible,nativeVisible:!!m.weapons?.some(w=>w.visible),armor:!!m.armor,swordVisible:!!m.sword?.visible};
     });
   }
 };
 '''
 cache={}
 with sync_playwright() as p:
- browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader'])
+ browser=p.chromium.launch(executable_path=os.environ.get('CHROMIUM','/usr/bin/chromium'),headless=True,args=['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader'])
  for block_models in [True,False]:
   page=browser.new_page(viewport={'width':390,'height':844},is_mobile=True,has_touch=True,device_scale_factor=2)
   page.add_init_script('requestAnimationFrame = () => 0')
@@ -65,8 +66,9 @@ with sync_playwright() as p:
    assert all(not x['gl'] for x in data),data
   else:
    assert all(x['gl'] for x in data),data
-   assert any('Captain_Barbarossa' in n for n in data[0]['meshes']),data[0]
-   assert not data[0]['rifleVisible'] and data[0]['nativeVisible'],data[0]
+   # 주인공: Henry 몸에 은빛 갑옷을 입힌 오리지널 "바다 수호 기사". 류트는 숨기고 습격 중에는 검을 듦
+   assert any('Henry' in n for n in data[0]['meshes']) and data[0]['armor'],data[0]
+   assert not data[0]['rifleVisible'] and not data[0]['nativeVisible'] and data[0]['swordVisible'],data[0]
    assert all(any('Henry' in n for n in x['meshes']) for x in data if x['kind']=='worker'),data
    assert any(any(n=='Mako' for n in x['meshes']) for x in data),data
    assert any(any(n=='Sharky' for n in x['meshes']) for x in data),data
