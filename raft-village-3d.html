@@ -2191,15 +2191,15 @@ function makeHero() {
   return m;
 }
 
-// 일꾼: 오리지널 "뼈다귀 곰 선원". Henry 몸을 매끈한 연회색 한 색으로 칠하고, 원래 머리는 숨긴 뒤
+// 일꾼: 오리지널 "뼈다귀 곰 선원". Henry 몸을 머리와 같은 하얀색으로 칠하고, 원래 머리는 숨긴 뒤
 // 둥근 곰 해골 머리·하얀 뼈 무늬·청록 선원 스카프를 뼈대에 붙여 원본 동작을 그대로 따라갑니다.
 function makeBoneBear(height = 1.58) {
   const m = makeGL('henry', { height, weapon: 'never' });
   // 원래 재질을 복사해 색만 바꿈 (뼈대를 따라 변형되는 skinning 설정 유지)
-  m.body.traverse(x => { if (x.isMesh && !/weapon/i.test(x.name)) { x.material = x.material.clone(); x.material.map = null; x.material.color.setHex(0x6a6380); x.material.roughness = 0.45; x.material.metalness = 0; x.material.needsUpdate = true; } });
+  m.body.traverse(x => { if (x.isMesh && !/weapon/i.test(x.name)) { x.material = x.material.clone(); x.material.map = null; x.material.color.setHex(0xf3f0f5); x.material.roughness = 0.45; x.material.metalness = 0; x.material.needsUpdate = true; } });
   const B = {}; m.body.traverse(x => { if (x.isBone) B[x.name] = x; });
   m.root.updateMatrixWorld(true);
-  const bone = mat(0xfbf9f4, { roughness: 0.4 }), white = mat(0xf6f4f1, { roughness: 0.35 }), dark = mat(0x2b2631, { roughness: 0.6 });
+  const bone = mat(0xb9abd2, { roughness: 0.5 }), white = mat(0xf6f4f1, { roughness: 0.35 }), dark = mat(0x2b2631, { roughness: 0.6 });
   const earIn = mat(0xa79cae, { roughness: 0.6 }), scarf = mat(0x2fb7b0, { roughness: 0.7 });
   const H = (n, f) => B[n] && boneMount(B[n], f);
   const cap = (g, x, y, z, sx, sy, sz, rz = 0) => { const c = mk(sphG(1, 12, 8), bone, false, x, y, z); c.scale.set(sx, sy, sz); c.rotation.z = rz; g.add(c); return c; };
@@ -2225,7 +2225,7 @@ function makeBoneBear(height = 1.58) {
   // 골반 (가운데 구멍 두 개)
   H('Hips', g => {
     cap(g, 0, 0.09, 0.22, 0.03, 0.035, 0.02);
-    for (const d of [-1, 1]) { cap(g, d * 0.065, 0.02, 0.22, 0.065, 0.045, 0.02); const hole = mk(sphG(0.018, 8, 6), mat(0x6f6880), false, d * 0.065, 0.02, 0.237); hole.scale.z = 0.4; g.add(hole); }
+    for (const d of [-1, 1]) { cap(g, d * 0.065, 0.02, 0.22, 0.065, 0.045, 0.02); const hole = mk(sphG(0.018, 8, 6), mat(0xf3f0f5), false, d * 0.065, 0.02, 0.237); hole.scale.z = 0.4; g.add(hole); }
   });
   // 팔뼈·손가락 마디 (처음 자세에서 팔은 옆으로 뻗어 있음)
   for (const [n, d] of [['UpperArmL', 1], ['UpperArmR', -1]]) H(n, g => cap(g, d * 0.1, 0.0, 0.085, 0.075, 0.022, 0.022));
@@ -2250,7 +2250,7 @@ function mkChar(kind, ent) {
       ? { shirt: '#26407a', pants: '#2a4076', hair: '#603e26', skin: '#eec6a2' }
       : kind === 'boarder'
         ? { shirt: '#547f91', pants: '#8f7b52', hair: '#354d61', skin: '#7ba6b7' }
-        : kind === 'worker' ? { shirt: '#cfcad8', pants: '#cfcad8', hair: '#f6f4f1', skin: '#f6f4f1' }
+        : kind === 'worker' ? { shirt: '#f3f0f5', pants: '#f3f0f5', hair: '#f6f4f1', skin: '#f6f4f1' }
         : { shirt: ent.shirt || '#66777b', pants: '#637c86', hair: ent.hair || '#3c291d', skin: '#bf946e' };
     const m = makeAdult3({ ...colors, bandana: true });
     m.melee = kind !== 'customer';
