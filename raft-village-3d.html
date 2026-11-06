@@ -285,7 +285,9 @@ const WS = 1.25;
 for (const id in DEFS) { const d = DEFS[id]; if (d.x !== undefined) { d.x *= WS; d.y *= WS; } if (d.rect) d.rect = d.rect.map(v => Math.round(v * WS)); }
 for (const p of PADS) { p.x *= WS; p.y *= WS; }
 for (const id in UPG) { UPG[id].x *= WS; UPG[id].y *= WS; }
-DEFS.waterShop.x = 17.1; // 넓어진 뗏목 오른쪽 끝에 맞춤
+// 물 배급소: 갑판 한가운데를 비우도록 오른쪽 끝(훈련소 칸 아래, 손님 부두 옆)으로 옮김
+DEFS.waterShop.x = 23.4; DEFS.waterShop.y = 6.4;
+UPG.waterShop.x = 21.4; UPG.waterShop.y = 7.8;
 for (const id of STATION_IDS) {
   const d = DEFS[id];
   if (d.type === 'shop') {
