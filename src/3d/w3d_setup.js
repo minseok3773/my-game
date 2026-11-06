@@ -5,7 +5,7 @@ renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 $('world').appendChild(renderer.domElement);
 const scene = new THREE.Scene();
-const SKY_DAY = new THREE.Color(0x57c8e8), SKY_DUSK = new THREE.Color(0xd99a7c), SKY_NIGHT = new THREE.Color(0x1a2740);
+const SKY_DAY = new THREE.Color(0x8fd8ef), SKY_DUSK = new THREE.Color(0xd99a7c), SKY_NIGHT = new THREE.Color(0x1a2740);
 scene.background = SKY_DAY.clone();
 scene.fog = new THREE.Fog(0x8fbfcc, 20, 54);
 // 직교 아이소메트릭: 멀리 있는 시설도 같은 비율로 보여 주는 모바일 타이쿤 구도.

@@ -31,10 +31,30 @@ function ringMesh(r0, r1, color, opacity) {
 
 /* ---------- 3D: 바다 ---------- */
 const uTime = { value: 0 };
+const uRaft = { value: new THREE.Vector4(0, 0, 12.5, 12.5) }, uIsl = { value: Array.from({ length: 24 }, () => new THREE.Vector3()) }, uIslN = { value: 0 };
 const waterMat = new THREE.MeshStandardMaterial({ color: 0x28aacd, roughness: 0.8, metalness: 0, transparent: true, opacity: 0.97 });
 waterMat.onBeforeCompile = sh => {
-  sh.uniforms.uTime = uTime;
-  sh.vertexShader = `uniform float uTime;
+  sh.uniforms.uTime = uTime; sh.uniforms.uRaft = uRaft; sh.uniforms.uIsl = uIsl; sh.uniforms.uIslN = uIslN;
+  sh.fragmentShader = `uniform vec4 uRaft; uniform vec3 uIsl[24]; uniform int uIslN; uniform float uTime; varying vec2 vSea;
+  ` + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+    vec2 sp = vSea;
+    float dx = max(max(uRaft.x - sp.x, sp.x - uRaft.z), 0.0), dz = max(max(uRaft.y - sp.y, sp.y - uRaft.w), 0.0);
+    float dr = length(vec2(dx, dz));
+    float shallow = 1.0 - smoothstep(0.5, 6.5, dr);
+    float foam = 1.0 - smoothstep(0.0, 0.45, dr);
+    for (int i = 0; i < 24; i++) {
+      if (i >= uIslN) break;
+      float d = length(sp - uIsl[i].xy) - uIsl[i].z;
+      shallow = max(shallow, 1.0 - smoothstep(0.0, 4.5, d));
+    }
+    vec3 deep = vec3(0.004, 0.10, 0.33), mid = vec3(0.01, 0.30, 0.56), lagoon = vec3(0.03, 0.56, 0.55); // 화면 출력 시 밝아지므로 진하게
+    vec3 col = mix(deep, mid, smoothstep(0.0, 0.5, shallow));
+    col = mix(col, lagoon, smoothstep(0.45, 1.0, shallow));
+    float glint = pow(max(0.0, sin(sp.x * 1.7 + uTime * 1.3) * sin(sp.y * 1.3 - uTime * 1.1)), 12.0) * 0.35;
+    col += glint * (0.4 + shallow * 0.6);
+    col = mix(col, vec3(0.95, 1.0, 1.0), foam * (0.55 + 0.25 * sin(uTime * 2.0 + sp.x * 2.0 + sp.y)));
+    diffuseColor.rgb = col;`);
+  sh.vertexShader = `uniform float uTime; varying vec2 vSea;
     float wave(vec2 p){ return sin(p.x*0.35+uTime*1.2)*0.12 + sin(p.y*0.5+uTime*0.9)*0.08 + sin((p.x+p.y)*0.8+uTime*1.7)*0.04; }
     vec2 waveD(vec2 p){
       float c = cos((p.x+p.y)*0.8+uTime*1.7)*0.032;
@@ -42,7 +62,7 @@ waterMat.onBeforeCompile = sh => {
     }
   ` + sh.vertexShader
     .replace('#include <beginnormal_vertex>', 'vec2 wd = waveD(position.xy); vec3 objectNormal = normalize(vec3(-wd.x, -wd.y, 1.0));')
-    .replace('#include <begin_vertex>', 'vec3 transformed = vec3(position); transformed.z += wave(position.xy);');
+    .replace('#include <begin_vertex>', 'vec3 transformed = vec3(position); transformed.z += wave(position.xy); vSea = (modelMatrix * vec4(position, 1.0)).xz;');
 };
 const water = new THREE.Mesh(new THREE.PlaneGeometry(220, 220, 170, 170), waterMat);
 water.rotation.x = -Math.PI / 2; water.position.set(12, -0.45, 8); water.receiveShadow = true; scene.add(water);
@@ -608,7 +628,7 @@ function sync3D(dt) {
   world.position.y = raftY;
   playerMarker.position.set(player.x, 0.085, player.y);
   shallow.position.set(raftC.x, -0.2, raftC.y); shallow.scale.setScalar(raftC.r * 2.8);
-  syncRaft(); syncStations(); syncCustomerDocks(); syncTrainingStations(); syncPads([...visiblePads(), ...recruitmentPads(), ...trainingPads()]); syncSharks(dt); bossHud();
+  syncRaft(); syncStations(); syncCustomerDocks(); syncTrainingStations(); syncPads([...visiblePads(), ...recruitmentPads(), ...trainingPads()]); syncSharks(dt); bossHud(); syncSeaShallows(); syncScenery(dt);
   // 캐릭터
   for (const m of models.values()) m.seen = false;
   const pm = charModel(player, () => mkChar('player', player)); pm.rifle.visible = false; animChar(pm, player, dt, { fighting: !!player.fighting, dead: !!player.dead }); syncStack(pm.carry, G.stack);
