@@ -1863,7 +1863,7 @@ function update(dt) {
   for (const w of workers) updateWorker(w, dt);
   separateWorkers(dt);
   updateSea(dt);
-  updateMilitary(dt); tickTrainingInteraction();
+  updateMilitary(dt); tickTrainingInteraction(dt);
   // 상호작용
   player.timer -= dt;
   if (isHeroAvailable() && player.timer <= 0) {

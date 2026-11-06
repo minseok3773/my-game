@@ -333,7 +333,7 @@ function syncPads(vp) {
     o.fill.material.dispose(); o.border.material.dispose(); o.ripple.material.dispose(); padObjs.delete(id);
   }
   for (const p of vp) {
-    const o = padObjs.get(p.id) || buildPad(p), left = p.recruit ? 30 : p.cost - (G.paid[p.id] || 0), afford = p.recruit ? p.canRecruit : p.train ? !p.maxed && G.money >= left : G.money >= left, ratio = p.recruit ? p.progress : p.train ? p.level / TRAINING_MAX_LEVEL : (G.paid[p.id] || 0) / p.cost;
+    const o = padObjs.get(p.id) || buildPad(p), left = p.recruit ? 30 : p.train ? p.cost - p.paid : p.cost - (G.paid[p.id] || 0), afford = p.recruit ? p.canRecruit : p.train ? !p.maxed && G.money >= left : G.money >= left, ratio = p.recruit ? p.progress : p.train ? (p.maxed ? 1 : p.paid / p.cost) : (G.paid[p.id] || 0) / p.cost;
     const far = dist(player.x, player.y, p.x, p.y) > 6.5 && !afford;
     o.g.visible = !far || dist(player.x, player.y, p.x, p.y) < 9;
     o.border.material.color.setHex(p.recruit ? 0x24b39e : p.train ? (p.kind === 'hero' ? 0xe8ab29 : 0x4294df) : afford ? 0xffd84d : 0xffffff); o.border.material.opacity = far ? 0.35 : 0.9;
@@ -348,7 +348,7 @@ function syncPads(vp) {
         c.font = 'bold 26px sans-serif'; c.fillText(p.kind === 'hero' ? '영웅 강화' : '일꾼 강화',64,27,120);
         c.font = 'bold 24px sans-serif'; c.fillText(p.maxed ? `Lv.${p.level} MAX` : `Lv.${p.level} → ${p.level+1}`,64,66,120);
         c.font = 'bold 32px sans-serif'; c.fillStyle = p.kind === 'hero' ? '#9b6426' : '#2673a4';
-        c.fillText(p.maxed ? '완료' : '$'+fmt(p.cost),64,105,120);
+        c.fillText(p.maxed ? '완료' : '$'+fmt(Math.ceil(left)),64,105,120);
       } else if (p.recruit) {
         c.font = 'bold 26px sans-serif'; c.fillText(`일꾼 ${p.live}/${p.capacity}`,64,27,120);
         c.font = 'bold 36px sans-serif'; c.fillStyle = '#178c74';

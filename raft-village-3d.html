@@ -1108,7 +1108,7 @@ function update(dt) {
   for (const w of workers) updateWorker(w, dt);
   separateWorkers(dt);
   updateSea(dt);
-  updateMilitary(dt); tickTrainingInteraction();
+  updateMilitary(dt); tickTrainingInteraction(dt);
   // 상호작용
   player.timer -= dt;
   if (isHeroAvailable() && player.timer <= 0) {
@@ -1607,7 +1607,7 @@ function syncPads(vp) {
     o.fill.material.dispose(); o.border.material.dispose(); o.ripple.material.dispose(); padObjs.delete(id);
   }
   for (const p of vp) {
-    const o = padObjs.get(p.id) || buildPad(p), left = p.recruit ? 30 : p.cost - (G.paid[p.id] || 0), afford = p.recruit ? p.canRecruit : p.train ? !p.maxed && G.money >= left : G.money >= left, ratio = p.recruit ? p.progress : p.train ? p.level / TRAINING_MAX_LEVEL : (G.paid[p.id] || 0) / p.cost;
+    const o = padObjs.get(p.id) || buildPad(p), left = p.recruit ? 30 : p.train ? p.cost - p.paid : p.cost - (G.paid[p.id] || 0), afford = p.recruit ? p.canRecruit : p.train ? !p.maxed && G.money >= left : G.money >= left, ratio = p.recruit ? p.progress : p.train ? (p.maxed ? 1 : p.paid / p.cost) : (G.paid[p.id] || 0) / p.cost;
     const far = dist(player.x, player.y, p.x, p.y) > 6.5 && !afford;
     o.g.visible = !far || dist(player.x, player.y, p.x, p.y) < 9;
     o.border.material.color.setHex(p.recruit ? 0x24b39e : p.train ? (p.kind === 'hero' ? 0xe8ab29 : 0x4294df) : afford ? 0xffd84d : 0xffffff); o.border.material.opacity = far ? 0.35 : 0.9;
@@ -1622,7 +1622,7 @@ function syncPads(vp) {
         c.font = 'bold 26px sans-serif'; c.fillText(p.kind === 'hero' ? '영웅 강화' : '일꾼 강화',64,27,120);
         c.font = 'bold 24px sans-serif'; c.fillText(p.maxed ? `Lv.${p.level} MAX` : `Lv.${p.level} → ${p.level+1}`,64,66,120);
         c.font = 'bold 32px sans-serif'; c.fillStyle = p.kind === 'hero' ? '#9b6426' : '#2673a4';
-        c.fillText(p.maxed ? '완료' : '$'+fmt(p.cost),64,105,120);
+        c.fillText(p.maxed ? '완료' : '$'+fmt(Math.ceil(left)),64,105,120);
       } else if (p.recruit) {
         c.font = 'bold 26px sans-serif'; c.fillText(`일꾼 ${p.live}/${p.capacity}`,64,27,120);
         c.font = 'bold 36px sans-serif'; c.fillStyle = '#178c74';
@@ -2838,7 +2838,7 @@ function recruitmentHud() {
   document.body.classList.toggle('has-recruit',!recruitHint.hidden);
 }
 
-/* ---------- 영웅·선원 훈련소: 건설 후 시설 앞에서 단계별 강화 ---------- */
+/* ---------- 영웅·선원 훈련소: 건설 후 시설 앞 칸에 서 있으면 게이지가 차며 단계별 강화 ---------- */
 const TRAINING_MAX_LEVEL = 50;
 const TRAINING_FACILITIES = {
   heroForge: { id: 'heroForge', kind: 'hero', name: '영웅 훈련소', icon: '⚔️',
@@ -2856,6 +2856,8 @@ function initializeTrainingState() {
   const old = G.training || {};
   const level = value => Number.isFinite(Number(value)) ? Math.min(TRAINING_MAX_LEVEL, Math.max(0, Math.floor(Number(value)))) : 0;
   G.training = { hero: level(old.hero), crew: level(old.crew) };
+  const paid = G.trainPaid || {}, money = v => Number.isFinite(Number(v)) ? Math.max(0, Number(v)) : 0;
+  G.trainPaid = { hero: money(paid.hero), crew: money(paid.crew) }; // 강화 칸에 넣어 둔 돈 (게이지)
 }
 const trainingLevel = kind => G.training?.[kind] || 0;
 const trainingCost = kind => (kind === 'hero' ? 60 : 50) + (kind === 'hero' ? 25 : 20) * trainingLevel(kind);
@@ -2864,12 +2866,14 @@ function canUseTraining(kind) {
   const f = trainingFacility(kind);
   return !!f && unlocked.has(f.id) && isHeroAvailable() && dist(player.x, player.y, f.pad.x, f.pad.y) <= 1.5;
 }
-function upgradeTraining(kind) {
+// prepaid: 칸 게이지로 이미 낸 경우 (돈을 다시 빼지 않음)
+function upgradeTraining(kind, prepaid = false) {
   if (!canUseTraining(kind) || trainingLevel(kind) >= TRAINING_MAX_LEVEL) return false;
   const cost = trainingCost(kind);
-  if (G.money < cost) return false;
+  if (!prepaid && G.money < cost) return false;
   const beforeHp = kind === 'hero' ? heroMaxHp() : crewHpMax();
-  G.money -= cost; G.training[kind]++;
+  if (!prepaid) G.money -= cost;
+  G.training[kind]++;
   if (kind === 'hero') {
     player.hp = Math.min(heroMaxHp(), player.hp + heroMaxHp() - beforeHp);
     snapshotHero();
@@ -2886,6 +2890,7 @@ function trainingPads() {
   return Object.values(TRAINING_FACILITIES).filter(f => unlocked.has(f.id)).map(f => ({
     id: 'train:' + f.id, facility: f.id, kind: f.kind, train: true,
     x: f.pad.x, y: f.pad.y, icon: f.icon, cost: trainingCost(f.kind),
+    paid: Math.min(trainingCost(f.kind), G.trainPaid?.[f.kind] || 0),
     level: trainingLevel(f.kind), maxed: trainingLevel(f.kind) >= TRAINING_MAX_LEVEL,
   }));
 }
@@ -2935,15 +2940,17 @@ function resetTrainingInteraction() {
   trainingPanel.hidden = true; trainingBtn.hidden = true;
   document.body.classList.remove('has-training');
 }
-function tickTrainingInteraction() {
-  if (paused) return;
-  if (!isHeroAvailable()) { trainingContact = null; return; }
+// 건설·업그레이드 칸과 같은 방식: 칸 위에 서 있으면 돈이 조금씩 들어가 게이지가 차고, 다 차면 한 단계 강화
+function tickTrainingInteraction(dt = 0) {
+  if (paused || !isHeroAvailable() || dt <= 0) return;
   const pad = trainingPads().filter(onTrainingPad)
     .sort((a, b) => dist(player.x, player.y, a.x, a.y) - dist(player.x, player.y, b.x, b.y))[0];
-  if (!pad) { trainingContact = null; return; }
-  // 화면을 닫은 뒤 같은 칸에 서 있는 동안은 다시 열지 않습니다.
-  // 다른 화면이 열려 진입에 실패하면 접촉을 소비하지 않아 다음 틱에 다시 시도합니다.
-  if (trainingContact !== pad.kind && openTraining(pad.kind)) trainingContact = pad.kind;
+  if (!pad || pad.maxed || G.money <= 0) return;
+  const cost = trainingCost(pad.kind), paid = G.trainPaid[pad.kind] || 0, rem = cost - paid;
+  const amt = Math.min(G.money, rem, Math.max(1, Math.round(cost * dt / 1.4)));
+  G.money -= amt; G.trainPaid[pad.kind] = paid + amt;
+  if (Math.random() < 0.5) { const s = S(pad.x, pad.y), a = S(player.x, player.y); fx.push({ ax: a.x, ay: a.y - 40 * Z, bx: s.x, by: s.y, t: 0, dur: 0.3 }); }
+  if (G.trainPaid[pad.kind] >= cost) { G.trainPaid[pad.kind] = 0; upgradeTraining(pad.kind, true); }
 }
 const trainingStatText = n => Number.isInteger(n) ? String(n) : n.toFixed(1);
 function refreshTrainingPanel() {
@@ -3007,7 +3014,8 @@ trainingPanel.addEventListener('keydown', e => {
 trainingBtn.onclick = () => openTraining(trainingBtn.dataset.kind);
 function trainingHud() {
   if (!trainingPanel.hidden) refreshTrainingPanel();
-  const near = isHeroAvailable() && !paused ? Object.values(TRAINING_FACILITIES)
+  // 게이지 방식으로 바뀌어 강화 화면 버튼은 표시하지 않습니다.
+  const near = false && isHeroAvailable() && !paused ? Object.values(TRAINING_FACILITIES)
     .filter(f => canUseTraining(f.kind))
     .sort((a, b) => dist(player.x, player.y, a.pad.x, a.pad.y) - dist(player.x, player.y, b.pad.x, b.pad.y))[0] : null;
   trainingBtn.hidden = !near;

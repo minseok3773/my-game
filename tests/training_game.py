@@ -70,7 +70,7 @@ window.trainingTest = {
   addFacility(kind) {const f=this.facility(kind);unlocked.add(f.id);applyUnlock(f.id);},
   state() {return {money:G.money,training:{...G.training},hero:{attack:heroAttack(),max:heroMaxHp(),hp:player.hp},
     crew:{attack:crewAttack(),max:crewHpMax(),hp:workers.map(w=>w.hp)},navy:soldiers.map(s=>s.hp),
-    pads:trainingPads(),unlocked:[...unlocked]};},
+    pads:trainingPads(),unlocked:[...unlocked],paid:{...G.trainPaid}};},
   buildFacility(kind) {
     this.reset();const f=this.facility(kind),p=visiblePads().find(p=>p.id===f.id);
     const before=G.money;player.x=p.x;player.y=p.y;
@@ -122,11 +122,16 @@ window.trainingTest = {
     const target=this.enemy(5.5,4);updateDefenders(0,1,1);
     return {before,after,bought,cost,firstDamage,actualDamage,recruitHp,navyDamage:1000-target.hp};
   },
-  noPassiveTraining() {
+  // 게이지 방식: 칸에 서 있으면 돈이 조금씩 들어가고, 다 차면 한 단계 강화 (화면은 열리지 않음)
+  gaugeTraining() {
     this.reset();this.addFacility('hero');this.addFacility('crew');this.standFacility('hero');
-    const before=this.state();
+    const before=this.state(),cost=trainingCost('hero');
+    update(.05);const partial=this.state();
     for(let i=0;i<30;i++){trainingHud();sync3D(.05);update(.05);}
-    return {before,after:this.state(),rendered:trainingObjs.size};
+    const after=this.state();this.leave();const away=G.money;
+    for(let i=0;i<10;i++)update(.05);
+    return {before,partial,after,cost,stillAway:G.money===away,rendered:trainingObjs.size,
+      paused,panelHidden:trainingPanel.hidden,buttonHidden:trainingBtn.hidden};
   },
   saveTraining() {
     this.reset();this.addFacility('hero');this.addFacility('crew');G.money=10000;
@@ -151,6 +156,7 @@ window.trainingTest = {
   },
   cleanupModels() {this.reset(false,false);sync3D(.016);return trainingObjs.size;},
   save() {save();},
+  tick(n) {for(let i=0;i<n;i++)update(.05);this.draw();},
   resume() {paused=false;for(const id of ['helpPanel','cardPanel','trainingPanel'])$(id).hidden=true;},
   get ready() {return GL.ready;}
 };
@@ -264,9 +270,12 @@ def main():
         guards = page.evaluate("trainingTest.upgradeGuards()")
         assert not any(guards[key] for key in ("unbuilt", "distant", "poor", "down", "capped")), guards
         assert guards["money"] == 500, guards
-        passive = page.evaluate("trainingTest.noPassiveTraining()")
-        assert passive["before"]["money"] == passive["after"]["money"] == 500, passive
-        assert passive["after"]["training"] == {"hero": 0, "crew": 0} and passive["rendered"] == 2, passive
+        gauge = page.evaluate("trainingTest.gaugeTraining()")
+        assert gauge["partial"]["training"]["hero"] == 0 and 0 < gauge["partial"]["paid"]["hero"] < gauge["cost"], gauge
+        same(gauge["before"]["money"] - gauge["partial"]["money"], gauge["partial"]["paid"]["hero"], "gauge holds paid money")
+        assert gauge["after"]["training"] == {"hero": 1, "crew": 0} and gauge["rendered"] == 2, gauge
+        same(gauge["before"]["money"] - gauge["after"]["money"], gauge["cost"] + gauge["after"]["paid"]["hero"], "gauge payment")
+        assert gauge["stillAway"] and not gauge["paused"] and gauge["panelHidden"] and gauge["buttonHidden"], gauge
 
         hero = page.evaluate("trainingTest.upgradeHero()")
         assert hero["bought"] and hero["after"]["training"]["hero"] == 1, hero
@@ -282,7 +291,7 @@ def main():
         assert crew["after"]["navy"] == crew["before"]["navy"] == [9], crew
         same(crew["recruitHp"], crew["after"]["crew"]["max"], "new worker inherits training")
         same(crew["navyDamage"], 4.5, "navy attack unchanged")
-        print("Buildable/rendered facilities, payment guards and real hero/worker combat improvements PASS", flush=True)
+        print("Buildable/rendered facilities, payment guards, gauge payment and real hero/worker combat improvements PASS", flush=True)
 
         expected = page.evaluate("trainingTest.saveTraining()")
         for _ in range(2):
@@ -301,22 +310,13 @@ def main():
                 page.evaluate("resizeDone")
             for kind in ("hero", "crew"):
                 page.evaluate("kind=>trainingTest.ui(kind)", kind)
-                button = page.locator("#trainingBtn")
-                assert button.is_visible()
-                rect = button.bounding_box()
-                assert rect["width"] >= 44 and rect["height"] >= 44, rect
-                assert rect["x"] >= 0 and rect["y"] >= 0 and rect["x"] + rect["width"] <= width + 1 and rect["y"] + rect["height"] <= height + 1, rect
-                button.click()
-                assert page.locator("#trainingPanel").is_visible()
                 before = page.evaluate("trainingTest.uiState()")
-                page.locator("#trainingUpgrade").click()
+                page.evaluate("trainingTest.tick(34)")
                 after = page.evaluate("trainingTest.uiState()")
                 assert after["levels"][kind] == 1 and before["levels"][kind] == 0, (before, after)
-                same(before["money"] - after["money"], 60 if kind == "hero" else 50, "one touch buys one tier")
+                assert page.locator("#trainingBtn").is_hidden() and page.locator("#trainingPanel").is_hidden() and not after["paused"], after
                 page.screenshot(path=str(screenshots / f"{kind}-training-{width}.png"))
-                page.locator("#trainingPanel .close").click()
-                assert page.locator("#trainingPanel").is_hidden() and not page.evaluate("trainingTest.uiState().paused")
-            print(f"Actual mobile training facilities and touch purchases PASS {width}x{height}", flush=True)
+            print(f"Actual mobile training pads fill and upgrade by standing PASS {width}x{height}", flush=True)
         assert page.evaluate("trainingTest.cleanupModels()") == 0
         assert not errors, errors
         browser.close()
