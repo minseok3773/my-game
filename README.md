@@ -37,7 +37,15 @@ python3 src/3d/assemble3d.py
 python3 -m http.server
 ```
 
-그다음 브라우저에서 `http://localhost:8000/raft-village-3d.html`을 엽니다. 글꼴(Google Fonts)과 three.js는 인터넷에서 불러옵니다.
+그다음 브라우저에서 `http://localhost:8000/raft-village-3d.html`을 엽니다. three.js r128과 필수 부속 스크립트는 `vendor/three-r128`에 포함되어 있어 외부 CDN 연결 없이 실행됩니다. Google Fonts는 선택 사항이며 연결되지 않으면 기기 글꼴을 사용합니다. 필수 파일이나 WebGL을 불러오지 못하면 원인 안내와 재시도 버튼을 표시합니다.
+
+## 저장과 오류 복구
+
+- 자동 저장에 실패하면 상단 안내와 메뉴에 경고를 표시합니다. 메뉴에서 저장을 다시 시도하거나 현재 진행을 JSON 파일로 내려받을 수 있습니다.
+- 기본 저장이 손상된 경우 이전 정상 저장 백업이 있으면 복구합니다. 기존 저장을 읽지 못한 상태에서는 자동 저장으로 원본을 덮어쓰지 않습니다. 사용자가 두 번 확인한 새 게임 초기화에서만 이 보호를 해제합니다.
+- 선장은 최대 50레벨, 해적은 상한 없이 성장합니다. 구버전에서 50을 넘긴 선장은 레벨을 50으로 정리하되 이미 얻은 공격력·최대 체력은 별도 보너스로 보존합니다. 새로고침을 반복해도 보너스가 중복 적용되지 않습니다.
+- 일꾼은 생산시설이 파손돼도 이미 든 물건을 배달합니다. 판매소까지 파손됐으면 물건을 보존하며 수리한 뒤 배달합니다.
+- 일반 안내는 상단에 표시되며 저장 오류·선장 회복·전투 안내를 가리지 않습니다. 하단 안내창은 표시하지 않습니다.
 
 ## 전략 업데이트
 
@@ -137,7 +145,7 @@ python3 -m http.server
 | Build command | `sh src/tools/build_site.sh` |
 | Build output directory | `_site` |
 
-`build_site.sh`는 게임 실행에 필요한 파일(`index.html`, `raft-village-3d.html`, `models`, `assets`)만 `_site`에 모읍니다. 소스·테스트·문서는 공개되지 않습니다.
+`build_site.sh`는 로컬 엔진 파일의 SHA-256을 확인한 뒤 게임 실행 파일(`index.html`, `raft-village-3d.html`, `models`, `assets`, `vendor`)을 `_site`에 모읍니다. `vendor`에는 엔진 라이선스·출처·검증 목록도 포함됩니다. 애플리케이션 소스·테스트는 공개 폴더에 넣지 않습니다.
 
 주소가 바뀌면 QR을 다시 생성합니다 (Python 패키지 `qrcode==8.2` 필요).
 
@@ -147,22 +155,24 @@ python3 src/tools/generate_qr.py --base-url https://first-village-game.pages.dev
 
 ## 브라우저 회귀 검증
 
-이번 변경의 검증은 `tests/update_game.py`, `tests/training_game.py`, `tests/smoke_game.py`, `tests/visual_game.py`를 사용합니다. 기존 손님 동선·3회 침공 성장 규칙을 전제하는 다른 검사는 이전 버전용입니다.
+현재 규칙은 아래 검사로 검증합니다. 기존 손님 동선·3회 침공 성장 규칙을 전제하는 나머지 검사는 이전 버전용입니다.
 
 Python Playwright, Pillow(렌더 캡처 확인), Chromium(`/usr/bin/chromium`), curl이 필요합니다. 저장소에서 `python3 -m http.server 8000 --bind 127.0.0.1`을 실행한 뒤 별도 터미널에서 실행합니다.
 
 ```bash
 python3 tests/smoke_game.py
 python3 tests/visual_game.py --screenshots /tmp/my-game-screenshots
-python3 tests/combat_game.py
-python3 tests/characters_game.py --screenshots /tmp/my-game-characters
-python3 tests/melee_recruit_game.py --screenshots /tmp/my-game-melee
-python3 tests/hero_boss_game.py
 python3 tests/training_game.py
 python3 tests/update_game.py
+python3 tests/worker_recovery_game.py
+python3 tests/ui_reliability_game.py
+python3 tests/storage_game.py
+python3 tests/startup_game.py
 ```
 
-준비 비용·효과, 중복 선택 방지, 저장·습격 복구, 방어 보상 중복 방지, 3D 카드 선택 복구와 JavaScript 실행 오류를 확인합니다. 테스트는 별도 브라우저 컨텍스트에서 실행되며 실제 사용자의 저장 데이터를 건드리지 않습니다. 화면 검증은 터치와 DPR 2를 설정한 실제 모바일 브라우저 문맥에서 320·390px 세로 화면과 가로 화면의 viewport 배율·HUD 겹침·터치 스크롤·드래그 방향을 확인합니다. 데스크톱 키보드 조작, 시설 표시, 습격 안내와 전투 카메라도 검사합니다. 전투 검증은 이전 버전과 체력·공격력·속도를 비교하고 상륙 전투와 저장 이관을 확인합니다. 캐릭터 검증은 원본 모델과 로딩 실패 시 임시 모델을 실제로 렌더링합니다. 외부 글꼴은 테스트에서 제외하며 three.js는 TLS 검증을 유지한 curl을 통해 불러옵니다.
+업데이트 검사는 `python3 tests/update_game.py --section progression`처럼 `logistics`, `progression`, `persistence`, `visual`, `mobile`을 독립 실행할 수 있습니다. 전체 실행에서는 한 섹션이 실패해도 다른 섹션을 검사한 뒤 실패 종료 코드를 반환합니다. 새 검사는 저장 오류·백업·레벨 50 경계·구버전 이관·파손 시설과 짐 보존·700~940px 화면·배정창 키보드 포커스·CDN 차단·WebGL 실패를 포함합니다.
+
+준비 비용·효과, 중복 선택 방지, 저장·습격 복구, 방어 보상 중복 방지, 3D 카드 선택 복구와 JavaScript 실행 오류를 확인합니다. 테스트는 별도 브라우저 컨텍스트에서 실행되며 실제 사용자의 저장 데이터를 건드리지 않습니다. 화면 검증은 터치와 DPR 2를 설정한 모바일 브라우저 문맥에서 viewport 배율·HUD 겹침·터치 스크롤·드래그 방향을 확인합니다. 데스크톱 키보드 조작, 시설 표시, 습격 안내와 전투 카메라도 검사합니다. 외부 글꼴은 테스트에서 제외하며 three.js는 배포에 포함된 로컬 파일을 사용합니다. 실물 휴대폰의 성능 검사는 별도로 필요합니다.
 
 ## 조작
 

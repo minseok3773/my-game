@@ -2,14 +2,22 @@
 const HERO_MAX_LEVEL = 50;
 const heroLevel = () => G.hero?.level || 1;
 const heroXpNeed = (level = heroLevel()) => 20 + 10 * (level - 1);
-const heroAttack = () => (4 + 2 * (heroLevel() - 1)) * allyMultiplier(heroLevel()) + 2 * ck('playerGun') + 3 * trainingLevel('hero');
-const heroMaxHp = () => (40 + 6 * (heroLevel() - 1)) * allyMultiplier(heroLevel()) + 10 * trainingLevel('hero');
+const heroBaseAttack = level => (4 + 2 * (level - 1)) * allyMultiplier(level);
+const heroBaseHp = level => (40 + 6 * (level - 1)) * allyMultiplier(level);
+const heroAttack = () => heroBaseAttack(heroLevel()) + (G.hero?.legacyAttackBonus || 0) + 2 * ck('playerGun') + 3 * trainingLevel('hero');
+const heroMaxHp = () => heroBaseHp(heroLevel()) + (G.hero?.legacyHpBonus || 0) + 10 * trainingLevel('hero');
 const isHeroAvailable = () => !!player && !player.dead && player.hp > 0 && !(G.hero?.downT > 0);
 function initializeHeroState() {
   const old = G.hero || {};
   const savedLevel = Number(old.level ?? G.level ?? 1);
   const level = Number.isFinite(savedLevel) ? Math.min(HERO_MAX_LEVEL, Math.max(1, Math.max(pirateLevel(), Math.floor(savedLevel)))) : 1;
+  const bonus = value => Number.isFinite(value) ? Math.max(0, value) : 0;
+  // 구버전에서 50을 넘긴 선장은 레벨을 정규화해도 이미 얻은 능력치를 잃지 않습니다.
+  const legacyLevel = Number.isFinite(savedLevel) ? Math.max(HERO_MAX_LEVEL, Math.floor(savedLevel)) : HERO_MAX_LEVEL;
+  const legacyAttackBonus = bonus(old.legacyAttackBonus) + bonus(heroBaseAttack(legacyLevel) - heroBaseAttack(HERO_MAX_LEVEL));
+  const legacyHpBonus = bonus(old.legacyHpBonus) + bonus(heroBaseHp(legacyLevel) - heroBaseHp(HERO_MAX_LEVEL));
   G.hero = { level, xp: level >= HERO_MAX_LEVEL ? 0 : Math.max(0, Number.isFinite(old.xp) ? old.xp : 0),
+    legacyAttackBonus, legacyHpBonus,
     downT: Math.max(0, old.downT || 0), kills: old.kills || 0,
     engagedWave: old.engagedWave || 0, rewardedWave: old.rewardedWave || 0 };
   G.hero.hp = Math.max(0, Math.min(heroMaxHp(), old.hp ?? heroMaxHp()));

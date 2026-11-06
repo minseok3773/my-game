@@ -58,8 +58,8 @@ body{background:var(--sea);color:var(--ink);font-family:var(--body);touch-action
 #hpBar i{display:block;height:100%;width:100%;background:#70ce46}#hpBar.low i{background:#ee7354}
 #defInfo{display:block;margin-top:4px;font-size:12px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#52663c}
 #defense.raid{background:#ffe7d8;border-color:#a94f3c}#defense.raid #defInfo{color:#aa4536}
-#toast{left:10px;right:10px;bottom:calc(136px + env(safe-area-inset-bottom,0px));border:2px solid #7b633a;border-radius:12px;padding:7px 10px;background:#fff2ccec;color:#654f2e;font-size:13px;line-height:1.4;opacity:0;transition:opacity .2s;word-break:keep-all;text-align:center;box-shadow:0 3px 0 #644e2a30}
-#toast.show{opacity:1}
+
+
 .panel{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:16px;background:#1c65836b;touch-action:pan-y;overscroll-behavior:contain;overflow:auto}
 .panel>div{max-width:380px;width:100%;max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain;touch-action:pan-y;padding:20px;background:#fff8e8;color:#354650;border:3px solid #536271;border-radius:22px;box-shadow:0 6px 0 #2d465b55}
 .panel h2{font:26px/1.15 var(--display);margin:0 0 10px;color:#6e512d;text-wrap:balance}
@@ -75,8 +75,9 @@ body{background:var(--sea);color:var(--ink);font-family:var(--body);touch-action
 #strategyPanel .choices button:nth-child(3){background:#ffedb5;border-color:#bd9555;color:#765c34;box-shadow:0 3px 0 #a98c53}
 #strategyBtn:focus-visible,#menuBtn:focus-visible,#bag:focus-visible,.panel button:focus-visible{outline:3px solid #fff;outline-offset:3px;box-shadow:0 0 0 6px #2c8dac}
 @keyframes reward{50%{transform:scale(1.03)}}
-@media(min-width:700px){#goal{left:50%;right:auto;transform:translateX(-50%);top:14px;width:400px}#quest{width:240px}#strategyBtn{right:auto;width:200px}#defense{left:auto;width:300px;right:12px}}
-@media(max-height:500px) and (orientation:landscape){#quest{width:22%;max-width:170px;height:74px;padding:5px 8px}#qText{font-size:12px}#goal{top:12px;left:25%;right:25%;width:auto;transform:none;font-size:12px;padding:5px 7px}#goal::before{font-size:9px}#strategyBtn{right:auto;width:180px}#defense{left:auto;right:10px;width:220px;font-size:12px}#defInfo{font-size:11px}#toast{right:auto;max-width:250px;bottom:68px}}
+@media(min-width:700px){#quest{width:240px}#strategyBtn{right:auto;width:200px}#defense{left:auto;width:300px;right:12px}}
+@media(min-width:940px){#goal{left:50%;right:auto;transform:translateX(-50%);top:14px;width:400px}}
+@media(max-height:500px) and (orientation:landscape){#quest{width:22%;max-width:170px;height:74px;padding:5px 8px}#qText{font-size:12px}#goal{top:12px;left:25%;right:25%;width:auto;transform:none;font-size:12px;padding:5px 7px}#goal::before{font-size:9px}#strategyBtn{right:auto;width:180px}#defense{left:auto;right:10px;width:220px;font-size:12px}#defInfo{font-size:11px}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 #dayCard{display:none!important}
 #world,#world canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
@@ -94,7 +95,6 @@ body{background:var(--sea);color:var(--ink);font-family:var(--body);touch-action
 <div class="hud" id="bag" role="button" tabindex="0" aria-label="가방 비우기">🎒 0/10</div>
 <div class="hud" id="quest"><div id="qTitle">📜 퀘스트</div><div id="qText"></div><span id="qBar"><i id="qFill"></i></span></div>
 <div class="hud" id="defense" hidden><span id="defTop">🛡️ 마을 체력</span><span id="hpBar"><i id="hpFill"></i></span><span id="defInfo"></span></div>
-<div class="hud" id="toast"></div>
 <button id="menuBtn" aria-label="메뉴 열기">☰</button>
 
 <div class="panel" id="helpPanel" hidden>
@@ -136,17 +136,62 @@ body{background:var(--sea);color:var(--ink);font-family:var(--body);touch-action
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
+<script>
+window.gameBoot = (() => {
+  let failed = false, ready = false;
+  const start = document.getElementById('startBtn');
+  if (start) start.disabled = true;
+  function fail(message) {
+    failed = true;
+    if (start) start.disabled = true;
+    let panel = document.getElementById('bootFailure');
+    if (!panel) {
+      const style = document.createElement('style');
+      style.textContent = '#bootFailure{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:18px;background:#225971cc;font:16px/1.6 system-ui,sans-serif;color:#30404a}#bootFailure>div{max-width:440px;padding:24px;border:3px solid #405363;border-radius:18px;background:#fff9e9}#bootFailure h2{margin:0 0 12px;font-size:23px}#bootFailure button{min-height:44px;padding:10px 18px;border:2px solid #427a32;border-radius:10px;background:#a9e66d;color:#28502b;font:inherit;cursor:pointer}#bootFailure button:focus-visible{outline:3px solid #2685ba;outline-offset:4px}';
+      document.head.appendChild(style);
+      panel = document.createElement('section'); panel.id = 'bootFailure';
+      panel.setAttribute('role', 'alertdialog'); panel.setAttribute('aria-modal', 'true');
+      panel.setAttribute('aria-labelledby', 'bootFailureTitle'); panel.setAttribute('aria-describedby', 'bootFailureMessage');
+      panel.innerHTML = '<div><h2 id="bootFailureTitle">게임을 시작하지 못했어요</h2><p id="bootFailureMessage"></p><button id="bootRetry" type="button">다시 시도</button></div>';
+      document.body.appendChild(panel);
+      document.getElementById('bootRetry').onclick = () => location.reload();
+      panel.addEventListener('keydown', event => { if (event.key === 'Tab') { event.preventDefault(); document.getElementById('bootRetry').focus(); } });
+    }
+    document.getElementById('bootFailureMessage').textContent = message;
+    document.getElementById('bootRetry').focus();
+  }
+  window.addEventListener('error', event => {
+    if (event.target?.tagName === 'SCRIPT' && event.target.src.includes('/vendor/three-r128/')) fail('게임 파일을 불러오지 못했어요. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.');
+    else if (!ready && event.error) fail('게임 준비 중 오류가 발생했어요. 페이지를 다시 열어 주세요. 문제가 계속되면 브라우저를 업데이트해 주세요.');
+  }, true);
+  return {
+    fail,
+    check() {
+      const engine = window.THREE;
+      if (failed || !engine || !['CopyShader', 'LuminosityHighPassShader', 'EffectComposer', 'RenderPass', 'ShaderPass', 'UnrealBloomPass', 'GLTFLoader', 'SkeletonUtils'].every(name => engine[name])) {
+        fail('게임 파일을 불러오지 못했어요. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.'); return false;
+      }
+      return true;
+    },
+    renderer(engine) {
+      try { return new engine.WebGLRenderer({ antialias: true }); }
+      catch (error) { fail('3D 화면을 열지 못했어요. 브라우저의 하드웨어 가속을 켜거나 WebGL을 지원하는 최신 브라우저에서 다시 시도해 주세요.'); return null; }
+    },
+    ready() { ready = true; if (!failed && start) start.disabled = false; }
+  };
+})();</script>
+<script src="vendor/three-r128/build/three.min.js" integrity="sha384-CI3ELBVUz9XQO+97x6nwMDPosPR5XvsxW2ua7N1Xeygeh1IxtgqtCkGfQY9WWdHu"></script>
+<script src="vendor/three-r128/examples/js/shaders/CopyShader.js" integrity="sha384-nhO9toQuMo5osCuA0l+YFpSqscZWxDu251Bnho2gD3kSPv1neEwHg0LyEmrA+mPj"></script>
+<script src="vendor/three-r128/examples/js/shaders/LuminosityHighPassShader.js" integrity="sha384-mY+ii969jnDCI2HjRHftH2NZVkIO5ZGUkcnGCg3oVJ3kVstWQXwerYWBg+nbUG4R"></script>
+<script src="vendor/three-r128/examples/js/postprocessing/EffectComposer.js" integrity="sha384-GkidzTYmQg24v13sa3xhBBbvOLbVLO1QxfyKLdOWweQqNqS/iWwUst2T1fER2Xrg"></script>
+<script src="vendor/three-r128/examples/js/postprocessing/RenderPass.js" integrity="sha384-2EpLreWSFuZsk4hcSplXLhlHd/wzvDNF907bTGIXSXM0SlhJNzy4YK0DhBFvkFEs"></script>
+<script src="vendor/three-r128/examples/js/postprocessing/ShaderPass.js" integrity="sha384-I3lsvPeDJYFrEAzn/TA0yhc/SCYKwpyfyq8lKzHYKohu43H9f7xc/Q9ZWgSVUDl3"></script>
+<script src="vendor/three-r128/examples/js/postprocessing/UnrealBloomPass.js" integrity="sha384-aVQ2QnWkoxhOefDB0YZB64OPVzujvccydpcC7UqMDJUK0ChwA382zOHmrWHGDRRa"></script>
+<script src="vendor/three-r128/examples/js/loaders/GLTFLoader.js" integrity="sha384-fljlqkjWlmSFjkESkQvm77heIZpoWmXEOzlCA7kOpGUH+95Zk0yGfQieWM2q136E"></script>
+<script src="vendor/three-r128/examples/js/utils/SkeletonUtils.js" integrity="sha384-48sEMz1pIoO9ktrDus6dw7q9KVj242/vYNeNwDA4Lom38S7Sutog0tJLSqRBBZa6"></script>
 <script>
 (() => {
+if (!window.gameBoot.check()) return;
 
 'use strict';
 const cv = document.getElementById('game'), ctx = cv.getContext('2d'); // 화면 효과용 2D 오버레이
@@ -154,7 +199,8 @@ const cv = document.getElementById('game'), ctx = cv.getContext('2d'); // 화면
 const $ = id => document.getElementById(id);
 let W = 0, H = 0, Z = 1;
 /* ---------- 3D 장면 ---------- */
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = window.gameBoot.renderer(THREE);
+if (!renderer) return;
 renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
 renderer.outputEncoding = THREE.sRGBEncoding;
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -442,11 +488,6 @@ function serialize() {
   G.unlocked = [...unlocked]; G.px = player.x; G.py = player.y;
   return JSON.parse(JSON.stringify(G));
 }
-function save() { try { localStorage.setItem(KEY, JSON.stringify(serialize())); } catch (e) {} }
-function load() {
-  try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.st && s.unlocked) return s; } catch (e) {}
-  return null;
-}
 
 /* ---------- 좌표 ---------- */
 let lift = 0; // 뗏목이 파도에 들썩이는 높이 (바다 층은 0)
@@ -715,8 +756,27 @@ function flyBills(from, n, toHud) {
   }
 }
 function floatText(x, y, text, color = '#fff') { floaters.push({ x, y, text, color, t: 0 }); }
-let toastTimer = 0;
-function toast(msg) { const el = $('toast'); el.textContent = msg; el.classList.add('show'); toastTimer = 1.8; }
+let toastTimer = 0, toastMessage = '', toastPriority = 1;
+function showGoalMessage(text, kind, label) {
+  const goal = $('goal');
+  goal.dataset.kind = kind; goal.dataset.label = label;
+  if (goal.textContent !== text) { goal.textContent = text; goal.classList.remove('pop'); void goal.offsetWidth; goal.classList.add('pop'); }
+}
+function refreshGoalMessage(obj) {
+  const storageWarning = typeof storageWarningMessage === 'function' ? storageWarningMessage() : '';
+  if (storageWarning) { showGoalMessage(storageWarning, 'danger', '저장 확인'); return; }
+  const recovering = !isHeroAvailable(), statePriority = recovering ? 4 : raidOn ? 3 : 0;
+  const notice = toastTimer > 0 && toastPriority >= statePriority;
+  showGoalMessage(notice ? toastMessage : obj.text,
+    notice ? (toastPriority >= 3 ? 'danger' : 'notice') : recovering || raidOn ? 'danger' : /짓기|업그레이드/.test(obj.text) ? 'build' : 'interact',
+    notice ? (toastPriority >= 3 ? '긴급 안내' : '안내') : recovering ? '선장 회복' : raidOn ? '마을 방어' : /짓기|업그레이드/.test(obj.text) ? '건설' : '작업');
+}
+function toast(msg, priority = /^(?:⚠️?|☠️?|💫)/u.test(msg) ? 3 : 1) {
+  // 잔잔한 알림이 아직 표시 중인 긴급 안내를 덮어쓰지 않습니다.
+  if (toastTimer > 0 && priority < toastPriority) return;
+  toastMessage = msg; toastTimer = 1.8; toastPriority = priority;
+  refreshGoalMessage(objective());
+}
 function burst(sx, sy) {
   const cols = ['#ffd84d', '#3fbf4f', '#ff8a1f', '#fff', '#2f8fd6'];
   for (let i = 0; i < 40; i++) { const a = rnd(0, 6.28), v = rnd(120, 320); confetti.push({ x: sx, y: sy, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 200, c: cols[i % 5], t: 0 }); }
@@ -761,7 +821,8 @@ function pickJob(w, item) {
   for (const r of ROUTES) {
     if (!assignmentRoute(w, r)) continue;
     if (!unlocked.has(r.from) || !unlocked.has(r.to)) continue;
-    if (isBroken(r.from) || isBroken(r.to)) continue;
+    // 이미 든 상품은 생산소가 파손돼도 정상 판매소에 배달할 수 있습니다.
+    if ((!item && isBroken(r.from)) || isBroken(r.to)) continue;
     const src = sourceInfo(r.from), dst = destInfo(r.to);
     if (item && src.item !== item) continue;
     const have = G.st[r.from][src.key], room = dst.max - G.st[r.to][dst.key];
@@ -793,21 +854,23 @@ function collectCash(w, dt) {
 }
 function updateWorker(w, dt) {
   if (raidOn) return; // 습격 중에는 싸우러 감 (updateMilitary)
-  if (returnUnassignedCargo(w, dt)) return;
+  if (returnUnassignedCargo(w, dt)) { w.repairing = null; return; }
   // 빈 생산소를 향하던 작업도 중단하고 수리해야 생산이 다시 시작됩니다.
   if (!w.carry.length && workerRepair(w, dt)) { w.job = null; return; }
-  w.repairing = null;
-  if (!w.assignment) { w.job = null; w.idle = true; stopMove(w, dt); return; }
+  if (!w.assignment) { w.job = null; w.repairing = null; w.idle = true; stopMove(w, dt); return; }
   w.idle = false;
   if (w.job && !w.job.cash) {
     const src = sourceInfo(w.job.from), dst = destInfo(w.job.to);
-    if (!assignmentRoute(w, w.job) || isBroken(w.job.from) || isBroken(w.job.to) ||
+    if (!assignmentRoute(w, w.job) || (!w.carry.length && isBroken(w.job.from)) || isBroken(w.job.to) ||
         (!w.carry.length && (!G.st[w.job.from][src.key] || G.st[w.job.to][dst.key] >= dst.max))) w.job = null;
   }
   if (!w.job) {
     const cid = w.carry.length ? null : pickCash(w);
     w.job = cid ? { cash: cid } : pickJob(w, w.carry[0]);
     if (!w.job) {
+      // 목적지까지 파손됐으면 짐을 보존한 채 수리한 뒤 배달을 재개합니다.
+      if (w.carry.length && workerRepair(w, dt)) return;
+      w.repairing = null;
       // 상품을 기다릴 때도 텐트에 머무르지 않고 배정된 판매소로 출근합니다.
       const target = workerSlot(w, destInfo(w.assignment));
       if (dist(w.x, w.y, target.x, target.y) > 0.35) moveTo(w, target.x, target.y, workerSpeed(), dt, workers);
@@ -815,9 +878,10 @@ function updateWorker(w, dt) {
       return;
     }
   }
+  w.repairing = null;
   if (w.job.cash) { collectCash(w, dt); return; }
   const src = sourceInfo(w.job.from), dst = destInfo(w.job.to), s1 = G.st[w.job.from], s2 = G.st[w.job.to];
-  const delivering = w.carry.length && (w.carry.length >= crewCap() || s1[src.key] === 0);
+  const delivering = w.carry.length && (isBroken(w.job.from) || w.carry.length >= crewCap() || s1[src.key] === 0);
   const target = workerSlot(w, delivering ? dst : src);
   const dd = dist(w.x, w.y, target.x, target.y);
   if (dd > 0.35) { moveTo(w, target.x, target.y, workerSpeed(), dt, workers); return; }
@@ -912,7 +976,7 @@ function killSoldier(s) {
 function startRaid() {
   const previousHeroHp = heroMaxHp(), previousCrewHp = crewHpMax();
   G.wave++; G.raidHadCrew = workers.length + soldiers.length > 0 || isHeroAvailable();
-  G.hero.level = Math.max(heroLevel(), pirateLevel());
+  G.hero.level = Math.min(HERO_MAX_LEVEL, Math.max(heroLevel(), pirateLevel()));
   if (isHeroAvailable()) player.hp += heroMaxHp() - previousHeroHp;
   for (const w of workers) if (w.hp > 0) w.hp += crewHpMax() - previousCrewHp;
   const n = Math.min(14, 2 + Math.floor(pirateLevel() * 0.9) + Math.floor(Math.random() * 2) + (raidPlan(G.wave).type === 'thief' ? 2 : 0)), baseA = rnd(0, 6.28);
@@ -1183,7 +1247,7 @@ function update(dt) {
   for (let i = catches.length - 1; i >= 0; i--) { catches[i].t += dt; if (catches[i].t > 0.8) catches.splice(i, 1); }
   for (let i = tossed.length - 1; i >= 0; i--) { const q = tossed[i]; q.t += dt; if (q.t < 0) continue; q.vy += 900 * dt; q.x += q.vx * dt; q.y += q.vy * dt; q.a += q.r * dt; if (q.t > 1.1) tossed.splice(i, 1); }
   for (let i = confetti.length - 1; i >= 0; i--) { const c = confetti[i]; c.t += dt; c.vy += 600 * dt; c.x += c.vx * dt; c.y += c.vy * dt; if (c.t > 1.4) confetti.splice(i, 1); }
-  if (toastTimer > 0) { toastTimer -= dt; if (toastTimer <= 0) $('toast').classList.remove('show'); }
+  if (toastTimer > 0) toastTimer = Math.max(0, toastTimer - dt);
   if (pulseT > 0) { pulseT -= dt; if (pulseT <= 0) moneyBox.classList.remove('pulse'); }
 }
 
@@ -1295,6 +1359,130 @@ function finishStrategyRaid(wasLooted) {
   }
   G.tactic = null; G.preparedWave = null; save();
 }
+
+/* ---------- 자동 저장 상태·실패 복구·파일 백업 ---------- */
+const STORAGE_BACKUP_KEY = KEY + ':backup';
+const storageState = { failed: false, error: '', lastSavedAt: 0, lastGood: '', loadBlocked: false, recovered: false };
+const storagePanel = document.createElement('section');
+storagePanel.id = 'storagePanel';
+storagePanel.setAttribute('aria-label', '진행 상황 저장');
+storagePanel.innerHTML = '<p id="storageStatus" role="status" aria-live="polite">진행 상황은 이 기기에 자동 저장됩니다.</p><p id="storageTime"></p><div class="row"><button type="button" id="storageRetry">저장 다시 시도</button><button type="button" id="storageExport">현재 진행 백업</button></div>';
+document.getElementById('resetRow').before(storagePanel);
+const storageStyle = document.createElement('style');
+storageStyle.textContent = '#storagePanel{border-top:2px dashed #ddcda9;padding-top:8px;margin-top:14px}#storagePanel p{font-size:14px;line-height:1.45;margin:5px 0}#storagePanel[data-failed=true] #storageStatus{color:#9a302b;font-weight:bold}#storagePanel .row{display:flex;flex-wrap:wrap;gap:8px}#storagePanel button{flex:1;min-height:44px;font-size:15px;padding:8px;touch-action:manipulation}#storageTime{color:#657565;font-size:12px!important}#menuBtn[data-storage-failed=true]{border-color:#a43b34;background:#ffe5bf}#menuBtn[data-storage-failed=true]::after{content:"!";position:absolute;right:-5px;top:-7px;display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#ac342e;color:#fff;font:bold 16px sans-serif}';
+document.head.appendChild(storageStyle);
+const storageMenuLabel = document.getElementById('menuBtn').getAttribute('aria-label');
+function storageWarningMessage() {
+  return storageState.failed ? '저장하지 못했습니다 · 메뉴에서 재시도하거나 백업하세요' : '';
+}
+function storageFailureMessage() { return storageWarningMessage(); }
+function updateStorageStatus() {
+  const status = document.getElementById('storageStatus');
+  const text = storageState.failed ? storageState.error : storageState.recovered
+    ? '이전 백업에서 진행 상황을 복구했습니다. 저장을 다시 확인해 주세요.'
+    : storageState.lastSavedAt ? '진행 상황이 이 기기에 저장되었습니다.' : '진행 상황은 이 기기에 자동 저장됩니다.';
+  if (status.textContent !== text) status.textContent = text;
+  storagePanel.dataset.failed = String(storageState.failed);
+  const menu = document.getElementById('menuBtn');
+  menu.dataset.storageFailed = String(storageState.failed);
+  menu.setAttribute('aria-label', storageState.failed ? '저장 실패 · 메뉴에서 재시도하거나 백업하기' : storageMenuLabel);
+  document.getElementById('storageTime').textContent = storageState.lastSavedAt
+    ? '최근 저장: ' + new Intl.DateTimeFormat('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(storageState.lastSavedAt) : '';
+}
+function storageError(error, loading = false) {
+  storageState.failed = true;
+  storageState.error = loading
+    ? '저장된 진행 상황을 읽지 못했습니다. 원본은 덮어쓰지 않았습니다. 접근을 허용한 뒤 다시 시도해 주세요.'
+    : error?.name === 'QuotaExceededError'
+      ? '저장 공간이 부족해 저장하지 못했습니다. 현재 진행을 파일로 백업한 뒤 공간을 확보하고 다시 시도해 주세요.'
+      : '이 브라우저에서 저장하지 못했습니다. 저장 권한을 확인하고 다시 시도하거나 현재 진행을 파일로 백업해 주세요.';
+  updateStorageStatus();
+  return false;
+}
+function parseStoredGame(raw) {
+  const data = JSON.parse(raw);
+  if (!data || typeof data.st !== 'object' || !data.st || !Array.isArray(data.unlocked)) throw new Error('Invalid saved game');
+  return data;
+}
+function save() {
+  if (storageState.loadBlocked) return false; // 읽지 못한 기존 저장을 새 게임으로 덮어쓰지 않습니다.
+  try {
+    const data = JSON.stringify(serialize()), previous = storageState.lastGood;
+    localStorage.setItem(KEY, data);
+    storageState.lastGood = data;
+    storageState.lastSavedAt = Date.now();
+    storageState.failed = false; storageState.error = ''; storageState.recovered = false;
+    // 백업 용량 부족은 이미 성공한 기본 저장을 실패로 바꾸지 않습니다.
+    if (previous && previous !== data) {
+      try { localStorage.setItem(STORAGE_BACKUP_KEY, previous); } catch (error) { /* 기본 저장은 유지됩니다. */ }
+    }
+    updateStorageStatus();
+    return true;
+  } catch (error) { return storageError(error); }
+}
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) {
+      storageState.loadBlocked = false;
+      storageState.failed = false; storageState.error = ''; updateStorageStatus();
+      return null;
+    }
+    const data = parseStoredGame(raw);
+    storageState.lastGood = raw;
+    storageState.loadBlocked = false;
+    storageState.failed = false; storageState.error = ''; updateStorageStatus();
+    return data;
+  } catch (error) {
+    try {
+      const raw = localStorage.getItem(STORAGE_BACKUP_KEY), data = parseStoredGame(raw);
+      storageState.lastGood = raw;
+      storageState.loadBlocked = false; storageState.failed = false; storageState.error = ''; storageState.recovered = true;
+      updateStorageStatus();
+      return data;
+    } catch (backupError) {
+      storageState.loadBlocked = true;
+      storageError(error, true);
+      return null;
+    }
+  }
+}
+function retryStorage() {
+  if (storageState.loadBlocked) {
+    const recovered = load();
+    if (storageState.loadBlocked) return false;
+    if (recovered) {
+      build(recovered); paused = true; document.getElementById('helpPanel').hidden = false;
+    }
+  }
+  return save();
+}
+// 기존의 두 번 확인하는 초기화 동작에서만 호출합니다.
+function resetStorageState() {
+  storageState.loadBlocked = false;
+  storageState.lastGood = ''; storageState.lastSavedAt = 0;
+  storageState.failed = false; storageState.error = ''; storageState.recovered = false;
+  try { localStorage.removeItem(STORAGE_BACKUP_KEY); } catch (error) { /* 이후 기본 저장에서 실패를 표시합니다. */ }
+  updateStorageStatus();
+}
+function exportSave() {
+  try {
+    const data = serialize();
+    const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+    const link = document.createElement('a');
+    link.href = url; link.download = 'raft-village-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json';
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return true;
+  } catch (error) {
+    storageState.failed = true;
+    storageState.error = '백업 파일을 만들지 못했습니다. 페이지를 닫지 말고 다시 시도해 주세요.';
+    updateStorageStatus();
+    return false;
+  }
+}
+document.getElementById('storageRetry').onclick = retryStorage;
+document.getElementById('storageExport').onclick = exportSave;
 
 /* ---------- 3D: 공용 재질·도형 ---------- */
 const _mats = new Map(), _geos = new Map();
@@ -2684,14 +2872,22 @@ function updateDefenders(dt, bl, mult) {
 const HERO_MAX_LEVEL = 50;
 const heroLevel = () => G.hero?.level || 1;
 const heroXpNeed = (level = heroLevel()) => 20 + 10 * (level - 1);
-const heroAttack = () => (4 + 2 * (heroLevel() - 1)) * allyMultiplier(heroLevel()) + 2 * ck('playerGun') + 3 * trainingLevel('hero');
-const heroMaxHp = () => (40 + 6 * (heroLevel() - 1)) * allyMultiplier(heroLevel()) + 10 * trainingLevel('hero');
+const heroBaseAttack = level => (4 + 2 * (level - 1)) * allyMultiplier(level);
+const heroBaseHp = level => (40 + 6 * (level - 1)) * allyMultiplier(level);
+const heroAttack = () => heroBaseAttack(heroLevel()) + (G.hero?.legacyAttackBonus || 0) + 2 * ck('playerGun') + 3 * trainingLevel('hero');
+const heroMaxHp = () => heroBaseHp(heroLevel()) + (G.hero?.legacyHpBonus || 0) + 10 * trainingLevel('hero');
 const isHeroAvailable = () => !!player && !player.dead && player.hp > 0 && !(G.hero?.downT > 0);
 function initializeHeroState() {
   const old = G.hero || {};
   const savedLevel = Number(old.level ?? G.level ?? 1);
   const level = Number.isFinite(savedLevel) ? Math.min(HERO_MAX_LEVEL, Math.max(1, Math.max(pirateLevel(), Math.floor(savedLevel)))) : 1;
+  const bonus = value => Number.isFinite(value) ? Math.max(0, value) : 0;
+  // 구버전에서 50을 넘긴 선장은 레벨을 정규화해도 이미 얻은 능력치를 잃지 않습니다.
+  const legacyLevel = Number.isFinite(savedLevel) ? Math.max(HERO_MAX_LEVEL, Math.floor(savedLevel)) : HERO_MAX_LEVEL;
+  const legacyAttackBonus = bonus(old.legacyAttackBonus) + bonus(heroBaseAttack(legacyLevel) - heroBaseAttack(HERO_MAX_LEVEL));
+  const legacyHpBonus = bonus(old.legacyHpBonus) + bonus(heroBaseHp(legacyLevel) - heroBaseHp(HERO_MAX_LEVEL));
   G.hero = { level, xp: level >= HERO_MAX_LEVEL ? 0 : Math.max(0, Number.isFinite(old.xp) ? old.xp : 0),
+    legacyAttackBonus, legacyHpBonus,
     downT: Math.max(0, old.downT || 0), kills: old.kills || 0,
     engagedWave: old.engagedWave || 0, rewardedWave: old.rewardedWave || 0 };
   G.hero.hp = Math.max(0, Math.min(heroMaxHp(), old.hp ?? heroMaxHp()));
@@ -3786,12 +3982,15 @@ const assignmentStyle = document.createElement('style');
 assignmentStyle.textContent = `#assignmentBtn{position:fixed;right:10px;bottom:calc(136px + env(safe-area-inset-bottom,0px));z-index:6;min-height:48px;padding:8px;border:2px solid #59844b;border-radius:12px;background:#ecffde;color:#354a2d;font:16px var(--display)}
 #assignmentPanel{z-index:35;overflow:auto}#assignmentPanel .box{max-height:85dvh;overflow:auto;width:min(420px,94vw);box-sizing:border-box}#assignmentPanel .assignment-row{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:12px 0}#assignmentPanel button{min-width:44px;min-height:44px;touch-action:manipulation}#assignmentPanel .assignment-row>div{display:flex;align-items:center;flex:none}#assignmentPanel .assignment-row>span{font-size:14px;min-width:0;flex:1}#assignmentPanel h2{font-size:22px}#assignmentPanel p{font-size:14px;line-height:1.5}#assignmentPanel output{display:inline-block;min-width:30px;text-align:center}`;
 document.head.appendChild(assignmentStyle);
-const assignmentButton = document.createElement('button'); assignmentButton.id = 'assignmentBtn'; assignmentButton.textContent = '👷 일꾼 배정'; document.body.appendChild(assignmentButton);
+const assignmentButton = document.createElement('button'); assignmentButton.id = 'assignmentBtn'; assignmentButton.textContent = '👷 일꾼 배정';
+assignmentButton.setAttribute('aria-haspopup', 'dialog'); assignmentButton.setAttribute('aria-controls', 'assignmentPanel'); assignmentButton.setAttribute('aria-expanded', 'false'); document.body.appendChild(assignmentButton);
 const assignmentPanel = document.createElement('div'); assignmentPanel.id = 'assignmentPanel'; assignmentPanel.className = 'panel'; assignmentPanel.hidden = true;
-assignmentPanel.innerHTML = '<div class="box"><button class="close" aria-label="닫기">✕</button><h2>판매소 일꾼 배정</h2><p>배정 인원은 전사 후에도 유지됩니다. 텐트에서 충원하면 빈자리를 채웁니다.</p><div id="assignmentRows"></div><p id="assignmentTotal"></p></div>';
+assignmentPanel.innerHTML = '<div class="box" role="dialog" aria-modal="true" aria-labelledby="assignmentTitle"><button class="close" aria-label="닫기">✕</button><h2 id="assignmentTitle">판매소 일꾼 배정</h2><p>배정 인원은 전사 후에도 유지됩니다. 텐트에서 충원하면 빈자리를 채웁니다.</p><div id="assignmentRows"></div><p id="assignmentTotal" role="status" aria-live="polite"></p></div>';
 document.body.appendChild(assignmentPanel);
 function refreshAssignmentPanel() {
-  const rows = document.getElementById('assignmentRows'); rows.replaceChildren();
+  const rows = document.getElementById('assignmentRows'), active = document.activeElement;
+  const focus = rows.contains(active) ? { id: active.dataset.assignment, delta: active.dataset.delta } : null;
+  rows.replaceChildren();
   const total = Object.values(G.workerAssignments).reduce((n, value) => n + value, 0);
   for (const id of assignmentShops()) {
     const row = document.createElement('div'); row.className = 'assignment-row';
@@ -3800,17 +3999,44 @@ function refreshAssignmentPanel() {
     for (const delta of [-1, 1]) {
       if (delta === 1) { const output = document.createElement('output'); output.textContent = G.workerAssignments[id] || 0; controls.appendChild(output); }
       const b = document.createElement('button'); b.textContent = delta < 0 ? '−' : '+'; b.setAttribute('aria-label', `${DEFS[id].name} ${delta < 0 ? '감소' : '증가'}`);
+      b.dataset.assignment = id; b.dataset.delta = String(delta);
       b.disabled = delta < 0 ? !(G.workerAssignments[id] > 0) : total >= assignmentCapacity();
       b.onclick = () => setWorkerAssignment(id, (G.workerAssignments[id] || 0) + delta); controls.appendChild(b);
     }
     row.appendChild(controls); rows.appendChild(row);
   }
   document.getElementById('assignmentTotal').textContent = `배정 ${total} / 텐트 정원 ${assignmentCapacity()} · 생존 ${workers.length}명 · 미배정 ${workers.filter(w => !w.assignment).length}명`;
+  if (focus) {
+    const buttons = [...rows.querySelectorAll('button:not(:disabled)')];
+    const next = buttons.find(b => b.dataset.assignment === focus.id && b.dataset.delta === focus.delta)
+      || buttons.find(b => b.dataset.assignment === focus.id) || assignmentPanel.querySelector('.close');
+    next.focus({ preventScroll: true });
+  }
 }
-assignmentButton.onclick = () => { if (paused) return; refreshAssignmentPanel(); assignmentPanel.hidden = false; paused = true; };
-function closeAssignments() { if (assignmentPanel.hidden) return; assignmentPanel.hidden = true; paused = false; last = performance.now(); }
+let assignmentReturnFocus = null;
+assignmentButton.onclick = () => {
+  if (paused) return;
+  assignmentReturnFocus = document.activeElement;
+  clearMovementInput(); refreshAssignmentPanel(); assignmentPanel.hidden = false; paused = true;
+  assignmentButton.setAttribute('aria-expanded', 'true');
+  assignmentPanel.querySelector('.close').focus({ preventScroll: true });
+};
+function closeAssignments() {
+  if (assignmentPanel.hidden) return;
+  assignmentPanel.hidden = true; paused = false; last = performance.now(); clearMovementInput();
+  assignmentButton.setAttribute('aria-expanded', 'false');
+  const target = assignmentReturnFocus?.isConnected && typeof assignmentReturnFocus.focus === 'function' ? assignmentReturnFocus : assignmentButton;
+  target.focus({ preventScroll: true });
+}
 assignmentPanel.querySelector('.close').onclick = closeAssignments;
-window.addEventListener('keydown', e => { if (e.key === 'Escape') closeAssignments(); });
+assignmentPanel.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { e.preventDefault(); closeAssignments(); }
+  if (e.key === 'Tab') {
+    const buttons = [...assignmentPanel.querySelectorAll('button:not(:disabled)')], first = buttons[0], end = buttons[buttons.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); end.focus(); }
+    else if (!e.shiftKey && document.activeElement === end) { e.preventDefault(); first.focus(); }
+  }
+});
 
 
 /* ---------- 화면 위 2D 오버레이: 간판·가격표·말풍선·효과 ---------- */
@@ -3995,8 +4221,7 @@ function frame(now) {
 let lastHud = '';
 function hud(obj) {
   strategyHud(); recruitmentHud(); trainingHud();
-  $('goal').dataset.kind = raidOn ? 'danger' : /짓기|업그레이드/.test(obj.text) ? 'build' : 'interact';
-  $('goal').dataset.label = raidOn ? '마을 방어' : /짓기|업그레이드/.test(obj.text) ? '건설' : '작업';
+  refreshGoalMessage(obj);
   const day = 1 + Math.floor(G.t / 40), km = G.t * 1.7 * (unlocked.has('solar') ? 1.4 : 1);
   const key = [Math.floor(G.money), day, Math.floor(km), G.stack.length, cap, obj.text, heroLevel(), G.hero.xp, heroAttack(), Math.ceil(player.hp), isHeroAvailable(),
     unlocked.has('tent1'), Math.ceil(G.hp), G.soldiers, workers.length, Math.ceil(crewHealthStatus().hp), G.wave, pirateLevel(), raidOn, Math.ceil(G.raidT), enemies.length, wages(), G.strike, phaseInfo(), G.qi, questInfo().cur, Math.round(incomePerMin() / 5)].join('|');
@@ -4023,8 +4248,6 @@ function hud(obj) {
   moneyEl.textContent = fmt(G.money);
   $('day').textContent = day; $('km').textContent = `${phaseInfo()} · 수입 $${fmt(incomePerMin())}/분`;
   $('bag').innerHTML = `🎒 ${G.stack.length}/${cap}${G.stack.length ? '<em>비우기</em>' : ''}`; $('bag').classList.toggle('full', G.stack.length >= cap);
-  const goal = $('goal');
-  if (goal.textContent !== obj.text) { goal.textContent = obj.text; goal.classList.remove('pop'); void goal.offsetWidth; goal.classList.add('pop'); }
 }
 
 // 하루 40초: 낮 → 노을 → 밤 → 새벽
@@ -4057,7 +4280,7 @@ let resetArmed = false;
 $('resetBtn').onclick = () => {
   if (!resetArmed) { resetArmed = true; $('resetBtn').textContent = '한 번 더 누르면 초기화돼요'; return; }
   resetArmed = false; $('resetBtn').textContent = '처음부터 다시';
-  build(freshState()); save(); $('helpPanel').hidden = true; paused = false;
+  resetStorageState(); build(freshState()); save(); $('helpPanel').hidden = true; paused = false;
 };
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
 
@@ -4071,6 +4294,7 @@ function start(data) {
   else go();
 }
 window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+window.gameBoot.ready();
 })();
 </script>
 </body>

@@ -58,8 +58,8 @@ body{background:var(--sea);color:var(--ink);font-family:var(--body);touch-action
 #hpBar i{display:block;height:100%;width:100%;background:#70ce46}#hpBar.low i{background:#ee7354}
 #defInfo{display:block;margin-top:4px;font-size:12px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#52663c}
 #defense.raid{background:#ffe7d8;border-color:#a94f3c}#defense.raid #defInfo{color:#aa4536}
-#toast{left:10px;right:10px;bottom:calc(136px + env(safe-area-inset-bottom,0px));border:2px solid #7b633a;border-radius:12px;padding:7px 10px;background:#fff2ccec;color:#654f2e;font-size:13px;line-height:1.4;opacity:0;transition:opacity .2s;word-break:keep-all;text-align:center;box-shadow:0 3px 0 #644e2a30}
-#toast.show{opacity:1}
+
+
 .panel{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:16px;background:#1c65836b;touch-action:pan-y;overscroll-behavior:contain;overflow:auto}
 .panel>div{max-width:380px;width:100%;max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain;touch-action:pan-y;padding:20px;background:#fff8e8;color:#354650;border:3px solid #536271;border-radius:22px;box-shadow:0 6px 0 #2d465b55}
 .panel h2{font:26px/1.15 var(--display);margin:0 0 10px;color:#6e512d;text-wrap:balance}
@@ -75,8 +75,9 @@ body{background:var(--sea);color:var(--ink);font-family:var(--body);touch-action
 #strategyPanel .choices button:nth-child(3){background:#ffedb5;border-color:#bd9555;color:#765c34;box-shadow:0 3px 0 #a98c53}
 #strategyBtn:focus-visible,#menuBtn:focus-visible,#bag:focus-visible,.panel button:focus-visible{outline:3px solid #fff;outline-offset:3px;box-shadow:0 0 0 6px #2c8dac}
 @keyframes reward{50%{transform:scale(1.03)}}
-@media(min-width:700px){#goal{left:50%;right:auto;transform:translateX(-50%);top:14px;width:400px}#quest{width:240px}#strategyBtn{right:auto;width:200px}#defense{left:auto;width:300px;right:12px}}
-@media(max-height:500px) and (orientation:landscape){#quest{width:22%;max-width:170px;height:74px;padding:5px 8px}#qText{font-size:12px}#goal{top:12px;left:25%;right:25%;width:auto;transform:none;font-size:12px;padding:5px 7px}#goal::before{font-size:9px}#strategyBtn{right:auto;width:180px}#defense{left:auto;right:10px;width:220px;font-size:12px}#defInfo{font-size:11px}#toast{right:auto;max-width:250px;bottom:68px}}
+@media(min-width:700px){#quest{width:240px}#strategyBtn{right:auto;width:200px}#defense{left:auto;width:300px;right:12px}}
+@media(min-width:940px){#goal{left:50%;right:auto;transform:translateX(-50%);top:14px;width:400px}}
+@media(max-height:500px) and (orientation:landscape){#quest{width:22%;max-width:170px;height:74px;padding:5px 8px}#qText{font-size:12px}#goal{top:12px;left:25%;right:25%;width:auto;transform:none;font-size:12px;padding:5px 7px}#goal::before{font-size:9px}#strategyBtn{right:auto;width:180px}#defense{left:auto;right:10px;width:220px;font-size:12px}#defInfo{font-size:11px}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -90,7 +91,6 @@ body{background:var(--sea);color:var(--ink);font-family:var(--body);touch-action
 <div class="hud" id="bag" role="button" tabindex="0" aria-label="가방 비우기">🎒 0/10</div>
 <div class="hud" id="quest"><div id="qTitle">📜 퀘스트</div><div id="qText"></div><span id="qBar"><i id="qFill"></i></span></div>
 <div class="hud" id="defense" hidden><span id="defTop">🛡️ 마을 체력</span><span id="hpBar"><i id="hpFill"></i></span><span id="defInfo"></span></div>
-<div class="hud" id="toast"></div>
 <button id="menuBtn" aria-label="메뉴 열기">☰</button>
 
 <div class="panel" id="helpPanel" hidden>
@@ -392,11 +392,6 @@ function serialize() {
   G.combat = { raidOn, looted, enemies };
   G.unlocked = [...unlocked]; G.px = player.x; G.py = player.y;
   return JSON.parse(JSON.stringify(G));
-}
-function save() { try { localStorage.setItem(KEY, JSON.stringify(serialize())); } catch (e) {} }
-function load() {
-  try { const s = JSON.parse(localStorage.getItem(KEY)); if (s && s.st && s.unlocked) return s; } catch (e) {}
-  return null;
 }
 
 /* ---------- 좌표 ---------- */
@@ -1313,8 +1308,27 @@ function flyBills(from, n, toHud) {
   }
 }
 function floatText(x, y, text, color = '#fff') { floaters.push({ x, y, text, color, t: 0 }); }
-let toastTimer = 0;
-function toast(msg) { const el = $('toast'); el.textContent = msg; el.classList.add('show'); toastTimer = 1.8; }
+let toastTimer = 0, toastMessage = '', toastPriority = 1;
+function showGoalMessage(text, kind, label) {
+  const goal = $('goal');
+  goal.dataset.kind = kind; goal.dataset.label = label;
+  if (goal.textContent !== text) { goal.textContent = text; goal.classList.remove('pop'); void goal.offsetWidth; goal.classList.add('pop'); }
+}
+function refreshGoalMessage(obj) {
+  const storageWarning = typeof storageWarningMessage === 'function' ? storageWarningMessage() : '';
+  if (storageWarning) { showGoalMessage(storageWarning, 'danger', '저장 확인'); return; }
+  const recovering = !isHeroAvailable(), statePriority = recovering ? 4 : raidOn ? 3 : 0;
+  const notice = toastTimer > 0 && toastPriority >= statePriority;
+  showGoalMessage(notice ? toastMessage : obj.text,
+    notice ? (toastPriority >= 3 ? 'danger' : 'notice') : recovering || raidOn ? 'danger' : /짓기|업그레이드/.test(obj.text) ? 'build' : 'interact',
+    notice ? (toastPriority >= 3 ? '긴급 안내' : '안내') : recovering ? '선장 회복' : raidOn ? '마을 방어' : /짓기|업그레이드/.test(obj.text) ? '건설' : '작업');
+}
+function toast(msg, priority = /^(?:⚠️?|☠️?|💫)/u.test(msg) ? 3 : 1) {
+  // 잔잔한 알림이 아직 표시 중인 긴급 안내를 덮어쓰지 않습니다.
+  if (toastTimer > 0 && priority < toastPriority) return;
+  toastMessage = msg; toastTimer = 1.8; toastPriority = priority;
+  refreshGoalMessage(objective());
+}
 function burst(sx, sy) {
   const cols = ['#ffd84d', '#3fbf4f', '#ff8a1f', '#fff', '#2f8fd6'];
   for (let i = 0; i < 40; i++) { const a = rnd(0, 6.28), v = rnd(120, 320); confetti.push({ x: sx, y: sy, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 200, c: cols[i % 5], t: 0 }); }
@@ -1358,7 +1372,8 @@ function pickJob(w, item) {
   for (const r of ROUTES) {
     if (!assignmentRoute(w, r)) continue;
     if (!unlocked.has(r.from) || !unlocked.has(r.to)) continue;
-    if (isBroken(r.from) || isBroken(r.to)) continue;
+    // 이미 든 상품은 생산소가 파손돼도 정상 판매소에 배달할 수 있습니다.
+    if ((!item && isBroken(r.from)) || isBroken(r.to)) continue;
     const src = sourceInfo(r.from), dst = destInfo(r.to);
     if (item && src.item !== item) continue;
     const have = G.st[r.from][src.key], room = dst.max - G.st[r.to][dst.key];
@@ -1390,21 +1405,23 @@ function collectCash(w, dt) {
 }
 function updateWorker(w, dt) {
   if (raidOn) return; // 습격 중에는 싸우러 감 (updateMilitary)
-  if (returnUnassignedCargo(w, dt)) return;
+  if (returnUnassignedCargo(w, dt)) { w.repairing = null; return; }
   // 빈 생산소를 향하던 작업도 중단하고 수리해야 생산이 다시 시작됩니다.
   if (!w.carry.length && workerRepair(w, dt)) { w.job = null; return; }
-  w.repairing = null;
-  if (!w.assignment) { w.job = null; w.idle = true; stopMove(w, dt); return; }
+  if (!w.assignment) { w.job = null; w.repairing = null; w.idle = true; stopMove(w, dt); return; }
   w.idle = false;
   if (w.job && !w.job.cash) {
     const src = sourceInfo(w.job.from), dst = destInfo(w.job.to);
-    if (!assignmentRoute(w, w.job) || isBroken(w.job.from) || isBroken(w.job.to) ||
+    if (!assignmentRoute(w, w.job) || (!w.carry.length && isBroken(w.job.from)) || isBroken(w.job.to) ||
         (!w.carry.length && (!G.st[w.job.from][src.key] || G.st[w.job.to][dst.key] >= dst.max))) w.job = null;
   }
   if (!w.job) {
     const cid = w.carry.length ? null : pickCash(w);
     w.job = cid ? { cash: cid } : pickJob(w, w.carry[0]);
     if (!w.job) {
+      // 목적지까지 파손됐으면 짐을 보존한 채 수리한 뒤 배달을 재개합니다.
+      if (w.carry.length && workerRepair(w, dt)) return;
+      w.repairing = null;
       // 상품을 기다릴 때도 텐트에 머무르지 않고 배정된 판매소로 출근합니다.
       const target = workerSlot(w, destInfo(w.assignment));
       if (dist(w.x, w.y, target.x, target.y) > 0.35) moveTo(w, target.x, target.y, workerSpeed(), dt, workers);
@@ -1412,9 +1429,10 @@ function updateWorker(w, dt) {
       return;
     }
   }
+  w.repairing = null;
   if (w.job.cash) { collectCash(w, dt); return; }
   const src = sourceInfo(w.job.from), dst = destInfo(w.job.to), s1 = G.st[w.job.from], s2 = G.st[w.job.to];
-  const delivering = w.carry.length && (w.carry.length >= crewCap() || s1[src.key] === 0);
+  const delivering = w.carry.length && (isBroken(w.job.from) || w.carry.length >= crewCap() || s1[src.key] === 0);
   const target = workerSlot(w, delivering ? dst : src);
   const dd = dist(w.x, w.y, target.x, target.y);
   if (dd > 0.35) { moveTo(w, target.x, target.y, workerSpeed(), dt, workers); return; }
@@ -1507,7 +1525,7 @@ function killSoldier(s) {
 function startRaid() {
   const previousHeroHp = heroMaxHp(), previousCrewHp = crewHpMax();
   G.wave++;
-  G.hero.level = Math.max(heroLevel(), pirateLevel());
+  G.hero.level = Math.min(HERO_MAX_LEVEL, Math.max(heroLevel(), pirateLevel()));
   if (isHeroAvailable()) player.hp += heroMaxHp() - previousHeroHp;
   for (const w of workers) if (w.hp > 0) w.hp += crewHpMax() - previousCrewHp;
   const n = Math.min(14, 2 + Math.floor(pirateLevel() * 0.9) + Math.floor(Math.random() * 2) + (raidPlan(G.wave).type === 'thief' ? 2 : 0)), baseA = rnd(0, 6.28);
@@ -1938,7 +1956,7 @@ function update(dt) {
   for (let i = catches.length - 1; i >= 0; i--) { catches[i].t += dt; if (catches[i].t > 0.8) catches.splice(i, 1); }
   for (let i = tossed.length - 1; i >= 0; i--) { const q = tossed[i]; q.t += dt; if (q.t < 0) continue; q.vy += 900 * dt; q.x += q.vx * dt; q.y += q.vy * dt; q.a += q.r * dt; if (q.t > 1.1) tossed.splice(i, 1); }
   for (let i = confetti.length - 1; i >= 0; i--) { const c = confetti[i]; c.t += dt; c.vy += 600 * dt; c.x += c.vx * dt; c.y += c.vy * dt; if (c.t > 1.4) confetti.splice(i, 1); }
-  if (toastTimer > 0) { toastTimer -= dt; if (toastTimer <= 0) $('toast').classList.remove('show'); }
+  if (toastTimer > 0) toastTimer = Math.max(0, toastTimer - dt);
   if (pulseT > 0) { pulseT -= dt; if (pulseT <= 0) moneyBox.classList.remove('pulse'); }
 }
 
@@ -2145,8 +2163,7 @@ function finishStrategyRaid(wasLooted) {
 let lastHud = '';
 function hud(obj) {
   strategyHud(); recruitmentHud(); trainingHud();
-  $('goal').dataset.kind = raidOn ? 'danger' : /짓기|업그레이드/.test(obj.text) ? 'build' : 'interact';
-  $('goal').dataset.label = raidOn ? '마을 방어' : /짓기|업그레이드/.test(obj.text) ? '건설' : '작업';
+  refreshGoalMessage(obj);
   const day = 1 + Math.floor(G.t / 40), km = G.t * 1.7 * (unlocked.has('solar') ? 1.4 : 1);
   const key = [Math.floor(G.money), day, Math.floor(km), G.stack.length, cap, obj.text, heroLevel(), G.hero.xp, heroAttack(), Math.ceil(player.hp), isHeroAvailable(),
     unlocked.has('tent1'), Math.ceil(G.hp), G.soldiers, workers.length, Math.ceil(crewHealthStatus().hp), G.wave, pirateLevel(), raidOn, Math.ceil(G.raidT), enemies.length, wages(), G.strike, phaseInfo(), G.qi, questInfo().cur, Math.round(incomePerMin() / 5)].join('|');
@@ -2173,8 +2190,6 @@ function hud(obj) {
   moneyEl.textContent = fmt(G.money);
   $('day').textContent = day; $('km').textContent = `${phaseInfo()} · 수입 $${fmt(incomePerMin())}/분`;
   $('bag').innerHTML = `🎒 ${G.stack.length}/${cap}${G.stack.length ? '<em>비우기</em>' : ''}`; $('bag').classList.toggle('full', G.stack.length >= cap);
-  const goal = $('goal');
-  if (goal.textContent !== obj.text) { goal.textContent = obj.text; goal.classList.remove('pop'); void goal.offsetWidth; goal.classList.add('pop'); }
 }
 
 /* ---------- 루프 ---------- */
@@ -2283,7 +2298,7 @@ let resetArmed = false;
 $('resetBtn').onclick = () => {
   if (!resetArmed) { resetArmed = true; $('resetBtn').textContent = '한 번 더 누르면 초기화돼요'; return; }
   resetArmed = false; $('resetBtn').textContent = '처음부터 다시';
-  build(freshState()); save(); $('helpPanel').hidden = true; paused = false;
+  resetStorageState(); build(freshState()); save(); $('helpPanel').hidden = true; paused = false;
 };
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
 

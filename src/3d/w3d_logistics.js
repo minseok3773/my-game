@@ -78,12 +78,15 @@ const assignmentStyle = document.createElement('style');
 assignmentStyle.textContent = `#assignmentBtn{position:fixed;right:10px;bottom:calc(136px + env(safe-area-inset-bottom,0px));z-index:6;min-height:48px;padding:8px;border:2px solid #59844b;border-radius:12px;background:#ecffde;color:#354a2d;font:16px var(--display)}
 #assignmentPanel{z-index:35;overflow:auto}#assignmentPanel .box{max-height:85dvh;overflow:auto;width:min(420px,94vw);box-sizing:border-box}#assignmentPanel .assignment-row{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:12px 0}#assignmentPanel button{min-width:44px;min-height:44px;touch-action:manipulation}#assignmentPanel .assignment-row>div{display:flex;align-items:center;flex:none}#assignmentPanel .assignment-row>span{font-size:14px;min-width:0;flex:1}#assignmentPanel h2{font-size:22px}#assignmentPanel p{font-size:14px;line-height:1.5}#assignmentPanel output{display:inline-block;min-width:30px;text-align:center}`;
 document.head.appendChild(assignmentStyle);
-const assignmentButton = document.createElement('button'); assignmentButton.id = 'assignmentBtn'; assignmentButton.textContent = '👷 일꾼 배정'; document.body.appendChild(assignmentButton);
+const assignmentButton = document.createElement('button'); assignmentButton.id = 'assignmentBtn'; assignmentButton.textContent = '👷 일꾼 배정';
+assignmentButton.setAttribute('aria-haspopup', 'dialog'); assignmentButton.setAttribute('aria-controls', 'assignmentPanel'); assignmentButton.setAttribute('aria-expanded', 'false'); document.body.appendChild(assignmentButton);
 const assignmentPanel = document.createElement('div'); assignmentPanel.id = 'assignmentPanel'; assignmentPanel.className = 'panel'; assignmentPanel.hidden = true;
-assignmentPanel.innerHTML = '<div class="box"><button class="close" aria-label="닫기">✕</button><h2>판매소 일꾼 배정</h2><p>배정 인원은 전사 후에도 유지됩니다. 텐트에서 충원하면 빈자리를 채웁니다.</p><div id="assignmentRows"></div><p id="assignmentTotal"></p></div>';
+assignmentPanel.innerHTML = '<div class="box" role="dialog" aria-modal="true" aria-labelledby="assignmentTitle"><button class="close" aria-label="닫기">✕</button><h2 id="assignmentTitle">판매소 일꾼 배정</h2><p>배정 인원은 전사 후에도 유지됩니다. 텐트에서 충원하면 빈자리를 채웁니다.</p><div id="assignmentRows"></div><p id="assignmentTotal" role="status" aria-live="polite"></p></div>';
 document.body.appendChild(assignmentPanel);
 function refreshAssignmentPanel() {
-  const rows = document.getElementById('assignmentRows'); rows.replaceChildren();
+  const rows = document.getElementById('assignmentRows'), active = document.activeElement;
+  const focus = rows.contains(active) ? { id: active.dataset.assignment, delta: active.dataset.delta } : null;
+  rows.replaceChildren();
   const total = Object.values(G.workerAssignments).reduce((n, value) => n + value, 0);
   for (const id of assignmentShops()) {
     const row = document.createElement('div'); row.className = 'assignment-row';
@@ -92,14 +95,41 @@ function refreshAssignmentPanel() {
     for (const delta of [-1, 1]) {
       if (delta === 1) { const output = document.createElement('output'); output.textContent = G.workerAssignments[id] || 0; controls.appendChild(output); }
       const b = document.createElement('button'); b.textContent = delta < 0 ? '−' : '+'; b.setAttribute('aria-label', `${DEFS[id].name} ${delta < 0 ? '감소' : '증가'}`);
+      b.dataset.assignment = id; b.dataset.delta = String(delta);
       b.disabled = delta < 0 ? !(G.workerAssignments[id] > 0) : total >= assignmentCapacity();
       b.onclick = () => setWorkerAssignment(id, (G.workerAssignments[id] || 0) + delta); controls.appendChild(b);
     }
     row.appendChild(controls); rows.appendChild(row);
   }
   document.getElementById('assignmentTotal').textContent = `배정 ${total} / 텐트 정원 ${assignmentCapacity()} · 생존 ${workers.length}명 · 미배정 ${workers.filter(w => !w.assignment).length}명`;
+  if (focus) {
+    const buttons = [...rows.querySelectorAll('button:not(:disabled)')];
+    const next = buttons.find(b => b.dataset.assignment === focus.id && b.dataset.delta === focus.delta)
+      || buttons.find(b => b.dataset.assignment === focus.id) || assignmentPanel.querySelector('.close');
+    next.focus({ preventScroll: true });
+  }
 }
-assignmentButton.onclick = () => { if (paused) return; refreshAssignmentPanel(); assignmentPanel.hidden = false; paused = true; };
-function closeAssignments() { if (assignmentPanel.hidden) return; assignmentPanel.hidden = true; paused = false; last = performance.now(); }
+let assignmentReturnFocus = null;
+assignmentButton.onclick = () => {
+  if (paused) return;
+  assignmentReturnFocus = document.activeElement;
+  clearMovementInput(); refreshAssignmentPanel(); assignmentPanel.hidden = false; paused = true;
+  assignmentButton.setAttribute('aria-expanded', 'true');
+  assignmentPanel.querySelector('.close').focus({ preventScroll: true });
+};
+function closeAssignments() {
+  if (assignmentPanel.hidden) return;
+  assignmentPanel.hidden = true; paused = false; last = performance.now(); clearMovementInput();
+  assignmentButton.setAttribute('aria-expanded', 'false');
+  const target = assignmentReturnFocus?.isConnected && typeof assignmentReturnFocus.focus === 'function' ? assignmentReturnFocus : assignmentButton;
+  target.focus({ preventScroll: true });
+}
 assignmentPanel.querySelector('.close').onclick = closeAssignments;
-window.addEventListener('keydown', e => { if (e.key === 'Escape') closeAssignments(); });
+assignmentPanel.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { e.preventDefault(); closeAssignments(); }
+  if (e.key === 'Tab') {
+    const buttons = [...assignmentPanel.querySelectorAll('button:not(:disabled)')], first = buttons[0], end = buttons[buttons.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); end.focus(); }
+    else if (!e.shiftKey && document.activeElement === end) { e.preventDefault(); first.focus(); }
+  }
+});

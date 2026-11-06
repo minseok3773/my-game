@@ -2,6 +2,8 @@ import re
 # 저장소 맨 위에서 실행: python3 src/3d/assemble3d.py  (base.html의 게임 규칙 + 3D 모듈 → raft-village-3d.html)
 # base.html은 게임 규칙·화면 UI의 바탕 파일이며, 그 안의 평면 그리기 코드는 조립할 때 빠짐
 import os
+import base64
+import hashlib
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(os.path.dirname(HERE))
 src = open(os.path.join(HERE, 'base.html'), encoding='utf-8').read()
 B = lambda n: open(os.path.join(HERE, n), encoding='utf-8').read()
@@ -161,6 +163,7 @@ for c in chunks:
     if c.startswith("function dockRect("):
         out.append("function dockRect(id) { return customerDockRect(id); }\n"); continue
     if c.startswith("/* ---------- HUD ---------- */"):
+        out.append(B('w3d_storage.js'))
         out.append(B('w3d_world.js')); out.append(B('w3d_chars.js')); out.append(B('w3d_game.js')); out.append(B('w3d_progression.js')); out.append(B('w3d_melee.js')); out.append(B('w3d_hero.js')); out.append(B('w3d_crew.js')); out.append(B('w3d_training.js')); out.append(B('w3d_customers.js')); out.append(B('w3d_fx.js')); out.append(B('w3d_scenery.js')); out.append(B('w3d_defense.js')); out.append(B('w3d_logistics.js')); out.append(overlay); out.append(c); continue
     if c.startswith("/* ---------- 루프 ---------- */") or c.startswith("let last = performance.now()"):
         continue
@@ -171,7 +174,7 @@ js = js.replace("const KEY = 'raft-village-v1';", "const KEY = 'raft-village-3d-
 js = re.sub(r"const phaseInfo = \(\) => \{[^\n]*\n", "const phaseInfo = () => '☀️ 낮';\n", js)
 js = re.sub(r"function nightAmt\(\) \{[^\n]*\n", "function nightAmt() { return 0; }\n", js)
 js = re.sub(r"function duskAmt\(\) \{[^\n]*\n", "function duskAmt() { return 0; }\n", js)
-# 3D 전용: 전투 종료 후 60초 준비, 침공마다 해적 1레벨 성장 (최대 50)
+# 3D 전용: 전투 종료 후 60초 준비, 해적 무제한 성장·선장 최대 50레벨
 R3 = [
     ("G.raidT = G.raidT ?? 60;", "G.raidT = G.raidT ?? RAID_INTERVAL;"),
     ("G.raidT = rnd(55, 80);", "G.raidT = 60;"),
@@ -288,8 +291,64 @@ h = head.replace("<title>표류 뗏목 마을</title>", "<title>표류 뗏목 �
 h = h.replace('<canvas id="game"', '<div id="world"></div>\n<canvas id="game"')
 # 3D 전용: 왼쪽 위 생존 일차 카드 숨김
 h = h.replace('</style>', '#dayCard{display:none!important}\n#world,#world canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}\n.panel a{color:#287b93}\n</style>', 1)
-h = h + '<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>\n' + ''.join(f'<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/{f}"></script>\n' for f in ['shaders/CopyShader.js', 'shaders/LuminosityHighPassShader.js', 'postprocessing/EffectComposer.js', 'postprocessing/RenderPass.js', 'postprocessing/ShaderPass.js', 'postprocessing/UnrealBloomPass.js', 'loaders/GLTFLoader.js', 'utils/SkeletonUtils.js'])
-res = h + "<script>\n(() => {\n" + js + tail
+# 필수 엔진은 검증한 고정 버전을 함께 배포합니다. 외부 CDN 장애가 게임 시작을 막지 않습니다.
+boot_guard = r'''<script>
+window.gameBoot = (() => {
+  let failed = false, ready = false;
+  const start = document.getElementById('startBtn');
+  if (start) start.disabled = true;
+  function fail(message) {
+    failed = true;
+    if (start) start.disabled = true;
+    let panel = document.getElementById('bootFailure');
+    if (!panel) {
+      const style = document.createElement('style');
+      style.textContent = '#bootFailure{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:18px;background:#225971cc;font:16px/1.6 system-ui,sans-serif;color:#30404a}#bootFailure>div{max-width:440px;padding:24px;border:3px solid #405363;border-radius:18px;background:#fff9e9}#bootFailure h2{margin:0 0 12px;font-size:23px}#bootFailure button{min-height:44px;padding:10px 18px;border:2px solid #427a32;border-radius:10px;background:#a9e66d;color:#28502b;font:inherit;cursor:pointer}#bootFailure button:focus-visible{outline:3px solid #2685ba;outline-offset:4px}';
+      document.head.appendChild(style);
+      panel = document.createElement('section'); panel.id = 'bootFailure';
+      panel.setAttribute('role', 'alertdialog'); panel.setAttribute('aria-modal', 'true');
+      panel.setAttribute('aria-labelledby', 'bootFailureTitle'); panel.setAttribute('aria-describedby', 'bootFailureMessage');
+      panel.innerHTML = '<div><h2 id="bootFailureTitle">게임을 시작하지 못했어요</h2><p id="bootFailureMessage"></p><button id="bootRetry" type="button">다시 시도</button></div>';
+      document.body.appendChild(panel);
+      document.getElementById('bootRetry').onclick = () => location.reload();
+      panel.addEventListener('keydown', event => { if (event.key === 'Tab') { event.preventDefault(); document.getElementById('bootRetry').focus(); } });
+    }
+    document.getElementById('bootFailureMessage').textContent = message;
+    document.getElementById('bootRetry').focus();
+  }
+  window.addEventListener('error', event => {
+    if (event.target?.tagName === 'SCRIPT' && event.target.src.includes('/vendor/three-r128/')) fail('게임 파일을 불러오지 못했어요. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.');
+    else if (!ready && event.error) fail('게임 준비 중 오류가 발생했어요. 페이지를 다시 열어 주세요. 문제가 계속되면 브라우저를 업데이트해 주세요.');
+  }, true);
+  return {
+    fail,
+    check() {
+      const engine = window.THREE;
+      if (failed || !engine || !['CopyShader', 'LuminosityHighPassShader', 'EffectComposer', 'RenderPass', 'ShaderPass', 'UnrealBloomPass', 'GLTFLoader', 'SkeletonUtils'].every(name => engine[name])) {
+        fail('게임 파일을 불러오지 못했어요. 인터넷 연결을 확인한 뒤 다시 시도해 주세요.'); return false;
+      }
+      return true;
+    },
+    renderer(engine) {
+      try { return new engine.WebGLRenderer({ antialias: true }); }
+      catch (error) { fail('3D 화면을 열지 못했어요. 브라우저의 하드웨어 가속을 켜거나 WebGL을 지원하는 최신 브라우저에서 다시 시도해 주세요.'); return null; }
+    },
+    ready() { ready = true; if (!failed && start) start.disabled = false; }
+  };
+})();</script>
+'''
+runtime_paths = ['build/three.min.js'] + ['examples/js/' + f for f in ['shaders/CopyShader.js', 'shaders/LuminosityHighPassShader.js', 'postprocessing/EffectComposer.js', 'postprocessing/RenderPass.js', 'postprocessing/ShaderPass.js', 'postprocessing/UnrealBloomPass.js', 'loaders/GLTFLoader.js', 'utils/SkeletonUtils.js']]
+runtime_scripts = []
+for relative in runtime_paths:
+    path = 'vendor/three-r128/' + relative
+    with open(os.path.join(ROOT, path), 'rb') as runtime_file:
+        integrity = base64.b64encode(hashlib.sha384(runtime_file.read()).digest()).decode('ascii')
+    runtime_scripts.append(f'<script src="{path}" integrity="sha384-{integrity}"></script>\n')
+h += boot_guard + ''.join(runtime_scripts)
+renderer_init = 'const renderer = new THREE.WebGLRenderer({ antialias: true });'
+assert js.count(renderer_init) == 1
+js = js.replace(renderer_init, 'const renderer = window.gameBoot.renderer(THREE);\nif (!renderer) return;')
+res = h + "<script>\n(() => {\nif (!window.gameBoot.check()) return;\n" + js + tail.replace('})();\n</script>', 'window.gameBoot.ready();\n})();\n</script>', 1)
 open(os.path.join(ROOT, 'raft-village-3d.html'), 'w', encoding='utf-8').write(res)
 print('chunks', len(chunks), 'size', len(res))
 for k in ['#game{', 'id="world"', 'three.min.js', 'function sync3D', 'function render(dt)']: print(k, res.count(k))
