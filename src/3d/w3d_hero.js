@@ -2,8 +2,8 @@
 const HERO_MAX_LEVEL = 50;
 const heroLevel = () => G.hero?.level || 1;
 const heroXpNeed = (level = heroLevel()) => 20 + 10 * (level - 1);
-const heroAttack = () => (4 + 2 * (heroLevel() - 1)) * pirateMultiplier(heroLevel()) + 2 * ck('playerGun') + 3 * trainingLevel('hero');
-const heroMaxHp = () => (40 + 6 * (heroLevel() - 1)) * pirateMultiplier(heroLevel()) + 10 * trainingLevel('hero');
+const heroAttack = () => (4 + 2 * (heroLevel() - 1)) * allyMultiplier(heroLevel()) + 2 * ck('playerGun') + 3 * trainingLevel('hero');
+const heroMaxHp = () => (40 + 6 * (heroLevel() - 1)) * allyMultiplier(heroLevel()) + 10 * trainingLevel('hero');
 const isHeroAvailable = () => !!player && !player.dead && player.hp > 0 && !(G.hero?.downT > 0);
 function initializeHeroState() {
   const old = G.hero || {};
