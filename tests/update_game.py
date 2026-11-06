@@ -19,7 +19,7 @@ HOOK=r'''
 window.updateTest={
  reset(wave=0){const d=freshState();d.unlocked.push('expand1','tent1','grill','diner','water','waterShop','garden','veggieShop');d.wave=wave;d.money=10000;build(d);paused=true;},
  state(){return {assignments:{...G.workerAssignments},workers:workers.map(w=>({id:w.assignment,hp:w.hp,carry:w.carry})),hero:{...G.hero},heroHp:heroMaxHp(),heroAttack:heroAttack(),crewHp:crewHpMax(),crewAttack:crewAttack(),level:pirateLevel(),wave:G.wave};},
- set:setWorkerAssignment, save, serialize, build, startRaid, updateShop, balanceAssignments, spawnWorker, killCrew, updateWorker, sync3D, update, render, hud, objective,
+ set:setWorkerAssignment, save, serialize, build, startRaid, updateShop, balanceAssignments, spawnWorker, killCrew, updateWorker, sync3D, update, render, hud, objective, slotPos, syncCustomerRoutes,
  get G(){return G},get workers(){return workers},get runtime(){return runtime},get defs(){return DEFS},get shops(){return assignmentShops()},get enemies(){return enemies},
  price:id=>priceOf(DEFS[id]),bossDue:bossDueNextRaid,spawnBoss,spawnBossBoarder,pirateLevel,pirateAttack,normalPirateHp,normalPirateAttack,
  route:assignmentRoute,pickJob, sourceInfo,destInfo,workerSlot,separateWorkers,
@@ -41,14 +41,96 @@ def check_logistics(page, screenshots):
     assert not result['tooMany'] and result['dinerFeed'] and not result['wrong'],result
     t('updateTest.save()'); expected=t('updateTest.state().assignments');page.reload(wait_until='networkidle');assert t('updateTest.state().assignments')==expected
     print('PASS quotas, route restriction, diner supply, death/recruit vacancy, cap, save/reload',flush=True)
-    result=t('''()=>{const t=updateTest;t.G.level=20;const results=[];for(const id of t.shops){const s=t.G.st[id];s.stock=4;s.cash=0;s.saleElapsed=0;t.updateShop(id,1.99);const early=s.stock;t.updateShop(id,.01);const first=s.stock;t.updateShop(id,4);results.push({id,early,first,stock:s.stock,cash:s.cash,price:t.price(id),customers:t.runtime[id].queue.length+t.runtime[id].leaving.length});}return results;}''')
-    assert all(r['early']==4 and r['first']==3 and r['stock']==1 and r['cash']==r['price']*3 and not r['customers'] for r in result),result
-    t("updateTest.G.st.fishShop.saleElapsed=1.25;updateTest.save()")
-    page.reload(wait_until='networkidle');assert t('updateTest.G.st.fishShop.saleElapsed')==1.25
+    check_customer_purchases(page)
     result=t("""()=>{const t=updateTest;t.reset();for(const id of t.shops)t.set(id,0);t.set('fishShop',2);t.G.st.fishing.pile=100;t.G.st.fishShop.stock=0;t.G.st.fishShop.cash=0;for(let i=0;i<1800;i++){for(const w of t.workers)t.updateWorker(w,.05);t.separateWorkers(.05);}const supplied=t.G.st.fishShop.stock;const w=t.workers[0];w.carry=['water'];t.G.st.water.pile=0;w.x=t.sourceInfo('water').x;w.y=t.sourceInfo('water').y;for(let i=0;i<100;i++)t.updateWorker(w,.05);const returned=t.G.st.water.pile;w.carry=[];w.job=null;const d=t.defs.fishShop;w.x=d.cx;w.y=d.cy;t.G.st.fishShop.cash=77;const money=t.G.money;for(let i=0;i<10;i++)t.updateWorker(w,.05);return {supplied,returned,collected:t.G.money-money,cash:t.G.st.fishShop.cash};}""")
     assert result['supplied']>0 and result['returned']==1 and result['collected']==77 and result['cash']==0,result
     print('PASS physical worker delivery, cash collection and incompatible cargo returned after reassignment',flush=True)
-    print('PASS every shop sells one per 2 seconds, retained cash, no customers, partial timer reload',flush=True)
+
+
+def check_customer_purchases(page):
+    """Only visitors who reach a counter may buy; reload never fabricates sales."""
+    result = page.evaluate("""() => {
+      const t = updateTest;
+      t.G.level = 20;
+      return t.shops.map(id => {
+        const d = t.defs[id], s = t.G.st[id], r = t.runtime[id];
+        r.queue.length = 0; r.leaving.length = 0; r.spawn = 10000;
+        s.stock = 4; s.cash = 0; s.saleElapsed = 1.99;
+        t.syncCustomerRoutes(id);
+        for (let i = 0; i < 80; i++) t.updateShop(id, .05);
+        const unattended = {stock: s.stock, cash: s.cash, count: r.queue.length};
+        r.spawn = 0; t.updateShop(id, .001); r.spawn = 10000;
+        const customer = r.queue[0];
+        const spawned = !!customer;
+        t.updateShop(id, .05);
+        const approaching = {stock: s.stock, cash: s.cash, got: customer?.got};
+        if (!customer) return {id, spawned, unattended, approaching};
+        customer.want = 1;
+        Object.assign(customer, t.slotPos(d, 0), {vx: 0, vy: 0, moving: false});
+        for (let i = 0; i < 39; i++) t.updateShop(id, .05);
+        const early = {stock: s.stock, cash: s.cash, got: customer.got};
+        t.updateShop(id, .05);
+        return {id, spawned, unattended, approaching, early,
+          stock: s.stock, cash: s.cash, price: t.price(id), got: customer.got,
+          carry: customer.carry, item: d.item,
+          departed: r.leaving.includes(customer) && !r.queue.includes(customer)};
+      });
+    }""")
+    for shop in result:
+        assert shop["spawned"], shop
+        assert shop["unattended"] == {"stock": 4, "cash": 0, "count": 0}, shop
+        assert shop["approaching"] == {"stock": 4, "cash": 0, "got": 0}, shop
+        assert shop["early"] == {"stock": 4, "cash": 0, "got": 0}, shop
+        assert shop["stock"] == 3 and shop["cash"] == shop["price"], shop
+        assert shop["got"] == 1 and shop["carry"] == [shop["item"]] and shop["departed"], shop
+    print('PASS all four shops: no automatic or pre-arrival sales, actual visitors buy once after two seconds at the counter and leave carrying goods', flush=True)
+
+    pending = page.evaluate("""() => {
+      const t = updateTest, id = 'fishShop', s = t.G.st[id], r = t.runtime[id];
+      r.spawn = 0; t.updateShop(id, .001); r.spawn = 10000;
+      const customer = r.queue[0]; customer.want = 1;
+      Object.assign(customer, t.slotPos(t.defs[id], 0), {vx: 0, vy: 0});
+      for (let i = 0; i < 25; i++) t.updateShop(id, .05);
+      t.save();
+      return {stock: s.stock, cash: s.cash, elapsed: s.saleElapsed};
+    }""")
+    assert math.isclose(pending["elapsed"], 1.25, abs_tol=1e-9), pending
+    reload_game(page)
+    restored = page.evaluate("""() => {
+      const t = updateTest, s = t.G.st.fishShop, r = t.runtime.fishShop;
+      const before = {stock: s.stock, cash: s.cash, count: r.queue.length};
+      r.spawn = 10000;
+      for (let i = 0; i < 80; i++) t.updateShop('fishShop', .05);
+      return {before, stock: s.stock, cash: s.cash, elapsed: s.saleElapsed};
+    }""")
+    assert restored["before"] == {"stock": pending["stock"], "cash": pending["cash"], "count": 0}, restored
+    assert restored["stock"] == pending["stock"] and restored["cash"] == pending["cash"], (pending, restored)
+    assert restored["elapsed"] == 0, restored
+
+    purchase = page.evaluate("""() => {
+      const t = updateTest, id = 'fishShop', s = t.G.st[id], r = t.runtime[id];
+      r.spawn = 0; t.updateShop(id, .001); r.spawn = 10000;
+      const customer = r.queue[0]; customer.want = 1;
+      Object.assign(customer, t.slotPos(t.defs[id], 0), {vx: 0, vy: 0});
+      for (let i = 0; i < 39; i++) t.updateShop(id, .05);
+      const early = {stock: s.stock, cash: s.cash, got: customer.got};
+      t.updateShop(id, .05); t.save();
+      return {early, stock: s.stock, cash: s.cash, price: t.price(id), got: customer.got};
+    }""")
+    assert purchase["early"] == {"stock": pending["stock"], "cash": pending["cash"], "got": 0}, purchase
+    assert purchase["stock"] == pending["stock"] - 1 and purchase["cash"] == pending["cash"] + purchase["price"], purchase
+    assert purchase["got"] == 1, purchase
+    for _ in range(2):
+        reload_game(page)
+        restored = page.evaluate("""() => {
+          const t = updateTest, s = t.G.st.fishShop, r = t.runtime.fishShop;
+          r.spawn = 10000;
+          for (let i = 0; i < 80; i++) t.updateShop('fishShop', .05);
+          t.save(); return {stock: s.stock, cash: s.cash};
+        }""")
+        assert restored == {"stock": purchase["stock"], "cash": purchase["cash"]}, (purchase, restored)
+    print('PASS partial service reload preserves inventory and cash; a fresh visitor must complete a new service, and completed purchases never repeat across reloads', flush=True)
+
 
 def check_progression(page, screenshots):
     t = page.evaluate

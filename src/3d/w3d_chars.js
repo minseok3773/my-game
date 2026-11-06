@@ -267,9 +267,130 @@ function makeBoneBear(height = 1.58) {
   return m;
 }
 
-// 원본 Pirate Kit 모형을 사용합니다.
-// 주인공: 바다 수호 기사 / 일꾼: 뼈다귀 곰 선원 (둘 다 Henry 바탕) / 손님: Henry / Mako·Sharky: 상륙 해적.
+// 손님: 참고 이미지의 둥근 파란 아기 돌고래. 도형·재질은 손님 사이에서 공유합니다.
+let dolphinCustomerParts = null;
+function dolphinGeometry(parts) {
+  const geometries = parts.map(part => {
+    part.updateMatrix();
+    const shape = part.geometry.index ? part.geometry.toNonIndexed() : part.geometry.clone();
+    return shape.applyMatrix4(part.matrix);
+  });
+  const merged = new THREE.BufferGeometry();
+  for (const name of ['position', 'normal']) {
+    const size = geometries.reduce((count, shape) => count + shape.getAttribute(name).array.length, 0);
+    const values = new Float32Array(size); let offset = 0;
+    for (const shape of geometries) { const array = shape.getAttribute(name).array; values.set(array, offset); offset += array.length; }
+    merged.setAttribute(name, new THREE.BufferAttribute(values, 3));
+  }
+  for (const shape of geometries) shape.dispose();
+  merged.computeBoundingSphere(); return merged;
+}
+function dolphinCustomerAssets() {
+  if (dolphinCustomerParts) return dolphinCustomerParts;
+  const blue = mat(0x1968bd, { roughness: 0.4 }), white = mat(0xfffcf3, { roughness: 0.42 });
+  const black = mat(0x161c35, { roughness: 0.18 }), blush = mat(0xff9fbe, { roughness: 0.52 });
+  const tongue = mat(0xf77fa7, { roughness: 0.4 }), yellow = mat(0xffd74e, { roughness: 0.4 });
+  const groups = new Map();
+  const add = (shape, material) => { if (!groups.has(material)) groups.set(material, []); groups.get(material).push(shape); return shape; };
+  const oval = (material, x, y, z, sx, sy, sz, rz = 0) => {
+    const part = mk(sphG(1, 20, 14), material, false, x, y, z);
+    part.scale.set(sx, sy, sz); part.rotation.z = rz; return add(part, material);
+  };
+  oval(blue, 0, 0.72, 0, 0.32, 0.52, 0.29);
+  oval(blue, 0, 1.49, -0.015, 0.53, 0.53, 0.465); // 몸보다 큰 통통한 머리
+  oval(white, 0, 0.71, 0.19, 0.245, 0.38, 0.142);
+  // 하얀 주둥이와 열린 미소. 눈과 볼은 곡면 바깥으로 조금 돌출시킵니다.
+  oval(white, 0, 1.285, 0.404, 0.25, 0.145, 0.12);
+  oval(blue, 0, 1.345, 0.501, 0.115, 0.055, 0.057);
+  const smile = geo('baby-dolphin-smile', () => {
+    const shape = new THREE.Shape();
+    shape.moveTo(-0.125, 0.035); shape.quadraticCurveTo(0, -0.005, 0.125, 0.035);
+    shape.quadraticCurveTo(0.105, -0.095, 0, -0.105); shape.quadraticCurveTo(-0.105, -0.095, -0.125, 0.035);
+    shape.closePath();
+    return new THREE.ExtrudeGeometry(shape, { depth: 0.008, bevelEnabled: true, bevelThickness: 0.004, bevelSize: 0.004, bevelSegments: 2, curveSegments: 10, steps: 1 });
+  });
+  add(mk(smile, black, false, 0, 1.245, 0.512), black);
+  oval(tongue, 0, 1.177, 0.524, 0.075, 0.042, 0.012);
+  for (const side of [-1, 1]) {
+    oval(white, side * 0.235, 1.49, 0.408, 0.145, 0.196, 0.046, side * 0.09);
+    oval(black, side * 0.235, 1.49, 0.443, 0.116, 0.164, 0.041, side * 0.09);
+    oval(white, side * 0.235 - 0.036, 1.56, 0.481, 0.036, 0.047, 0.014);
+    oval(white, side * 0.235 + 0.037, 1.435, 0.483, 0.017, 0.023, 0.01);
+    oval(blush, side * 0.375, 1.315, 0.343, 0.095, 0.069, 0.027, side * 0.18);
+  }
+  // 머리 위와 등 뒤의 작은 지느러미는 앞·옆·뒤에서 돌고래 실루엣을 드러냅니다.
+  const fin = geo('baby-dolphin-fin', () => {
+    const shape = new THREE.Shape();
+    shape.moveTo(-0.12, 0); shape.quadraticCurveTo(-0.035, 0.14, 0.02, 0.29);
+    shape.quadraticCurveTo(0.11, 0.16, 0.12, 0); shape.closePath();
+    const mesh = new THREE.ExtrudeGeometry(shape, { depth: 0.045, bevelEnabled: true, bevelThickness: 0.022, bevelSize: 0.022, bevelSegments: 2, curveSegments: 6, steps: 1 });
+    mesh.translate(0, 0, -0.0225); return mesh;
+  });
+  const crownFin = mk(fin, blue, false, 0, 1.97, -0.04);
+  crownFin.scale.set(0.7, 0.7, 0.8); crownFin.rotation.y = Math.PI / 2 + 0.25; crownFin.rotation.z = -0.18; add(crownFin, blue);
+  const backFin = mk(fin, blue, false, 0, 0.83, -0.27); backFin.rotation.y = Math.PI / 2; backFin.rotation.x = -0.95; add(backFin, blue);
+  const star = geo('baby-dolphin-star', () => {
+    const shape = new THREE.Shape();
+    for (let i = 0; i < 10; i++) {
+      const angle = Math.PI / 2 + i * Math.PI / 5, radius = i % 2 ? 0.077 : 0.157;
+      const x = Math.cos(angle) * radius, y = Math.sin(angle) * radius;
+      if (!i) shape.moveTo(x, y); else shape.lineTo(x, y);
+    }
+    shape.closePath();
+    const mesh = new THREE.ExtrudeGeometry(shape, { depth: 0.045, bevelEnabled: true, bevelThickness: 0.021, bevelSize: 0.023, bevelSegments: 3, curveSegments: 4, steps: 1 });
+    mesh.translate(0, 0, -0.0225); return mesh;
+  });
+  const clip = mk(star, yellow, false, 0.31, 1.87, 0.3); clip.rotation.z = -0.16; clip.rotation.y = 0.35; add(clip, yellow);
+  const staticParts = [...groups].map(([material, parts]) => ({ material, geometry: dolphinGeometry(parts) }));
+  // 꼬리의 몸통과 양쪽 꼬리지느러미도 한 도형으로 합쳐 고객 수가 늘어도 draw call을 제한합니다.
+  const tailShapes = [];
+  for (const [x, y, z, sx, sy, sz, ry] of [[0, 0, -0.08, 0.1, 0.105, 0.2, 0], [-0.15, 0.015, -0.25, 0.22, 0.055, 0.095, -0.45], [0.15, 0.015, -0.25, 0.22, 0.055, 0.095, 0.45]]) {
+    const shape = mk(sphG(1, 16, 10), blue, false, x, y, z); shape.scale.set(sx, sy, sz); shape.rotation.y = ry; tailShapes.push(shape);
+  }
+  dolphinCustomerParts = { blue, staticParts, tail: dolphinGeometry(tailShapes) };
+  return dolphinCustomerParts;
+}
+function makeDolphinCustomer() {
+  const assets = dolphinCustomerAssets(), root = new THREE.Group(), body = new THREE.Group(); root.add(body);
+  root.name = 'customer-baby-dolphin'; root.userData.customerStyle = 'baby-dolphin';
+  const m = { root, body, dolphin: true, arms: [], legs: [], heading: 0, phase: 0, walk: 0, ph: rnd(0, 6) };
+  for (const part of assets.staticParts) {
+    const mesh = mk(part.geometry, part.material, part.material === assets.blue); mesh.name = 'dolphin-face-body'; body.add(mesh);
+  }
+  for (const side of [-1, 1]) {
+    const arm = new THREE.Group(); arm.position.set(side * 0.3, 1.005, 0); arm.rotation.z = side * 0.3;
+    const flipper = mk(sphG(1, 16, 10), assets.blue, false, side * 0.04, -0.18, 0); flipper.scale.set(0.09, 0.24, 0.105); arm.add(flipper); body.add(arm); m.arms.push(arm);
+    const foot = new THREE.Group(); foot.position.set(side * 0.145, 0.18, 0);
+    const toe = mk(sphG(1, 16, 10), assets.blue, false, 0, -0.045, 0.085); toe.scale.set(0.125, 0.16, 0.185); foot.add(toe); body.add(foot); m.legs.push(foot);
+  }
+  m.tail = mk(assets.tail, assets.blue, false, 0, 0.43, -0.28); body.add(m.tail);
+  m.carry = new THREE.Group(); m.carry.name = 'dolphin-purchases'; m.carry.position.set(0, 0.68, 0.43); m.carry.scale.setScalar(0.33); body.add(m.carry);
+  m.rifle = new THREE.Group(); m.rifle.visible = false; // 공통 렌더 계약만 유지하며 손님에게 무기는 만들지 않습니다.
+  return m;
+}
+function animateDolphinCustomer(m, ent, dt) {
+  const speed = Math.hypot(ent.vx || 0, ent.vy || 0), moving = speed > 0.08;
+  const heading = moving ? Math.atan2(ent.vx || 0, ent.vy || 0) : ent.aimYaw;
+  if (heading !== undefined) m.heading += Math.atan2(Math.sin(heading - m.heading), Math.cos(heading - m.heading)) * Math.min(1, dt * 12);
+  m.root.position.set(ent.x, 0, ent.y); m.root.rotation.y = m.heading;
+  m.walk += ((moving ? Math.min(1, speed / 1.5) : 0) - m.walk) * Math.min(1, dt * 8);
+  m.phase += dt * (moving ? 7 + speed * 2 : 2);
+  const sway = Math.sin(m.phase), step = sway * m.walk;
+  m.body.position.y = Math.abs(sway) * 0.045 * m.walk + Math.sin(G.t * 2 + m.ph) * 0.009;
+  m.body.rotation.z = step * 0.04; m.body.rotation.x = m.walk * 0.055;
+  m.legs[0].rotation.x = step * 0.38; m.legs[1].rotation.x = -step * 0.38;
+  const holding = !!ent.carry?.length;
+  m.arms[0].rotation.x = holding ? -0.75 : -step * 0.38;
+  m.arms[1].rotation.x = holding ? -0.75 : step * 0.38;
+  m.arms[0].rotation.z = -0.3 + (holding ? 0.16 : 0);
+  m.arms[1].rotation.z = 0.3 - (holding ? 0.16 : 0);
+  m.tail.rotation.x = Math.sin(m.phase * 0.8 + m.ph) * (0.06 + m.walk * 0.1);
+  m.tail.rotation.y = Math.sin(m.phase * 0.6) * 0.08;
+}
+
+// 주인공: 바다 수호 기사 / 일꾼: 뼈다귀 곰 선원 (Henry 바탕) / 손님: 아기 돌고래 / Mako·Sharky: 상륙 해적.
 function mkChar(kind, ent) {
+  if (kind === 'customer') return makeDolphinCustomer();
   if (!GL.ready) {
     // 로딩 중에도 토끼 모자나 동물 후드 대신 단순한 두건 해적 실루엣을 표시합니다.
     const colors = kind === 'player'
@@ -286,12 +407,12 @@ function mkChar(kind, ent) {
   const n = Math.floor((ent.ph || 0) * 10);
   if (kind === 'player') { const m = makeHero(); m.melee = true; return m; }
   if (kind === 'worker') { const m = makeBoneBear(1.42); m.melee = true; return m; }
-  if (kind === 'customer') return makeGL(n % 3 === 0 ? 'captain' : 'henry', { height: 1.55, weapon: 'never' });
   const m = makeGL(ent.champion ? 'mako' : n % 2 ? 'mako' : 'sharky', { height: ent.champion ? 2.35 : 1.65, weapon: 'always' });
   m.melee = true;
   return m;
 }
 function animChar(m, ent, dt, st = {}) {
+  if (m.dolphin) { animateDolphinCustomer(m, ent, dt); return; }
   if (m.gl) animateGL(m, ent, dt, st); else animate3(m, ent, dt, !!(st.fighting || ent.fighting));
   if (m.hideHead && m.head) m.head.scale.setScalar(0.001); // 원래 머리(두건·얼굴)는 숨기고 곰 해골 머리로
   if (m.melee) {

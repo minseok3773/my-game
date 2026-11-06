@@ -649,7 +649,10 @@ function sync3D(dt) {
   }
   for (const id of STATION_IDS) {
     if (!unlocked.has(id) || DEFS[id].type !== 'shop') continue;
-    for (const c of [...runtime[id].queue, ...runtime[id].leaving]) { const m = charModel(c, () => mkChar('customer', c)); animChar(m, c, dt); m.root.visible = c.alpha > 0.15; }
+    for (const c of [...runtime[id].queue, ...runtime[id].leaving]) {
+      const m = charModel(c, () => mkChar('customer', c)); animChar(m, c, dt);
+      syncStack(m.carry, c.carry || []); m.root.visible = c.alpha > 0.15;
+    }
   }
   for (const e of enemies) {
     if (e.kind !== 'boarder') continue;

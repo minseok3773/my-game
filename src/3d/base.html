@@ -104,7 +104,7 @@ body{background:var(--sea);color:var(--ink);font-family:var(--body);touch-action
       <li>건설 칸에 서 있으면 자금이 투입되고, 다 채우면 완공됩니다</li>
       <li>일꾼 텐트를 지으면 선원 2명이 합류하고, 텐트를 증축할 때마다 2명씩 더 들어옵니다</li>
       <li>🧭 첫 확장 뒤 다음 습격을 확인하고 무역·방어·정찰 중 한 번 준비하세요. 5회 방어 성공 시 항로 확보 보상을 받습니다.</li>
-      <li>손님은 15초 넘게 기다리면 그냥 떠납니다</li>
+      <li>손님이 구매대에 도착하면 2초마다 물건 한 개를 삽니다. 재고가 없으면 최대 35초 기다린 뒤 떠납니다</li>
       <li>1차 뗏목 확장 뒤부터 해적의 습격이 시작됩니다. 뗏목 가장자리에 🗼 망루 포탑을 세워 막으세요. 상륙한 해적에게 다가가면 선장도 자동으로 칼을 휘두릅니다. 공격·처치로 전투 경험치를 얻고, 참전한 습격에서 승리하면 레벨이 오릅니다. 레벨마다 공격력 +2, 최대 체력 +6! 주인공 전투 레벨은 최대 50이며, 해적은 침공 3회당 1레벨씩 성장합니다. 해적 Lv.5·10·15마다 일반 해적보다 체력·공격력이 5배인 보스가 한 번씩 상륙합니다</li>
       <li>해적이 오면 선원들이 일을 멈추고 칼을 들어 상륙한 해적과 맞붙습니다. 일꾼이 전사하면 ⛺ 텐트 앞 네모 칸에 서 있으세요. 단계와 관계없이 1명당 $30을 내고 1초마다 자동 충원합니다. 칸을 떠나면 추가 결제가 멈춥니다</li>
       <li>첫 확장 뒤 훈련 부두에서 영웅 훈련소($100)와 선원 훈련소($120)를 지으세요. 시설 앞 네모 칸에 올라서면 강화 화면이 열립니다. 비용과 효과를 확인해 최대 50단계까지 강화합니다. 영웅은 단계마다 공격력 +3·체력 +10, 일꾼은 공격력 +1·체력 +5를 얻습니다</li>
@@ -1341,18 +1341,7 @@ const SHIRTS = ['#e85d75', '#6c5ce7', '#00a8a8', '#f2b134', '#8d6e63', '#4d96ff'
 const HAIRS = ['#3a2414', '#1d1d1d', '#a0522d', '#e2b65c', '#7a7a7a'];
 function slotPos(d, k) { const a = 0.95 + k * 0.75; return { x: d.x + d.dir[0] * a, y: d.y + d.dir[1] * a }; }
 function updateShop(id, dt) {
-  const d = DEFS[id], s = G.st[id], r = runtime[id];
-  r.queue.length = 0; r.leaving.length = 0;
-  s.saleElapsed = Math.max(0, Number.isFinite(s.saleElapsed) ? s.saleElapsed : 0) + dt;
-  while (s.saleElapsed >= 2) {
-    s.saleElapsed -= 2;
-    if (s.stock <= 0) continue;
-    const pr = priceOf(d);
-    s.stock--; s.cash += pr; addXp(pr); earn(pr);
-    G.stats.sold = (G.stats.sold || 0) + 1;
-    G.stats['sold_' + d.item] = (G.stats['sold_' + d.item] || 0) + 1;
-    floatText(d.x, d.y, `+$${pr}`, '#b8ffbf');
-  }
+  updateCustomerShop(id, dt);
 }
 
 /* ---------- 일꾼 ---------- */
