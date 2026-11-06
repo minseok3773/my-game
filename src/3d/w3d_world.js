@@ -312,7 +312,7 @@ function syncStations() {
     if (o.pile) syncPile(o.pile, d.item, s.pile);
     if (o.bobber) o.bobber.position.y = -0.27 + Math.sin(G.t * 3) * 0.05;
     if (o.inPile) { syncPile(o.inPile, 'fish', s.inPile); syncPile(o.outPile, 'grilled', s.outPile); o.fire.emissiveIntensity = s.inPile > 0 && s.outPile < maxPile(id) ? 2 + Math.sin(G.t * 20) * 0.4 : 0.05; }
-    if (o.stock) { syncPile(o.stock, d.item, s.stock); syncPile(o.cash, 'bill', Math.min(9, Math.ceil(s.cash / 8)), 0.82); }
+    if (o.stock) { syncPile(o.stock, d.item, Math.min(30, s.stock)); syncPile(o.cash, 'bill', Math.min(9, Math.ceil(s.cash / 8)), 0.82); }
     if (o.beam) o.beam.rotation.y = G.t * 1.2;
     if (o.flag) o.flag.rotation.y = Math.sin(G.t * 4) * 0.25;
     if (o.crates) syncPile(o.crates, 'crate', Math.ceil(G.st.base.food / 3));
@@ -628,7 +628,7 @@ function sync3D(dt) {
   world.position.y = raftY;
   playerMarker.position.set(player.x, 0.085, player.y);
   shallow.position.set(raftC.x, -0.2, raftC.y); shallow.scale.setScalar(raftC.r * 2.8);
-  syncRaft(); syncStations(); syncCustomerDocks(); syncTrainingStations(); syncPads([...visiblePads(), ...recruitmentPads(), ...trainingPads()]); syncSharks(dt); bossHud(); syncSeaShallows(); syncScenery(dt);
+  syncRaft(); syncStations(); syncCustomerDocks(); syncTrainingStations(); syncPads([...visiblePads(), ...recruitmentPads(), ...trainingPads()]); syncSharks(dt); bossHud(); syncSeaShallows(); syncScenery(dt); syncBrokenFx();
   // 캐릭터
   for (const m of models.values()) m.seen = false;
   const pm = charModel(player, () => mkChar('player', player)); pm.rifle.visible = false; animChar(pm, player, dt, { fighting: !!player.fighting, dead: !!player.dead }); syncStack(pm.carry, G.stack);

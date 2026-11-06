@@ -110,7 +110,7 @@ body{background:var(--sea);color:var(--ink);font-family:var(--body);touch-action
       <li>첫 확장 뒤 훈련 부두에서 영웅 훈련소($100)와 선원 훈련소($120)를 지으세요. 시설 앞 네모 칸에 올라서면 강화 화면이 열립니다. 비용과 효과를 확인해 최대 50단계까지 강화합니다. 영웅은 단계마다 공격력 +3·체력 +10, 일꾼은 공격력 +1·체력 +5를 얻습니다</li>
       <li>습격은 전투 종료 후 게임 시간 60초를 준비하고 시작됩니다. 강화 카드나 정찰로 간격이 바뀌지 않습니다</li>
       <li>해적선이 붙으면 해적이 뗏목에 상륙합니다. 해군과 포탑이 맞서 싸웁니다</li>
-      <li>상륙 해적은 선원과 칼로 싸웁니다. 방어 인원이 모두 전사하면 해적은 철수하며, 돈과 시설은 약탈하지 않습니다</li>
+      <li>일꾼이 6명 모이면 해적이 쳐들어옵니다. 상륙 해적은 선원과 칼로 싸우고, 방어 인원이 모두 쓰러지면 시설을 부숩니다. 주인공이 회복하면 끝까지 싸워 물리치세요. 부서진 시설은 옆에 서 있으면 수리됩니다</li>
     </ul>
     <div class="row"><button id="startBtn">출항하기</button></div>
     <div class="row" id="resetRow" hidden><button class="danger" id="resetBtn">처음부터 다시</button></div>
@@ -323,7 +323,7 @@ function build(data) {
   G = data;
   G.tactic = G.tactic || null;
   G.level = G.level || 1; G.xp = G.xp || 0; G.strike = false;
-  initializeTrainingState(); initializeHeroState(); restoreRaidSchedule();
+  initializeTrainingState(); initializeHeroState(); initializeBuildingState(); restoreRaidSchedule();
   if (!G.ws) { G.px *= 1.25; G.py *= 1.25; G.ws = 1; } // 넓어진 뗏목 좌표로 변환
   G.stats = G.stats || {}; G.qi = G.qi || 0; if (!G.qBase) G.qBase = {};
   G.slv = G.slv || {}; G.st.base = G.st.base || { food: 0 };
@@ -1854,7 +1854,7 @@ function update(dt) {
   // 생산
   const spd = speedMult();
   for (const id of STATION_IDS) {
-    if (!unlocked.has(id)) continue;
+    if (!unlocked.has(id) || isBroken(id)) continue; // 부서진 시설은 생산·판매 정지
     const d = DEFS[id], s = G.st[id], r = runtime[id];
     if (d.type === 'producer') {
       const mp = maxPile(id), isFish = d.item === 'fish';
@@ -1871,7 +1871,7 @@ function update(dt) {
   for (const w of workers) updateWorker(w, dt);
   separateWorkers(dt);
   updateSea(dt);
-  updateMilitary(dt); tickTrainingInteraction(dt);
+  updateMilitary(dt); tickTrainingInteraction(dt); tickRepairs(dt);
   // 상호작용
   player.timer -= dt;
   if (isHeroAvailable() && player.timer <= 0) {
@@ -1889,7 +1889,7 @@ function update(dt) {
       else if (d.type === 'converter') {
         if (s.inPile < maxPile(id) && removeFromStack(d.input)) { s.inPile++; break; }
         if (s.outPile > 0 && G.stack.length < cap) { s.outPile--; G.stack.push(d.output); break; }
-      } else if (d.type === 'shop') { if (s.stock < MAXS && removeFromStack(d.item)) { s.stock++; break; } }
+      } else if (d.type === 'shop') { if (removeFromStack(d.item)) { s.stock++; break; } } // 가판대: 들고 있는 건 전부 올림
     }
   }
   // 돈 줍기
@@ -2110,7 +2110,7 @@ function strategyHud() {
   strategyBtn.hidden = !unlocked.has('expand1') || raidOn || paused;
   const plan = raidPlan(), tactic = TACTICS.find(t => t.id === G.tactic);
   const seconds = Math.max(0, Math.ceil(G.raidT));
-  strategyBtn.innerHTML = `🧭 습격 ${seconds}초<span>${tactic ? tactic.name : '준비 선택 ›'} · Lv.${pirateLevel(G.wave + 1)}</span>`;
+  strategyBtn.innerHTML = !raidGateOpen() ? `🛡️ 일꾼 ${aliveWorkers()}/${RAID_MIN_CREW}명<span>6명이 모이면 해적 침공</span>` : `🧭 습격 ${seconds}초<span>${tactic ? tactic.name : '준비 선택 ›'} · Lv.${pirateLevel(G.wave + 1)}</span>`;
   strategyBtn.setAttribute('aria-label', `제${G.wave + 1}파 해적 레벨 ${pirateLevel(G.wave + 1)}, ${plan.name}, ${seconds}초 후 습격. ${tactic ? tactic.name : '준비 선택'}. 방어 ${G.defended || 0}/5${G.expeditionWon ? ', 항로 확보 완료' : ''}`);
 }
 function finishStrategyRaid(wasLooted) {
@@ -2147,7 +2147,7 @@ function hud(obj) {
     $('defTop').textContent = `⚔️ 방어 ${workers.length + soldiers.length + (isHeroAvailable() ? 1 : 0)}명`;
     $('hpFill').style.width = Math.max(0, ch.ratio * 100) + '%';
     $('hpBar').classList.toggle('low', ch.ratio < 0.3);
-    $('defInfo').textContent = raidOn ? `⚠️ Lv.${pirateLevel()} · 해적선 ${alive}척 · 상륙 ${enemies.filter(e => e.kind === 'boarder' && e.state === 'walk').length}명` : `⚔️ 다음 해적 Lv.${pirateLevel(G.wave + 1)}${bossDueNextRaid() ? ' · 보스' : ''} · ${Math.ceil(G.raidT)}초`;
+    $('defInfo').textContent = raidOn ? `⚠️ Lv.${pirateLevel()} · 해적선 ${alive}척 · 상륙 ${enemies.filter(e => e.kind === 'boarder' && e.state === 'walk').length}명` : !raidGateOpen() ? `🛡️ 일꾼 ${aliveWorkers()}/${RAID_MIN_CREW}명 · 6명이 모이면 해적 침공` : `⚔️ 다음 해적 Lv.${pirateLevel(G.wave + 1)}${bossDueNextRaid() ? ' · 보스' : ''} · ${Math.ceil(G.raidT)}초`;
     if (!raidOn && !workers.length && !soldiers.length) $('defInfo').textContent = crewTents().length ? '⛺ 텐트 앞 칸에서 $30씩 자동 충원' : '⛺ 텐트를 지어 방어 인원을 모으세요';
     def.classList.toggle('raid', raidOn);
   }

@@ -114,7 +114,7 @@ body{background:var(--sea);color:var(--ink);font-family:var(--body);touch-action
       <li>첫 확장 뒤 훈련 부두에서 영웅 훈련소($100)와 선원 훈련소($120)를 지으세요. 시설 앞 네모 칸에 올라서면 강화 화면이 열립니다. 비용과 효과를 확인해 최대 50단계까지 강화합니다. 영웅은 단계마다 공격력 +3·체력 +10, 일꾼은 공격력 +1·체력 +5를 얻습니다</li>
       <li>습격은 전투 종료 후 게임 시간 60초를 준비하고 시작됩니다. 강화 카드나 정찰로 간격이 바뀌지 않습니다</li>
       <li>해적선이 붙으면 해적이 뗏목에 상륙합니다. 해군과 포탑이 맞서 싸웁니다</li>
-      <li>상륙 해적은 선원과 칼로 싸웁니다. 방어 인원이 모두 전사하면 해적은 철수하며, 돈과 시설은 약탈하지 않습니다</li>
+      <li>일꾼이 6명 모이면 해적이 쳐들어옵니다. 상륙 해적은 선원과 칼로 싸우고, 방어 인원이 모두 쓰러지면 시설을 부숩니다. 주인공이 회복하면 끝까지 싸워 물리치세요. 부서진 시설은 옆에 서 있으면 수리됩니다</li>
     </ul>
     <div class="row"><button id="startBtn">출항하기</button></div>
     <div class="row" id="resetRow" hidden><button class="danger" id="resetBtn">처음부터 다시</button></div>
@@ -372,7 +372,7 @@ function build(data) {
   G = data;
   G.tactic = G.tactic || null;
   G.level = G.level || 1; G.xp = G.xp || 0; G.strike = false;
-  initializeTrainingState(); initializeHeroState(); restoreRaidSchedule();
+  initializeTrainingState(); initializeHeroState(); initializeBuildingState(); restoreRaidSchedule();
   if (!G.ws) { G.px *= 1.25; G.py *= 1.25; G.ws = 1; } // 넓어진 뗏목 좌표로 변환
   G.stats = G.stats || {}; G.qi = G.qi || 0; if (!G.qBase) G.qBase = {};
   G.slv = G.slv || {}; G.st.base = G.st.base || { food: 0 };
@@ -943,7 +943,7 @@ function updateMilitary(dt) {
   // 습격 주기
   const active = enemies.some(alive);
   if (raidOn && !active) { raidOn = false; G.raidT = 60; if (!looted) { toast('해적을 격퇴했습니다'); offerCards(); } finishStrategyRaid(looted); looted = false; }
-  if (!raidOn) { G.hp = Math.min(hpMax(), G.hp + (1 + 2 * ck('regen')) * dt); if (workers.length || soldiers.length || isHeroAvailable()) G.raidT -= dt; else G.raidT = Math.max(10, G.raidT); if (G.raidT <= 0) { startRaid(); raidOn = true; } }
+  if (!raidOn) { G.hp = Math.min(hpMax(), G.hp + (1 + 2 * ck('regen')) * dt); if (raidGateOpen()) G.raidT -= dt; else G.raidT = Math.max(10, G.raidT); if (G.raidT <= 0) { startRaid(); raidOn = true; } }
   // 해적선
   for (let i = enemies.length - 1; i >= 0; i--) {
     const e = enemies[i];
@@ -1099,7 +1099,7 @@ function update(dt) {
   // 생산
   const spd = speedMult();
   for (const id of STATION_IDS) {
-    if (!unlocked.has(id)) continue;
+    if (!unlocked.has(id) || isBroken(id)) continue; // 부서진 시설은 생산·판매 정지
     const d = DEFS[id], s = G.st[id], r = runtime[id];
     if (d.type === 'producer') {
       const mp = maxPile(id), isFish = d.item === 'fish';
@@ -1116,7 +1116,7 @@ function update(dt) {
   for (const w of workers) updateWorker(w, dt);
   separateWorkers(dt);
   updateSea(dt);
-  updateMilitary(dt); tickTrainingInteraction(dt);
+  updateMilitary(dt); tickTrainingInteraction(dt); tickRepairs(dt);
   // 상호작용
   player.timer -= dt;
   if (isHeroAvailable() && player.timer <= 0) {
@@ -1134,7 +1134,7 @@ function update(dt) {
       else if (d.type === 'converter') {
         if (s.inPile < maxPile(id) && removeFromStack(d.input)) { s.inPile++; break; }
         if (s.outPile > 0 && G.stack.length < cap) { s.outPile--; G.stack.push(d.output); break; }
-      } else if (d.type === 'shop') { if (s.stock < MAXS && removeFromStack(d.item)) { s.stock++; break; } }
+      } else if (d.type === 'shop') { if (removeFromStack(d.item)) { s.stock++; break; } } // 가판대: 들고 있는 건 전부 올림
     }
   }
   // 돈 줍기
@@ -1265,7 +1265,7 @@ function strategyHud() {
   strategyBtn.hidden = !unlocked.has('expand1') || raidOn || paused;
   const plan = raidPlan(), tactic = TACTICS.find(t => t.id === G.tactic);
   const seconds = Math.max(0, Math.ceil(G.raidT));
-  strategyBtn.innerHTML = `🧭 습격 ${seconds}초<span>${tactic ? tactic.name : '준비 선택 ›'} · Lv.${pirateLevel(G.wave + 1)}</span>`;
+  strategyBtn.innerHTML = !raidGateOpen() ? `🛡️ 일꾼 ${aliveWorkers()}/${RAID_MIN_CREW}명<span>6명이 모이면 해적 침공</span>` : `🧭 습격 ${seconds}초<span>${tactic ? tactic.name : '준비 선택 ›'} · Lv.${pirateLevel(G.wave + 1)}</span>`;
   strategyBtn.setAttribute('aria-label', `제${G.wave + 1}파 해적 레벨 ${pirateLevel(G.wave + 1)}, ${plan.name}, ${seconds}초 후 습격. ${tactic ? tactic.name : '준비 선택'}. 방어 ${G.defended || 0}/5${G.expeditionWon ? ', 항로 확보 완료' : ''}`);
 }
 function finishStrategyRaid(wasLooted) {
@@ -1594,7 +1594,7 @@ function syncStations() {
     if (o.pile) syncPile(o.pile, d.item, s.pile);
     if (o.bobber) o.bobber.position.y = -0.27 + Math.sin(G.t * 3) * 0.05;
     if (o.inPile) { syncPile(o.inPile, 'fish', s.inPile); syncPile(o.outPile, 'grilled', s.outPile); o.fire.emissiveIntensity = s.inPile > 0 && s.outPile < maxPile(id) ? 2 + Math.sin(G.t * 20) * 0.4 : 0.05; }
-    if (o.stock) { syncPile(o.stock, d.item, s.stock); syncPile(o.cash, 'bill', Math.min(9, Math.ceil(s.cash / 8)), 0.82); }
+    if (o.stock) { syncPile(o.stock, d.item, Math.min(30, s.stock)); syncPile(o.cash, 'bill', Math.min(9, Math.ceil(s.cash / 8)), 0.82); }
     if (o.beam) o.beam.rotation.y = G.t * 1.2;
     if (o.flag) o.flag.rotation.y = Math.sin(G.t * 4) * 0.25;
     if (o.crates) syncPile(o.crates, 'crate', Math.ceil(G.st.base.food / 3));
@@ -1910,7 +1910,7 @@ function sync3D(dt) {
   world.position.y = raftY;
   playerMarker.position.set(player.x, 0.085, player.y);
   shallow.position.set(raftC.x, -0.2, raftC.y); shallow.scale.setScalar(raftC.r * 2.8);
-  syncRaft(); syncStations(); syncCustomerDocks(); syncTrainingStations(); syncPads([...visiblePads(), ...recruitmentPads(), ...trainingPads()]); syncSharks(dt); bossHud(); syncSeaShallows(); syncScenery(dt);
+  syncRaft(); syncStations(); syncCustomerDocks(); syncTrainingStations(); syncPads([...visiblePads(), ...recruitmentPads(), ...trainingPads()]); syncSharks(dt); bossHud(); syncSeaShallows(); syncScenery(dt); syncBrokenFx();
   // 캐릭터
   for (const m of models.values()) m.seen = false;
   const pm = charModel(player, () => mkChar('player', player)); pm.rifle.visible = false; animChar(pm, player, dt, { fighting: !!player.fighting, dead: !!player.dead }); syncStack(pm.carry, G.stack);
@@ -2228,20 +2228,25 @@ function makeBoneBear(height = 1.58) {
   const B = {}; m.body.traverse(x => { if (x.isBone) B[x.name] = x; });
   m.root.updateMatrixWorld(true);
   const bone = mat(0xb9abd2, { roughness: 0.5 }), white = mat(0xf6f4f1, { roughness: 0.35 }), dark = mat(0x2b2631, { roughness: 0.6 });
-  const earIn = mat(0xa79cae, { roughness: 0.6 }), scarf = mat(0x2fb7b0, { roughness: 0.7 });
+  const earIn = mat(0xf6b3c6, { roughness: 0.6 }), scarf = mat(0x2fb7b0, { roughness: 0.7 });
+  const blush = mat(0xffa6bf, { roughness: 0.7 }), shine = mat(0xffffff, { roughness: 0.2, emissive: 0xffffff, emissiveIntensity: 0.4 });
   const H = (n, f) => B[n] && boneMount(B[n], f);
   const cap = (g, x, y, z, sx, sy, sz, rz = 0) => { const c = mk(sphG(1, 12, 8), bone, false, x, y, z); c.scale.set(sx, sy, sz); c.rotation.z = rz; g.add(c); return c; };
   // 곰 해골 머리 (목에 붙임: 원래 머리 뼈는 매 프레임 숨김)
-  H('Neck', g => {
+  H('Neck', root => {
+    const g = new THREE.Group(); g.scale.setScalar(1.16); root.add(g); // 몸보다 큰 머리로 아기자기하게
     const head = mk(sphG(0.33, 24, 18), white, true, 0, 0.3, 0.05); head.scale.set(1.06, 0.96, 0.96); g.add(head);
     const muzzle = mk(sphG(0.17, 18, 12), white, true, 0, 0.13, 0.2); muzzle.scale.set(1.25, 0.7, 0.85); g.add(muzzle);
     for (const d of [-1, 1]) {
       const ear = mk(sphG(0.13, 16, 12), white, true, d * 0.27, 0.56, 0.0); ear.scale.set(1, 1, 0.6); g.add(ear);
       const inner = mk(sphG(0.08, 12, 10), earIn, false, d * 0.27, 0.55, 0.06); inner.scale.set(1, 1, 0.35); g.add(inner);
-      const eye = mk(sphG(0.088, 16, 12), dark, false, d * 0.125, 0.3, 0.33); eye.scale.set(1, 1.05, 0.45); g.add(eye);
+      const eye = mk(sphG(0.092, 16, 12), dark, false, d * 0.125, 0.3, 0.33); eye.scale.set(1, 1.08, 0.45); g.add(eye);
+      g.add(mk(sphG(0.03, 10, 8), shine, false, d * 0.125 + 0.03, 0.34, 0.37));   // 눈 반짝임
+      g.add(mk(sphG(0.014, 8, 6), shine, false, d * 0.125 - 0.025, 0.27, 0.372));
+      const cheek = mk(sphG(0.058, 12, 10), blush, false, d * 0.215, 0.19, 0.28); cheek.scale.set(1.2, 0.65, 0.35); g.add(cheek); // 볼터치
     }
-    const nose = mk(coneG(0.04, 0.07, 3), dark, false, 0, 0.18, 0.36); nose.rotation.set(-0.3, 0, Math.PI); nose.scale.z = 0.6; g.add(nose);
-    for (const x of [-0.07, 0, 0.07]) g.add(bx(0.012, 0.055, 0.02, 0x8f8697, {}, false, x, 0.06, 0.335));
+    const nose = mk(sphG(0.036, 12, 10), mat(0x5d4b62, { roughness: 0.5 }), false, 0, 0.185, 0.365); nose.scale.set(1.3, 0.85, 0.7); g.add(nose);
+    for (const x of [-0.05, 0, 0.05]) g.add(bx(0.01, 0.04, 0.02, 0xcfc4dc, {}, false, x, 0.075, 0.335));
     const knot = mk(new THREE.TorusGeometry(0.11, 0.04, 8, 18), scarf, true, 0, 0.0, 0.0); knot.rotation.x = Math.PI / 2; g.add(knot);
     const tip = mk(coneG(0.07, 0.12, 4), scarf, true, 0, -0.05, 0.11); tip.rotation.x = Math.PI; g.add(tip);
   });
@@ -2254,6 +2259,7 @@ function makeBoneBear(height = 1.58) {
   H('Hips', g => {
     cap(g, 0, 0.09, 0.22, 0.03, 0.035, 0.02);
     for (const d of [-1, 1]) { cap(g, d * 0.065, 0.02, 0.22, 0.065, 0.045, 0.02); const hole = mk(sphG(0.018, 8, 6), mat(0xf3f0f5), false, d * 0.065, 0.02, 0.237); hole.scale.z = 0.4; g.add(hole); }
+    g.add(mk(sphG(0.085, 12, 10), white, false, 0, 0.04, -0.2)); // 동그란 곰 꼬리
   });
   // 팔뼈·손가락 마디 (처음 자세에서 팔은 옆으로 뻗어 있음)
   for (const [n, d] of [['UpperArmL', 1], ['UpperArmR', -1]]) H(n, g => cap(g, d * 0.1, 0.0, 0.085, 0.075, 0.022, 0.022));
@@ -2287,7 +2293,7 @@ function mkChar(kind, ent) {
   }
   const n = Math.floor((ent.ph || 0) * 10);
   if (kind === 'player') { const m = makeHero(); m.melee = true; return m; }
-  if (kind === 'worker') { const m = makeBoneBear(1.58); m.melee = true; return m; }
+  if (kind === 'worker') { const m = makeBoneBear(1.42); m.melee = true; return m; }
   if (kind === 'customer') return makeGL(n % 3 === 0 ? 'captain' : 'henry', { height: 1.55, weapon: 'never' });
   const m = makeGL(ent.champion ? 'mako' : n % 2 ? 'mako' : 'sharky', { height: ent.champion ? 2.35 : 1.65, weapon: 'always' });
   m.melee = true;
@@ -2298,7 +2304,8 @@ function animChar(m, ent, dt, st = {}) {
   if (m.hideHead && m.head) m.head.scale.setScalar(0.001); // 원래 머리(두건·얼굴)는 숨기고 곰 해골 머리로
   if (m.melee) {
     m.rifle.visible = false;
-    m.sword.visible = !st.dead && (raidOn || ent.fighting) && !(m.gl && m.weaponMode === 'always');
+    // 일꾼은 일할 때 칼을 넣어 두고, 해적과 맞붙을 때만 손에 쥠
+    m.sword.visible = !st.dead && (m.boneBear ? !!(ent.fighting || ent.swingT > 0 || (raidOn && ent.foe && alive(ent.foe))) : (raidOn || ent.fighting)) && !(m.gl && m.weaponMode === 'always');
   }
   if (m.slash) {
     m.slash.visible = !st.dead && (ent.swingT || 0) > 0;
@@ -2592,7 +2599,7 @@ function updateSwordBoarder(e, dt) {
   if (!alive(e)) return;
   const foe = nearestCrew(e, Infinity);
   e.fighting = false;
-  if (!foe) { stopMove(e, dt); return; }
+  if (!foe) { boarderWreck(e, dt); return; } // 싸울 상대가 없으면 시설을 부숨
   e.aimYaw = Math.atan2(foe.x - e.x, foe.y - e.y);
   const d = dist(e.x, e.y, foe.x, foe.y);
   if (d > MELEE_REACH) {
@@ -2651,11 +2658,9 @@ function updateDefenders(dt, bl, mult) {
     }
   }
   if (raidOn && G.raidHadCrew && !workers.length && !soldiers.length && !isHeroAvailable()) {
-    looted = true; G.raidHadCrew = false;
-    for (const e of enemies) if (alive(e)) {
-      e.fighting = false; e.state = e.kind === 'boarder' ? 'retreat' : 'flee'; e.retreatT = 2;
-    }
-    toast('⚔️ 방어 인원 전사 · 돈과 시설은 안전합니다. 텐트에서 충원하세요'); save();
+    // 해적은 물러나지 않고 시설을 부숩니다. 주인공이 회복하면 다시 싸웁니다.
+    G.raidHadCrew = false;
+    toast('⚠️ 방어 인원이 모두 쓰러졌습니다! 해적이 시설을 부숩니다 · 주인공이 회복하면 끝까지 싸우세요'); save();
   }
 }
 
@@ -3561,6 +3566,98 @@ function syncSeaShallows() {
   }
 }
 
+/* ---------- 마을 방어 규칙 ----------
+ * - 살아 있는 일꾼이 6명 이상일 때만 습격 카운트다운이 흐릅니다.
+ * - 방어 인원(일꾼·해군·주인공)이 모두 쓰러지면 해적은 물러나지 않고 가까운 시설을 부숩니다.
+ * - 주인공이 회복하면 해적은 다시 주인공과 싸우고, 주인공이 끝까지 물리쳐야 습격이 끝납니다.
+ * - 부서진 시설은 생산·판매가 멈추며, 주인공이 옆에 2초 서 있으면 무료로 수리됩니다.
+ */
+const RAID_MIN_CREW = 6;
+const BUILDING_HP = 120;
+const REPAIR_SECONDS = 2;
+const aliveWorkers = () => workers.filter(w => w.hp > 0 && !w.dead).length;
+const raidGateOpen = () => aliveWorkers() >= RAID_MIN_CREW;
+function initializeBuildingState() {
+  G.broken = G.broken && typeof G.broken === 'object' ? G.broken : {};
+  G.bhp = G.bhp && typeof G.bhp === 'object' ? G.bhp : {};
+  G.repair = null;
+}
+const isBroken = id => !!G.broken?.[id];
+const buildingMaxHp = id => BUILDING_HP + 30 * (slv(id) - 1);
+function nearestBuilding(e) {
+  let best = null, bd = Infinity;
+  for (const id of STATION_IDS) {
+    if (!unlocked.has(id) || isBroken(id)) continue;
+    const d = DEFS[id], dd = dist(e.x, e.y, d.x, d.y);
+    if (dd < bd) { bd = dd; best = id; }
+  }
+  return best;
+}
+// 싸울 상대가 없을 때 해적: 가까운 시설로 가서 칼로 부숨
+function boarderWreck(e, dt) {
+  if (!e.wreckId || isBroken(e.wreckId) || !unlocked.has(e.wreckId)) e.wreckId = nearestBuilding(e);
+  const id = e.wreckId;
+  e.fighting = false;
+  if (!id) { stopMove(e, dt); return; }
+  const d = DEFS[id], dd = dist(e.x, e.y, d.x, d.y);
+  e.aimYaw = Math.atan2(d.x - e.x, d.y - e.y);
+  if (dd > 1.35) { moveTo(e, d.x, d.y, 1.8, dt, null, true); return; }
+  stopMove(e, dt); e.fighting = true;
+  e.atkT = (e.atkT ?? 0.8) - dt;
+  if (e.atkT > 0) return;
+  e.atkT = 1.05; e.swingT = 0.4;
+  G.bhp[id] = (G.bhp[id] ?? buildingMaxHp(id)) - pirateAttack(e);
+  booms.push({ x: d.x + rnd(-0.4, 0.4), y: d.y + rnd(-0.4, 0.4), t: 0, kind: 'fire' }); shake = Math.max(shake, 0.08);
+  if (G.bhp[id] <= 0) {
+    G.broken[id] = true; delete G.bhp[id]; e.wreckId = null;
+    floatText(d.x, d.y, `💥 ${d.name} 파손!`, '#ffb0a0');
+    toast(`💥 해적이 ${d.name}을(를) 부쉈습니다! 주인공이 회복하면 다시 싸워 물리치세요`); save();
+  }
+}
+// 부서진 시설 옆에 주인공이 서 있으면 수리 (근처에 싸우는 해적이 있으면 멈춤)
+function tickRepairs(dt) {
+  if (!isHeroAvailable()) { G.repair = null; return; }
+  for (const id of Object.keys(G.broken || {})) {
+    if (!G.broken[id]) continue;
+    const d = DEFS[id];
+    if (!d || dist(player.x, player.y, d.x, d.y) > 1.9) continue;
+    if (enemies.some(e => e.kind === 'boarder' && alive(e) && dist(e.x, e.y, d.x, d.y) < 3)) return;
+    if (!G.repair || G.repair.id !== id) G.repair = { id, t: 0 };
+    G.repair.t += dt;
+    if (G.repair.t >= REPAIR_SECONDS) {
+      delete G.broken[id]; G.repair = null;
+      floatText(d.x, d.y, `🔧 ${d.name} 수리 완료`, '#b8ffbf'); save();
+    }
+    return;
+  }
+  G.repair = null;
+}
+// 부서진 시설: 기울어지고 연기가 남
+function syncBrokenFx() {
+  for (const id of STATION_IDS) {
+    const o = objs[id]; if (!o || !o.g) continue;
+    const broken = isBroken(id);
+    o.g.rotation.z = broken ? 0.12 : 0;
+    o.g.scale.y = broken ? 0.88 : 1;
+    if (broken && Math.random() < 0.12) {
+      const d = DEFS[id];
+      spawnPart(d.x + rnd(-0.4, 0.4), raftY + 1.2, d.y + rnd(-0.4, 0.4), { tex: smokeTex, add: false, color: 0x5d5752, vx: rnd(-0.1, 0.1), vy: 0.55, vz: rnd(-0.1, 0.1), life: 1.6, size: 0.9 });
+    }
+  }
+}
+// 화면 위 표시: 공격받는 시설 체력, 부서진 시설 수리 안내
+function drawBrokenSigns() {
+  for (const id of Object.keys(G.bhp || {})) {
+    const d = DEFS[id]; if (!d || isBroken(id)) continue;
+    hpBar(d.x, d.y, 95, G.bhp[id] / buildingMaxHp(id), '#ffb347', 40);
+  }
+  for (const id of Object.keys(G.broken || {})) {
+    const d = DEFS[id]; if (!d || !G.broken[id]) continue;
+    const t = G.repair && G.repair.id === id ? G.repair.t : 0;
+    sign(t > 0 ? `🔧 수리 중 ${Math.min(100, Math.round(t / REPAIR_SECONDS * 100))}%` : '🔧 부서짐 · 옆에 서면 수리', d.x, d.y, 100, 'rgba(255,232,226,.93)', '#a3392a', 15);
+  }
+}
+
 /* 판매소별 정원은 사망한 일꾼과 별도로 보관합니다. 새 일꾼은 결원부터 채웁니다. */
 const assignmentShops = () => STATION_IDS.filter(id => DEFS[id].type === 'shop' && unlocked.has(id));
 const assignmentCapacity = () => crewTents().reduce((n, id) => n + tentCapacity(id), 0);
@@ -3698,6 +3795,7 @@ function padBadge(p, full) {
   if (paid > 0) hpBar(p.x, p.y, 10, paid / p.cost, '#67cf48', 46);
 }
 function overlayWorld() {
+  drawBrokenSigns();
   const n = nightAmt();
   if (n > 0) {
     const pts = [];
@@ -3867,7 +3965,7 @@ function hud(obj) {
     $('defTop').textContent = `⚔️ 방어 ${workers.length + soldiers.length + (isHeroAvailable() ? 1 : 0)}명`;
     $('hpFill').style.width = Math.max(0, ch.ratio * 100) + '%';
     $('hpBar').classList.toggle('low', ch.ratio < 0.3);
-    $('defInfo').textContent = raidOn ? `⚠️ Lv.${pirateLevel()} · 해적선 ${alive}척 · 상륙 ${enemies.filter(e => e.kind === 'boarder' && e.state === 'walk').length}명` : `⚔️ 다음 해적 Lv.${pirateLevel(G.wave + 1)}${bossDueNextRaid() ? ' · 보스' : ''} · ${Math.ceil(G.raidT)}초`;
+    $('defInfo').textContent = raidOn ? `⚠️ Lv.${pirateLevel()} · 해적선 ${alive}척 · 상륙 ${enemies.filter(e => e.kind === 'boarder' && e.state === 'walk').length}명` : !raidGateOpen() ? `🛡️ 일꾼 ${aliveWorkers()}/${RAID_MIN_CREW}명 · 6명이 모이면 해적 침공` : `⚔️ 다음 해적 Lv.${pirateLevel(G.wave + 1)}${bossDueNextRaid() ? ' · 보스' : ''} · ${Math.ceil(G.raidT)}초`;
     if (!raidOn && !workers.length && !soldiers.length) $('defInfo').textContent = crewTents().length ? '⛺ 텐트 앞 칸에서 $30씩 자동 충원' : '⛺ 텐트를 지어 방어 인원을 모으세요';
     def.classList.toggle('raid', raidOn);
   }

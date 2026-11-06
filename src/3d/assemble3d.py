@@ -62,6 +62,7 @@ function padBadge(p, full) {
   if (paid > 0) hpBar(p.x, p.y, 10, paid / p.cost, '#67cf48', 46);
 }
 function overlayWorld() {
+  drawBrokenSigns();
   const n = nightAmt();
   if (n > 0) {
     const pts = [];
@@ -160,7 +161,7 @@ for c in chunks:
     if c.startswith("function dockRect("):
         out.append("function dockRect(id) { return customerDockRect(id); }\n"); continue
     if c.startswith("/* ---------- HUD ---------- */"):
-        out.append(B('w3d_world.js')); out.append(B('w3d_chars.js')); out.append(B('w3d_game.js')); out.append(B('w3d_progression.js')); out.append(B('w3d_melee.js')); out.append(B('w3d_hero.js')); out.append(B('w3d_crew.js')); out.append(B('w3d_training.js')); out.append(B('w3d_customers.js')); out.append(B('w3d_fx.js')); out.append(B('w3d_scenery.js')); out.append(B('w3d_logistics.js')); out.append(overlay); out.append(c); continue
+        out.append(B('w3d_world.js')); out.append(B('w3d_chars.js')); out.append(B('w3d_game.js')); out.append(B('w3d_progression.js')); out.append(B('w3d_melee.js')); out.append(B('w3d_hero.js')); out.append(B('w3d_crew.js')); out.append(B('w3d_training.js')); out.append(B('w3d_customers.js')); out.append(B('w3d_fx.js')); out.append(B('w3d_scenery.js')); out.append(B('w3d_defense.js')); out.append(B('w3d_logistics.js')); out.append(overlay); out.append(c); continue
     if c.startswith("/* ---------- 루프 ---------- */") or c.startswith("let last = performance.now()"):
         continue
     if keep(c): out.append(c)
@@ -250,7 +251,7 @@ js = js.replace('e.sinkT > 1.4', "e.sinkT > (e.kind === 'boarder' ? 2 : 1.4)")
 js = js.replace("e.state = 'sink'; e.sinkT = 0.6;", "e.state = 'sink'; e.sinkT = 0;")
 js = js.replace('function updateMilitary(dt) {', 'function updateMilitary(dt) {\n  tickMeleeEffects(dt);')
 js = js.replace('  G.wave++;', '  G.wave++; G.raidHadCrew = workers.length + soldiers.length > 0 || isHeroAvailable();')
-js = js.replace('G.raidT -= dt;', 'if (workers.length || soldiers.length || isHeroAvailable()) G.raidT -= dt; else G.raidT = Math.max(10, G.raidT);')
+js = js.replace('G.raidT -= dt;', 'if (raidGateOpen()) G.raidT -= dt; else G.raidT = Math.max(10, G.raidT);') # 일꾼 6명부터 침공
 js = js.replace("state: 'walk', atkT: 0.6", "state: 'walk', atkT: 1.0")
 js = replace_section(js, 'function hitVillage(s) {', 'function shoot(', """function hitVillage(s) {
   // 구버전 투사체 호환용. 새 해적은 선원과만 싸우며 돈과 시설을 약탈하지 않습니다.

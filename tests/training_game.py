@@ -44,10 +44,16 @@ window.trainingTest = {
   partialPaidJob() {this.reset();this.standRecruit();this.recruit(.6);save();return this.recruitState();},
   raidState() {return {seconds:G.raidT,wave:G.wave,active:raidOn,marker:G.raidIntervalVersion,
     tactic:G.tactic,money:G.money,damage:strategyDamage()};},
+  // 습격 카운트다운은 살아 있는 일꾼이 6명 이상일 때만 흐름
   minuteBoundary() {
-    this.reset();const start=this.raidState();
+    this.reset();while(workers.length<RAID_MIN_CREW)spawnWorker('tent1',1);const start=this.raidState();
     for(let i=0;i<1199;i++)updateMilitary(.05);
     const before=this.raidState();updateMilitary(.1);return {start,before,after:this.raidState()};
+  },
+  raidGate() {
+    this.reset();while(workers.length>RAID_MIN_CREW-1)workers.pop();while(workers.length<RAID_MIN_CREW-1)spawnWorker('tent1',1);
+    const t0=G.raidT;for(let i=0;i<40;i++)updateMilitary(.05);const held=G.raidT;
+    spawnWorker('tent1',1);for(let i=0;i<40;i++)updateMilitary(.05);return {t0,held,after:G.raidT,alive:aliveWorkers()};
   },
   expandTimer() {
     this.reset(false,false);G.raidT=7;
@@ -238,6 +244,8 @@ def main():
             assert state["count"] == 0 and state["money"] == 470, state
         print("One worker per second, leave/full guards and paid-job migrations/reloads PASS", flush=True)
 
+        gate = page.evaluate("trainingTest.raidGate()")
+        assert gate["held"] == gate["t0"] and gate["after"] < gate["held"] and gate["alive"] >= 6, gate
         timing = page.evaluate("trainingTest.minuteBoundary()")
         same(timing["start"]["seconds"], 60, "minute interval")
         assert not timing["before"]["active"] and timing["before"]["wave"] == 0, timing

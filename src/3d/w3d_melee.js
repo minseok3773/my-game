@@ -40,7 +40,7 @@ function updateSwordBoarder(e, dt) {
   if (!alive(e)) return;
   const foe = nearestCrew(e, Infinity);
   e.fighting = false;
-  if (!foe) { stopMove(e, dt); return; }
+  if (!foe) { boarderWreck(e, dt); return; } // 싸울 상대가 없으면 시설을 부숨
   e.aimYaw = Math.atan2(foe.x - e.x, foe.y - e.y);
   const d = dist(e.x, e.y, foe.x, foe.y);
   if (d > MELEE_REACH) {
@@ -99,10 +99,8 @@ function updateDefenders(dt, bl, mult) {
     }
   }
   if (raidOn && G.raidHadCrew && !workers.length && !soldiers.length && !isHeroAvailable()) {
-    looted = true; G.raidHadCrew = false;
-    for (const e of enemies) if (alive(e)) {
-      e.fighting = false; e.state = e.kind === 'boarder' ? 'retreat' : 'flee'; e.retreatT = 2;
-    }
-    toast('⚔️ 방어 인원 전사 · 돈과 시설은 안전합니다. 텐트에서 충원하세요'); save();
+    // 해적은 물러나지 않고 시설을 부숩니다. 주인공이 회복하면 다시 싸웁니다.
+    G.raidHadCrew = false;
+    toast('⚠️ 방어 인원이 모두 쓰러졌습니다! 해적이 시설을 부숩니다 · 주인공이 회복하면 끝까지 싸우세요'); save();
   }
 }

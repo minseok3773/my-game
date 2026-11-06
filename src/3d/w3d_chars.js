@@ -220,20 +220,25 @@ function makeBoneBear(height = 1.58) {
   const B = {}; m.body.traverse(x => { if (x.isBone) B[x.name] = x; });
   m.root.updateMatrixWorld(true);
   const bone = mat(0xb9abd2, { roughness: 0.5 }), white = mat(0xf6f4f1, { roughness: 0.35 }), dark = mat(0x2b2631, { roughness: 0.6 });
-  const earIn = mat(0xa79cae, { roughness: 0.6 }), scarf = mat(0x2fb7b0, { roughness: 0.7 });
+  const earIn = mat(0xf6b3c6, { roughness: 0.6 }), scarf = mat(0x2fb7b0, { roughness: 0.7 });
+  const blush = mat(0xffa6bf, { roughness: 0.7 }), shine = mat(0xffffff, { roughness: 0.2, emissive: 0xffffff, emissiveIntensity: 0.4 });
   const H = (n, f) => B[n] && boneMount(B[n], f);
   const cap = (g, x, y, z, sx, sy, sz, rz = 0) => { const c = mk(sphG(1, 12, 8), bone, false, x, y, z); c.scale.set(sx, sy, sz); c.rotation.z = rz; g.add(c); return c; };
   // 곰 해골 머리 (목에 붙임: 원래 머리 뼈는 매 프레임 숨김)
-  H('Neck', g => {
+  H('Neck', root => {
+    const g = new THREE.Group(); g.scale.setScalar(1.16); root.add(g); // 몸보다 큰 머리로 아기자기하게
     const head = mk(sphG(0.33, 24, 18), white, true, 0, 0.3, 0.05); head.scale.set(1.06, 0.96, 0.96); g.add(head);
     const muzzle = mk(sphG(0.17, 18, 12), white, true, 0, 0.13, 0.2); muzzle.scale.set(1.25, 0.7, 0.85); g.add(muzzle);
     for (const d of [-1, 1]) {
       const ear = mk(sphG(0.13, 16, 12), white, true, d * 0.27, 0.56, 0.0); ear.scale.set(1, 1, 0.6); g.add(ear);
       const inner = mk(sphG(0.08, 12, 10), earIn, false, d * 0.27, 0.55, 0.06); inner.scale.set(1, 1, 0.35); g.add(inner);
-      const eye = mk(sphG(0.088, 16, 12), dark, false, d * 0.125, 0.3, 0.33); eye.scale.set(1, 1.05, 0.45); g.add(eye);
+      const eye = mk(sphG(0.092, 16, 12), dark, false, d * 0.125, 0.3, 0.33); eye.scale.set(1, 1.08, 0.45); g.add(eye);
+      g.add(mk(sphG(0.03, 10, 8), shine, false, d * 0.125 + 0.03, 0.34, 0.37));   // 눈 반짝임
+      g.add(mk(sphG(0.014, 8, 6), shine, false, d * 0.125 - 0.025, 0.27, 0.372));
+      const cheek = mk(sphG(0.058, 12, 10), blush, false, d * 0.215, 0.19, 0.28); cheek.scale.set(1.2, 0.65, 0.35); g.add(cheek); // 볼터치
     }
-    const nose = mk(coneG(0.04, 0.07, 3), dark, false, 0, 0.18, 0.36); nose.rotation.set(-0.3, 0, Math.PI); nose.scale.z = 0.6; g.add(nose);
-    for (const x of [-0.07, 0, 0.07]) g.add(bx(0.012, 0.055, 0.02, 0x8f8697, {}, false, x, 0.06, 0.335));
+    const nose = mk(sphG(0.036, 12, 10), mat(0x5d4b62, { roughness: 0.5 }), false, 0, 0.185, 0.365); nose.scale.set(1.3, 0.85, 0.7); g.add(nose);
+    for (const x of [-0.05, 0, 0.05]) g.add(bx(0.01, 0.04, 0.02, 0xcfc4dc, {}, false, x, 0.075, 0.335));
     const knot = mk(new THREE.TorusGeometry(0.11, 0.04, 8, 18), scarf, true, 0, 0.0, 0.0); knot.rotation.x = Math.PI / 2; g.add(knot);
     const tip = mk(coneG(0.07, 0.12, 4), scarf, true, 0, -0.05, 0.11); tip.rotation.x = Math.PI; g.add(tip);
   });
@@ -246,6 +251,7 @@ function makeBoneBear(height = 1.58) {
   H('Hips', g => {
     cap(g, 0, 0.09, 0.22, 0.03, 0.035, 0.02);
     for (const d of [-1, 1]) { cap(g, d * 0.065, 0.02, 0.22, 0.065, 0.045, 0.02); const hole = mk(sphG(0.018, 8, 6), mat(0xf3f0f5), false, d * 0.065, 0.02, 0.237); hole.scale.z = 0.4; g.add(hole); }
+    g.add(mk(sphG(0.085, 12, 10), white, false, 0, 0.04, -0.2)); // 동그란 곰 꼬리
   });
   // 팔뼈·손가락 마디 (처음 자세에서 팔은 옆으로 뻗어 있음)
   for (const [n, d] of [['UpperArmL', 1], ['UpperArmR', -1]]) H(n, g => cap(g, d * 0.1, 0.0, 0.085, 0.075, 0.022, 0.022));
@@ -279,7 +285,7 @@ function mkChar(kind, ent) {
   }
   const n = Math.floor((ent.ph || 0) * 10);
   if (kind === 'player') { const m = makeHero(); m.melee = true; return m; }
-  if (kind === 'worker') { const m = makeBoneBear(1.58); m.melee = true; return m; }
+  if (kind === 'worker') { const m = makeBoneBear(1.42); m.melee = true; return m; }
   if (kind === 'customer') return makeGL(n % 3 === 0 ? 'captain' : 'henry', { height: 1.55, weapon: 'never' });
   const m = makeGL(ent.champion ? 'mako' : n % 2 ? 'mako' : 'sharky', { height: ent.champion ? 2.35 : 1.65, weapon: 'always' });
   m.melee = true;
@@ -290,7 +296,8 @@ function animChar(m, ent, dt, st = {}) {
   if (m.hideHead && m.head) m.head.scale.setScalar(0.001); // 원래 머리(두건·얼굴)는 숨기고 곰 해골 머리로
   if (m.melee) {
     m.rifle.visible = false;
-    m.sword.visible = !st.dead && (raidOn || ent.fighting) && !(m.gl && m.weaponMode === 'always');
+    // 일꾼은 일할 때 칼을 넣어 두고, 해적과 맞붙을 때만 손에 쥠
+    m.sword.visible = !st.dead && (m.boneBear ? !!(ent.fighting || ent.swingT > 0 || (raidOn && ent.foe && alive(ent.foe))) : (raidOn || ent.fighting)) && !(m.gl && m.weaponMode === 'always');
   }
   if (m.slash) {
     m.slash.visible = !st.dead && (ent.swingT || 0) > 0;
