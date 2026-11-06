@@ -2,9 +2,9 @@
 const TRAINING_MAX_LEVEL = 50;
 const TRAINING_FACILITIES = {
   heroForge: { id: 'heroForge', kind: 'hero', name: '영웅 훈련소', icon: '⚔️',
-    x: 20.25, y: 1.75, cost: 100, pad: { x: 20.25, y: 3.65 }, color: 0x4f9ed1 },
+    x: 11.6, y: 1.75, cost: 100, pad: { x: 11.6, y: 3.65 }, color: 0x4f9ed1 },
   crewDojo: { id: 'crewDojo', kind: 'crew', name: '선원 훈련소', icon: '🛡️',
-    x: 23, y: 1.75, cost: 120, pad: { x: 23, y: 3.65 }, color: 0x69b65a },
+    x: 14.35, y: 1.75, cost: 120, pad: { x: 14.35, y: 3.65 }, color: 0x69b65a },
 };
 // 모듈은 기존 좌표·가격 배율 변환 뒤에 삽입됩니다. 아래 값은 실제 게임 좌표·가격입니다.
 for (const facility of Object.values(TRAINING_FACILITIES)) {

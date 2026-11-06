@@ -192,12 +192,10 @@ const PADS = [
   { id: 'waterShop',  cost: 120,  x: 12.2, y: 4.0,  icon: '🥤', after: ['water'] },
   { id: 'bag2',       cost: 150,  x: 9.6,  y: 4.2,  icon: '🎒', after: ['waterShop'] },
   { id: 'tent2',      cost: 250, x: 12.0, y: 7.0,  icon: '⛺', after: ['waterShop', 'tent1'] },
-  { id: 'solar',      cost: 300,  x: 9.6,  y: 6.6,  icon: '☀️', after: ['waterShop'] },
-  { id: 'expand2',    cost: 400,  x: 4.0,  y: 7.3,  icon: '🪵', after: ['solar'] },
+  { id: 'expand2',    cost: 400,  x: 4.0,  y: 7.3,  icon: '🪵', after: ['waterShop'] },
   { id: 'garden',     cost: 250,  x: 11.5, y: 10.5, icon: '🍅', after: ['expand2'] },
   { id: 'tent3',      cost: 450, x: 9.2,  y: 11.6, icon: '⛺', after: ['garden', 'tent2'] },
   { id: 'veggieShop', cost: 350,  x: 6.5,  y: 11.2, icon: '🥗', after: ['garden'] },
-  { id: 'lighthouse', cost: 1000, x: 2.5,  y: 11.0, icon: '🗼', after: ['veggieShop'] },
   { id: 'expand3',    cost: 1200, x: 13.2, y: 12.3, icon: '⚓', after: ['veggieShop'] },
   { id: 'tower1',     cost: 800,  x: 13.3, y: 0.7,  icon: '💣', after: ['expand3'] },
   { id: 'tower2',     cost: 1200, x: 0.7,  y: 12.3, icon: '💣', after: ['expand3'] },
@@ -239,6 +237,9 @@ for (const id in UPG) { UPG[id].x *= WS; UPG[id].y *= WS; }
 // 물 배급소: 갑판 한가운데를 비우도록 오른쪽 끝(훈련소 칸 아래, 손님 부두 옆)으로 옮김
 DEFS.waterShop.x = 23.4; DEFS.waterShop.y = 6.4;
 UPG.waterShop.x = 21.4; UPG.waterShop.y = 7.8;
+// 빗물 정수기: 훈련소가 있던 오른쪽 위로 옮겨 물 배급소와 가깝게 (훈련소는 정수기 자리로)
+DEFS.water.x = 21.6; DEFS.water.y = 1.9; UPG.water.x = 21.6; UPG.water.y = 3.9;
+for (const p of PADS) if (p.id === 'water') { p.x = DEFS.water.x; p.y = DEFS.water.y; }
 for (const id of STATION_IDS) {
   const d = DEFS[id];
   if (d.type === 'shop') {
@@ -332,6 +333,13 @@ function build(data) {
   soldiers = []; enemies = []; shots = []; booms = []; raidOn = false; looted = false; trainT = 0;
   for (const t of TOWERS) towerSt[t] = { cd: 0, ang: 0 };
   unlocked = new Set(G.unlocked);
+  // 없앤 시설(태양광 패널·구조 신호탑): 예전 저장에서 지었거나 돈을 넣어 둔 경우 한 번 돌려줌
+  let removedRefund = 0;
+  for (const [id, cost] of [['solar', 420], ['lighthouse', 1400]]) {
+    if (unlocked.delete(id)) removedRefund += cost;
+    if (G.paid && G.paid[id]) { removedRefund += G.paid[id]; delete G.paid[id]; }
+  }
+  if (removedRefund > 0) { G.money += removedRefund; setTimeout(() => toast(`태양광 패널·구조 신호탑이 없어져 $${fmt(removedRefund)}를 돌려받았습니다`), 1800); }
   const legacyRespawn = G.respawn || [];
   restoringCrewRoster = Array.isArray(G.crewRoster);
   fallenCrew = []; G.recruitment = G.recruitment || {}; restoreRecruitmentJobs(); G.respawn = [];
