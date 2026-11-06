@@ -4,9 +4,8 @@
 
 ## 바로 하기
 
-- 수정본 공개 실행 페이지 (배포 후): https://minseok3773.github.io/my-game/
-- QR코드는 공개 배포 후 수정본을 실행합니다.
-- QR코드: `assets/qr-3d.png`
+- 게임 주소: https://first-village-game.pages.dev/
+- QR코드: `assets/qr-3d.png` (게임 화면으로 바로 연결)
 
 ## 파일
 
@@ -114,15 +113,22 @@ python3 -m http.server
 
 ## 공개 배포와 QR코드
 
-1. 변경 파일을 GitHub 저장소에 올립니다.
-2. 저장소 **Settings → Pages → Source**를 **GitHub Actions**로 설정합니다.
-3. **Actions → Publish game to GitHub Pages → Run workflow**를 실행합니다. 이후 `main`에 푸시하면 자동 배포됩니다.
-4. 배포 성공 후 공개 실행 페이지와 게임을 휴대폰에서 확인합니다. 그다음 QR코드를 공유하세요. 클라우드 환경 게시와 GitHub Pages 게임 배포는 별개입니다.
+게임은 **Cloudflare Pages**로 배포합니다. `main`에 올리면 Cloudflare가 자동으로 다시 배포합니다.
+
+| Cloudflare Pages 설정 | 값 |
+|---|---|
+| Project name | `first-village-game` |
+| Production branch | `main` |
+| Framework preset | `None` |
+| Build command | `sh src/tools/build_site.sh` |
+| Build output directory | `_site` |
+
+`build_site.sh`는 게임 실행에 필요한 파일(`index.html`, `raft-village-3d.html`, `models`, `assets`)만 `_site`에 모읍니다. 소스·테스트·문서는 공개되지 않습니다.
 
 주소가 바뀌면 QR을 다시 생성합니다 (Python 패키지 `qrcode==8.2` 필요).
 
 ```bash
-python3 src/tools/generate_qr.py --base-url https://minseok3773.github.io/my-game
+python3 src/tools/generate_qr.py --base-url https://first-village-game.pages.dev
 ```
 
 ## 브라우저 회귀 검증

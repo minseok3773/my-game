@@ -9,7 +9,7 @@ import qrcode
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--base-url", default="https://minseok3773.github.io/my-game"
+        "--base-url", default="https://first-village-game.pages.dev"
     )
     args = parser.parse_args()
     base = args.base_url.rstrip("/")

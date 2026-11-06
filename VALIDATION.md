@@ -1,6 +1,6 @@
 # 업데이트 검증 결과 — 2026-11-02
 
-기준 저장소: minseok3773/my-game, 기준 커밋 3e5e71e.
+기준 저장소: my-game, 기준 커밋 3e5e71e.
 `git fetch origin` 성공. 변경 전 HEAD와 origin/main의 차이 0/0 확인.
 GitHub 업로드·커밋·푸시는 수행하지 않음.
 
