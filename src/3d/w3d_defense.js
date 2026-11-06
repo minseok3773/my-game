@@ -57,12 +57,40 @@ function tickRepairs(dt) {
     if (!G.repair || G.repair.id !== id) G.repair = { id, t: 0 };
     G.repair.t += dt;
     if (G.repair.t >= REPAIR_SECONDS) {
-      delete G.broken[id]; G.repair = null;
+      delete G.broken[id]; G.repair = null; if (G.repairWork) delete G.repairWork[id];
+      for (const o of workers) if (o.repairing === id) o.repairing = null;
       floatText(d.x, d.y, `🔧 ${d.name} 수리 완료`, '#b8ffbf'); save();
     }
     return;
   }
   G.repair = null;
+}
+// 일꾼 수리: 할 일이 없는 일꾼은 부서진 시설로 가서 고침 (시설 하나에 최대 3명, 일꾼 1명 기준 4초)
+const WORKER_REPAIR_SECONDS = 4;
+function workerRepair(w, dt) {
+  const ids = Object.keys(G.broken || {}).filter(id => G.broken[id] && DEFS[id]);
+  if (!ids.length) { w.repairing = null; return false; }
+  let id = w.repairing && G.broken[w.repairing] ? w.repairing : null;
+  if (!id) {
+    id = ids.sort((a, b) => dist(w.x, w.y, DEFS[a].x, DEFS[a].y) - dist(w.x, w.y, DEFS[b].x, DEFS[b].y))
+      .find(i => workers.filter(o => o !== w && o.repairing === i).length < 3) || null;
+    w.repairing = id;
+  }
+  if (!id) return false;
+  const d = DEFS[id];
+  w.idle = false;
+  if (dist(w.x, w.y, d.x, d.y) > 1.3) { moveTo(w, d.x, d.y, workerSpeed(), dt, workers, true); return true; }
+  stopMove(w, dt);
+  if (enemies.some(e => e.kind === 'boarder' && alive(e) && dist(e.x, e.y, d.x, d.y) < 3)) return true;
+  G.repairWork = G.repairWork || {};
+  G.repairWork[id] = (G.repairWork[id] || 0) + dt;
+  if (Math.random() < 0.08) booms.push({ x: d.x + rnd(-0.4, 0.4), y: d.y + rnd(-0.4, 0.4), t: 0, kind: 'water' });
+  if (G.repairWork[id] >= WORKER_REPAIR_SECONDS) {
+    delete G.broken[id]; delete G.repairWork[id];
+    for (const o of workers) if (o.repairing === id) o.repairing = null;
+    floatText(d.x, d.y, `🔧 ${d.name} 수리 완료`, '#b8ffbf'); save();
+  }
+  return true;
 }
 // 부서진 시설: 기울어지고 연기가 남
 function syncBrokenFx() {
@@ -85,7 +113,9 @@ function drawBrokenSigns() {
   }
   for (const id of Object.keys(G.broken || {})) {
     const d = DEFS[id]; if (!d || !G.broken[id]) continue;
-    const t = G.repair && G.repair.id === id ? G.repair.t : 0;
-    sign(t > 0 ? `🔧 수리 중 ${Math.min(100, Math.round(t / REPAIR_SECONDS * 100))}%` : '🔧 부서짐 · 옆에 서면 수리', d.x, d.y, 100, 'rgba(255,232,226,.93)', '#a3392a', 15);
+    const hero = G.repair && G.repair.id === id ? G.repair.t / REPAIR_SECONDS : 0;
+    const crew = (G.repairWork?.[id] || 0) / WORKER_REPAIR_SECONDS;
+    const pct = Math.min(100, Math.round(Math.max(hero, crew) * 100));
+    sign(pct > 0 ? `🔧 수리 중 ${pct}%` : '🔧 부서짐 · 일꾼이 곧 고쳐요', d.x, d.y, 100, 'rgba(255,232,226,.93)', '#a3392a', 15);
   }
 }

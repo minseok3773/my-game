@@ -101,7 +101,7 @@ function overlayWorld() {
 """ + cust + """      if (emote && c.alpha > 0.3 && (index < 2 || index === runtime[id].queue.length)) { const p = S(c.x, c.y, 82); bubble(p.x, p.y + Math.sin(G.t * 3 + (c.ph || 0)) * 1.5 * k, emote, k, emote === '😡' ? '#ffd9d4' : '#ffffff', emote === '😡' ? 1.2 : 0); }
     }
   }
-  for (const w of workers) { const em = w.job && w.job.cash ? '💵' : w.idle ? '💤' : null; if (em) { const p = S(w.x, w.y, 82); bubble(p.x, p.y, em, k); } }
+  for (const w of workers) { const em = w.repairing ? '🔧' : w.job && w.job.cash ? '💵' : w.idle ? '💤' : null; if (em) { const p = S(w.x, w.y, 82); bubble(p.x, p.y, em, k); } }
   if (G.stack.length >= cap) { const p = S(player.x, player.y, 92); bubble(p.x, p.y, '🎒', k); }
   for (const w of workers) if ((w.hp ?? CREW_HP) < CREW_HP) hpBar(w.x, w.y, 76, w.hp / CREW_HP, '#5fd16b', 24, pirateLevel());
   for (const s of soldiers) if ((s.hp ?? 12) < 12) hpBar(s.x, s.y, 76, s.hp / 12, '#5fd16b', 24, blv());

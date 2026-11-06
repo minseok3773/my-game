@@ -1390,6 +1390,7 @@ function collectCash(w, dt) {
 function updateWorker(w, dt) {
   if (raidOn) return; // 습격 중에는 싸우러 감 (updateMilitary)
   if (returnUnassignedCargo(w, dt)) return;
+  if (!w.job && !w.carry.length && workerRepair(w, dt)) return; // 부서진 시설이 있으면 먼저 고침
   if (!w.assignment) { w.job = null; stopMove(w, dt); return; }
   if (!w.job) {
     const cid = w.carry.length ? null : pickCash(w);
