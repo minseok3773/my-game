@@ -79,7 +79,7 @@ function recruitWorker(id) {
   const heroReady = typeof isHeroAvailable === 'function' ? isHeroAvailable() : true;
   if (!heroReady || !pad || dist(player.x,player.y,pad.x,pad.y)>0.6 || !pad.canRecruit) return false;
   G.money -= 30; G.recruitment[id] = { remaining:RECRUIT_SECONDS, duration:RECRUIT_SECONDS, paid:30 };
-  save(); toast(`⛺ ${DEFS[id].name} · $30 결제, 일꾼 모집 중 (1초)`); return true;
+  save(); return true;
 }
 function tickRecruitment(dt) {
   if (!(dt>0) || paused) return;

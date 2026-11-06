@@ -761,6 +761,7 @@ function pickJob(w, item) {
   for (const r of ROUTES) {
     if (!assignmentRoute(w, r)) continue;
     if (!unlocked.has(r.from) || !unlocked.has(r.to)) continue;
+    if (isBroken(r.from) || isBroken(r.to)) continue;
     const src = sourceInfo(r.from), dst = destInfo(r.to);
     if (item && src.item !== item) continue;
     const have = G.st[r.from][src.key], room = dst.max - G.st[r.to][dst.key];
@@ -793,12 +794,26 @@ function collectCash(w, dt) {
 function updateWorker(w, dt) {
   if (raidOn) return; // 습격 중에는 싸우러 감 (updateMilitary)
   if (returnUnassignedCargo(w, dt)) return;
-  if (!w.job && !w.carry.length && workerRepair(w, dt)) return; // 부서진 시설이 있으면 먼저 고침
-  if (!w.assignment) { w.job = null; stopMove(w, dt); return; }
+  // 빈 생산소를 향하던 작업도 중단하고 수리해야 생산이 다시 시작됩니다.
+  if (!w.carry.length && workerRepair(w, dt)) { w.job = null; return; }
+  w.repairing = null;
+  if (!w.assignment) { w.job = null; w.idle = true; stopMove(w, dt); return; }
+  w.idle = false;
+  if (w.job && !w.job.cash) {
+    const src = sourceInfo(w.job.from), dst = destInfo(w.job.to);
+    if (!assignmentRoute(w, w.job) || isBroken(w.job.from) || isBroken(w.job.to) ||
+        (!w.carry.length && (!G.st[w.job.from][src.key] || G.st[w.job.to][dst.key] >= dst.max))) w.job = null;
+  }
   if (!w.job) {
     const cid = w.carry.length ? null : pickCash(w);
     w.job = cid ? { cash: cid } : pickJob(w, w.carry[0]);
-    w.idle = !w.job; if (!w.job) { stopMove(w, dt); return; }
+    if (!w.job) {
+      // 상품을 기다릴 때도 텐트에 머무르지 않고 배정된 판매소로 출근합니다.
+      const target = workerSlot(w, destInfo(w.assignment));
+      if (dist(w.x, w.y, target.x, target.y) > 0.35) moveTo(w, target.x, target.y, workerSpeed(), dt, workers);
+      else stopMove(w, dt);
+      return;
+    }
   }
   if (w.job.cash) { collectCash(w, dt); return; }
   const src = sourceInfo(w.job.from), dst = destInfo(w.job.to), s1 = G.st[w.job.from], s2 = G.st[w.job.to];
@@ -2817,7 +2832,7 @@ function recruitWorker(id) {
   const heroReady = typeof isHeroAvailable === 'function' ? isHeroAvailable() : true;
   if (!heroReady || !pad || dist(player.x,player.y,pad.x,pad.y)>0.6 || !pad.canRecruit) return false;
   G.money -= 30; G.recruitment[id] = { remaining:RECRUIT_SECONDS, duration:RECRUIT_SECONDS, paid:30 };
-  save(); toast(`⛺ ${DEFS[id].name} · $30 결제, 일꾼 모집 중 (1초)`); return true;
+  save(); return true;
 }
 function tickRecruitment(dt) {
   if (!(dt>0) || paused) return;
@@ -3108,8 +3123,10 @@ function buildTrainingStation(f) {
   details.add(bx(0.61, 0.06, 0.045, gold, {}, false, -0.56, 1.39, -0.64));
   const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 160;
   const texture = new THREE.CanvasTexture(canvas); texture.encoding = THREE.sRGBEncoding;
-  const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
-  const sign = new THREE.Sprite(material); sign.position.set(0, 2.04, -0.15); sign.scale.set(2.6, 0.81, 1); g.add(sign);
+  // 이름표는 울타리와 시설 뒤로 잘리지 않도록 장면 위에 표시합니다.
+  const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, depthTest: false });
+  const sign = new THREE.Sprite(material); sign.renderOrder = 100;
+  sign.position.set(0, 2.04, -0.15); sign.scale.set(2.6, 0.81, 1); g.add(sign);
   world.add(g);
   return { g, canvas, texture, material, level: -1 };
 }

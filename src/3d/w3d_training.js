@@ -234,8 +234,10 @@ function buildTrainingStation(f) {
   details.add(bx(0.61, 0.06, 0.045, gold, {}, false, -0.56, 1.39, -0.64));
   const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 160;
   const texture = new THREE.CanvasTexture(canvas); texture.encoding = THREE.sRGBEncoding;
-  const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
-  const sign = new THREE.Sprite(material); sign.position.set(0, 2.04, -0.15); sign.scale.set(2.6, 0.81, 1); g.add(sign);
+  // 이름표는 울타리와 시설 뒤로 잘리지 않도록 장면 위에 표시합니다.
+  const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, depthTest: false });
+  const sign = new THREE.Sprite(material); sign.renderOrder = 100;
+  sign.position.set(0, 2.04, -0.15); sign.scale.set(2.6, 0.81, 1); g.add(sign);
   world.add(g);
   return { g, canvas, texture, material, level: -1 };
 }
