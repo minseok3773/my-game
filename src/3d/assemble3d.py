@@ -100,13 +100,13 @@ function overlayWorld() {
   for (const id of STATION_IDS) {
     if (!unlocked.has(id) || DEFS[id].type !== 'shop') continue;
     for (const [index, c] of [...runtime[id].queue, ...runtime[id].leaving].entries()) {
-""" + cust + """      if (emote && c.alpha > 0.3 && (index < 2 || index === runtime[id].queue.length)) { const p = S(c.x, c.y, 82); bubble(p.x, p.y + Math.sin(G.t * 3 + (c.ph || 0)) * 1.5 * k, emote, k, emote === '😡' ? '#ffd9d4' : '#ffffff', emote === '😡' ? 1.2 : 0); }
+""" + cust + """      if (emote && c.alpha > 0.3 && (index < 2 || index === runtime[id].queue.length)) { const p = S(c.x, c.y, 82 * CHARACTER_SCALE); bubble(p.x, p.y + Math.sin(G.t * 3 + (c.ph || 0)) * 1.5 * k, emote, k, emote === '😡' ? '#ffd9d4' : '#ffffff', emote === '😡' ? 1.2 : 0); }
     }
   }
-  for (const w of workers) { const em = w.repairing ? '🔧' : w.job && w.job.cash ? '💵' : w.idle ? '💤' : null; if (em) { const p = S(w.x, w.y, 82); bubble(p.x, p.y, em, k); } }
-  if (G.stack.length >= cap) { const p = S(player.x, player.y, 92); bubble(p.x, p.y, '🎒', k); }
-  for (const w of workers) if ((w.hp ?? CREW_HP) < CREW_HP) hpBar(w.x, w.y, 76, w.hp / CREW_HP, '#5fd16b', 24, pirateLevel());
-  for (const s of soldiers) if ((s.hp ?? 12) < 12) hpBar(s.x, s.y, 76, s.hp / 12, '#5fd16b', 24, blv());
+  for (const w of workers) { const em = w.repairing ? '🔧' : w.job && w.job.cash ? '💵' : w.idle ? '💤' : null; if (em) { const p = S(w.x, w.y, 82 * CHARACTER_SCALE); bubble(p.x, p.y, em, k); } }
+  if (G.stack.length >= cap) { const p = S(player.x, player.y, 92 * CHARACTER_SCALE); bubble(p.x, p.y, '🎒', k); }
+  for (const w of workers) if ((w.hp ?? CREW_HP) < CREW_HP) hpBar(w.x, w.y, 76 * CHARACTER_SCALE, w.hp / CREW_HP, '#5fd16b', 24, pirateLevel());
+  for (const s of soldiers) if ((s.hp ?? 12) < 12) hpBar(s.x, s.y, 76 * CHARACTER_SCALE, s.hp / 12, '#5fd16b', 24, blv());
   for (const e of enemies) {
     if (!alive(e)) continue;
     if (e.kind === 'boarder') hpBar(e.x, e.y, 74, e.hp / e.max, '#ff4d3d', 26, G.wave);
@@ -269,8 +269,8 @@ js = replace_section(js, 'function hitVillage(s) {', 'function shoot(', """funct
 # 선장도 갑판에서 근접전: 보스는 배가 침몰해도 반드시 상륙합니다.
 js = replace_section(js, '  // 주인공도 가까운 해적선에 물총', '  // 탄환\n', '  updateHeroCombat(dt);\n')
 js = js.replace('function sinkEnemy(e) {', 'function sinkEnemy(e) {\n  if (e.boss) spawnBossBoarder(e);')
-js = js.replace("  for (const s of soldiers) if ((s.hp ?? 12) < 12)", "  if (isHeroAvailable() && (raidOn || player.hp < heroMaxHp())) hpBar(player.x, player.y, 86, player.hp / heroMaxHp(), '#f3d15c', 32, heroLevel());\n  for (const s of soldiers) if ((s.hp ?? 12) < 12)")
-js = js.replace("hpBar(e.x, e.y, 74,", "hpBar(e.x, e.y, e.champion ? 110 : 74,")
+js = js.replace("  for (const s of soldiers) if ((s.hp ?? 12) < 12)", "  if (isHeroAvailable() && (raidOn || player.hp < heroMaxHp())) hpBar(player.x, player.y, 86 * CHARACTER_SCALE, player.hp / heroMaxHp(), '#f3d15c', 32, heroLevel());\n  for (const s of soldiers) if ((s.hp ?? 12) < 12)")
+js = js.replace("hpBar(e.x, e.y, 74,", "hpBar(e.x, e.y, (e.champion ? 110 : 74) * CHARACTER_SCALE,")
 js = js.replace("|| '#ff4d3d', 26, G.wave);", "|| '#ff4d3d', e.champion ? 44 : 26, G.wave);")
 
 # 적 체력 배지에는 실제 해적 레벨을 표시합니다.

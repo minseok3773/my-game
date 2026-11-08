@@ -389,6 +389,16 @@ function syncPads(vp) {
 }
 
 /* ---------- 3D: 캐릭터 ---------- */
+const CHARACTER_SCALE = 2 / 3;
+const scaledCharacterRoots = new WeakSet();
+// 발 위치와 게임 좌표는 그대로 두고, 장비·운반물을 포함한 모형 전체만 줄입니다.
+function applyCharacterScale(m) {
+  if (!scaledCharacterRoots.has(m.root)) {
+    m.root.scale.multiplyScalar(CHARACTER_SCALE);
+    scaledCharacterRoots.add(m.root);
+  }
+  return m;
+}
 function makeLeg(parent, x, y, legColor, shoeColor, m) {
   const hip = new THREE.Group(); hip.position.set(x, y, 0); parent.add(hip);
   hip.add(mk(cylG(0.072, 0.064, 0.28, 10), mat(legColor), true, 0, -0.14, 0));
@@ -531,7 +541,7 @@ function animate3(m, ent, dt, fighting) {
 const models = new Map();
 function charModel(ent, make) {
   let m = models.get(ent);
-  if (!m) { m = make(); world.add(m.root); models.set(ent, m); }
+  if (!m) { m = applyCharacterScale(make()); world.add(m.root); models.set(ent, m); }
   m.seen = true; return m;
 }
 
@@ -586,10 +596,10 @@ function makeShip3(big, boss) {
     flag.rotation.y = Math.PI; g.add(flag); (g.userData.flags = g.userData.flags || []).push(flag);
   }
   // 해골 선원
-  const c1 = makeSkelCrew(1); c1.position.set(-0.5, 0.63, 0.05); c1.scale.setScalar(0.55); g.add(c1);
-  if (big) { const c2 = makeSkelCrew(2); c2.position.set(0.2, 0.37, 0.2); c2.scale.setScalar(0.5); g.add(c2); }
+  const c1 = makeSkelCrew(1); c1.position.set(-0.5, 0.63, 0.05); c1.scale.setScalar(0.55); applyCharacterScale({ root: c1 }); g.add(c1);
+  if (big) { const c2 = makeSkelCrew(2); c2.position.set(0.2, 0.37, 0.2); c2.scale.setScalar(0.5); applyCharacterScale({ root: c2 }); g.add(c2); }
   if (boss) { // 보스: 금관 쓴 해골 선장 + 금빛 테두리
-    const cap = makeSkelCrew(2); cap.position.set(-0.5, 0.63, -0.15); cap.scale.setScalar(0.75); g.add(cap);
+    const cap = makeSkelCrew(2); cap.position.set(-0.5, 0.63, -0.15); cap.scale.setScalar(0.75); applyCharacterScale({ root: cap }); g.add(cap);
     for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2; cap.add(mk(coneG(0.04, 0.12, 4), mat(0xf2c240, { metalness: 0.7, roughness: 0.3 }), false, Math.cos(a) * 0.17, 1.12, Math.sin(a) * 0.17)); }
     const trim = mk(new THREE.TorusGeometry(1, 0.035, 6, 30), mat(0xf2c240, { metalness: 0.7, roughness: 0.3 }), false, 0, 0.47, 0); trim.rotation.x = Math.PI / 2; trim.scale.set(0.8, 0.44, 1); g.add(trim);
   }

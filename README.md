@@ -39,6 +39,12 @@ python3 -m http.server
 
 그다음 브라우저에서 `http://localhost:8000/raft-village-3d.html`을 엽니다. three.js r128과 필수 부속 스크립트는 `vendor/three-r128`에 포함되어 있어 외부 CDN 연결 없이 실행됩니다. Google Fonts는 선택 사항이며 연결되지 않으면 기기 글꼴을 사용합니다. 필수 파일이나 WebGL을 불러오지 못하면 원인 안내와 재시도 버튼을 표시합니다.
 
+## 모바일 화면과 캐릭터 크기
+
+- 게임 화면은 CSS 표시 영역과 3D·2D 캔버스의 실제 해상도를 함께 갱신합니다. 화면 회전, 모바일 주소창 높이 변화, 화면 복귀와 픽셀 비율 변경에도 크기를 맞춥니다.
+- 공격력과 체력은 긴 소수점을 정리해 표시하고, 큰 자금과 능력치는 축약합니다. 상태 표시로 실제 전투·경제 수치가 바뀌지는 않습니다.
+- 선장·일꾼·해군·해적·보스·돌고래 손님과 해적선 장식 선원은 이전 모형 크기의 **2/3**입니다. 장비·운반물도 함께 축소하며 건물·배와 게임 이동 좌표는 유지합니다.
+
 ## 저장과 오류 복구
 
 - 자동 저장에 실패하면 상단 안내와 메뉴에 경고를 표시합니다. 메뉴에서 저장을 다시 시도하거나 현재 진행을 JSON 파일로 내려받을 수 있습니다.
@@ -170,6 +176,9 @@ python3 tests/storage_game.py
 python3 tests/startup_game.py
 python3 tests/customer_sales_game.py
 python3 tests/customer_visual_game.py
+python3 tests/mobile_viewport_game.py
+python3 tests/mobile_hud_game.py
+python3 tests/character_scale_game.py
 ```
 
 업데이트 검사는 `python3 tests/update_game.py --section progression`처럼 `logistics`, `progression`, `persistence`, `visual`, `mobile`을 독립 실행할 수 있습니다. 전체 실행에서는 한 섹션이 실패해도 다른 섹션을 검사한 뒤 실패 종료 코드를 반환합니다. 새 검사는 저장 오류·백업·레벨 50 경계·구버전 이관·파손 시설과 짐 보존·700~940px 화면·배정창 키보드 포커스·CDN 차단·WebGL 실패를 포함합니다.

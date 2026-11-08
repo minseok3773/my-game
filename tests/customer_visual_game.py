@@ -83,7 +83,7 @@ def main():
                 if not block_models:page.wait_for_function('dolphinTest.ready')
                 result=page.evaluate('dolphinTest.inspect()')
                 assert result['style']=='baby-dolphin' and not result['gl'] and result['gear'] and result['shared'],result
-                assert result['meshes']<=12 and 1.8<result['height']<2.5 and result['width']>1,result
+                assert result['meshes']<=12 and 1.2<result['height']<1.67 and result['width']>2/3,result
                 assert 0xffd74e in result['materials'] and 0xff9fbe in result['materials'],result
                 walking=page.evaluate('dolphinTest.walk()')
                 assert walking['finite'] and walking['carry']==1 and walking['holding']==-.75,walking

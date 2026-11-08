@@ -390,6 +390,9 @@ function animateDolphinCustomer(m, ent, dt) {
 
 // 주인공: 바다 수호 기사 / 일꾼: 뼈다귀 곰 선원 (Henry 바탕) / 손님: 아기 돌고래 / Mako·Sharky: 상륙 해적.
 function mkChar(kind, ent) {
+  return applyCharacterScale(makeCharacterModel(kind, ent));
+}
+function makeCharacterModel(kind, ent) {
   if (kind === 'customer') return makeDolphinCustomer();
   if (!GL.ready) {
     // 로딩 중에도 토끼 모자나 동물 후드 대신 단순한 두건 해적 실루엣을 표시합니다.

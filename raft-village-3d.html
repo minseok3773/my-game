@@ -18,8 +18,8 @@
 }
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-html,body{margin:0;height:100%;overflow:hidden}
-body{background:var(--sea);color:var(--ink);font-family:var(--body);touch-action:auto;user-select:none;-webkit-user-select:none}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;overflow:clip}
+body{position:fixed;inset:0;background:var(--sea);color:var(--ink);font-family:var(--body);touch-action:auto;user-select:none;-webkit-user-select:none;-webkit-text-size-adjust:100%;text-size-adjust:100%}
 #game{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
 #world,#world canvas{touch-action:none}
 .hud{position:fixed;pointer-events:none;font-family:var(--display)}
@@ -28,7 +28,7 @@ body{background:var(--sea);color:var(--ink);font-family:var(--body);touch-action
   border:3px solid #405363;background:var(--paper);color:var(--ink);
   border-radius:14px;box-shadow:0 3px 0 #40536340,inset 0 2px 0 #fff9;text-shadow:none;
 }
-#quest{top:calc(10px + env(safe-area-inset-top,0px));left:calc(10px + env(safe-area-inset-left,0px));width:calc(100% - 156px);max-width:250px;height:78px;padding:7px 10px;overflow:hidden}
+#quest{top:calc(10px + env(safe-area-inset-top,0px));left:calc(10px + env(safe-area-inset-left,0px));width:calc(100% - 156px - env(safe-area-inset-left,0px) - env(safe-area-inset-right,0px));max-width:250px;height:78px;padding:7px 10px;overflow:hidden}
 #qTitle{font-size:11px;line-height:1.1;color:#a06c2d;margin-bottom:3px}
 #qText{font-size:13px;line-height:1.25;word-break:keep-all;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 #qText b{color:#218f45;font-weight:400}
@@ -37,13 +37,14 @@ body{background:var(--sea);color:var(--ink);font-family:var(--body);touch-action
 #quest.done{animation:reward .35s ease-out}
 #money{top:calc(10px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));width:126px;height:44px;display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:3px 11px 3px 4px;font-size:24px;font-variant-numeric:tabular-nums;background:#e8ffcf;border-color:#3c663b;transition:transform .12s}
 #money i{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#63ca44;border:2px solid #3d8a30;color:#fff;font-style:normal;font-size:20px;box-shadow:inset 0 2px 0 #b2f080;text-shadow:0 1px 0 #347c29;flex:none}
+#moneyVal{display:block;flex:1;min-width:0;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:20px}
 #money.pulse{transform:scale(1.08)}
-#level{top:calc(60px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));height:36px;width:126px;padding:2px 5px;display:flex;flex-direction:column;gap:2px;align-items:center;border-width:2px;border-radius:9px;font-size:12px;box-shadow:none}
+#level{top:calc(60px + env(safe-area-inset-top,0px));right:calc(10px + env(safe-area-inset-right,0px));height:50px;width:126px;padding:2px 5px;display:flex;flex-direction:column;gap:1px;align-items:center;border-width:2px;border-radius:9px;font-size:12px;box-shadow:none;overflow:hidden}
 #level b{font-weight:400;color:#7c542c;white-space:nowrap}
-#level>div{display:flex;gap:5px;align-items:center;width:100%}#heroStats{font-size:10px;line-height:1.1;white-space:nowrap}
-#level s{display:block;flex:1;height:7px;background:#e8dcc6;border-radius:4px;overflow:hidden;text-decoration:none}
+#level>div{display:flex;flex:none;gap:5px;align-items:center;width:100%;min-width:0;line-height:14px}#heroStats{display:grid;gap:1px;width:100%;min-width:0;font-size:10px;line-height:1.15;text-align:center;font-variant-numeric:tabular-nums}#heroStats span{display:block;max-width:100%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#level s{display:block;flex:1;min-width:0;height:7px;background:#e8dcc6;border-radius:4px;overflow:hidden;text-decoration:none}
 #level s i{display:block;height:100%;width:0;background:#f7bc39;transition:width .2s}
-#goal{top:calc(102px + env(safe-area-inset-top,0px));left:10px;right:10px;max-width:none;padding:6px 10px;font-size:14px;line-height:1.35;word-break:keep-all;border-color:#349ca8;background:#edffff;box-shadow:0 3px 0 #227c8b50;text-align:center;white-space:normal}
+#goal{top:calc(118px + env(safe-area-inset-top,0px));left:calc(10px + env(safe-area-inset-left,0px));right:calc(10px + env(safe-area-inset-right,0px));max-width:none;padding:6px 10px;font-size:14px;line-height:1.35;word-break:keep-all;overflow-wrap:anywhere;border-color:#349ca8;background:#edffff;box-shadow:0 3px 0 #227c8b50;text-align:center;white-space:normal}
 #goal::before{content:attr(data-label);display:inline-block;margin-right:6px;padding:2px 5px;border-radius:5px;background:#78dbd4;color:#225961;font-size:10px;vertical-align:1px;white-space:nowrap}
 #goal[data-kind=build]{border-color:#9b6b2d;background:#fff6d6}#goal[data-kind=build]::before{background:#ffd86c;color:#765020}
 #goal[data-kind=danger]{border-color:#9a3d36;background:#ffe8de}#goal[data-kind=danger]::before{background:#fa8a75;color:#763029}
@@ -52,7 +53,7 @@ body{background:var(--sea);color:var(--ink);font-family:var(--body);touch-action
 #menuBtn{position:fixed;bottom:calc(10px + env(safe-area-inset-bottom,0px));right:calc(10px + env(safe-area-inset-right,0px));width:46px;height:48px;font-size:24px;font-family:var(--display);cursor:pointer;background:#fff1ce}
 #strategyBtn{position:fixed;z-index:4;bottom:calc(10px + env(safe-area-inset-bottom,0px));left:calc(110px + env(safe-area-inset-left,0px));right:calc(66px + env(safe-area-inset-right,0px));height:48px;min-width:44px;min-height:44px;padding:3px 6px;font:16px/1.15 var(--display);text-align:center;cursor:pointer;background:#a8eaf0;border-color:#377b91;box-shadow:0 3px 0 #245c7050,inset 0 2px 0 #e9fdff}
 #strategyBtn span{display:block;font-size:11px;line-height:1.1;margin-top:2px;color:#356175;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#defense{bottom:calc(68px + env(safe-area-inset-bottom,0px));left:10px;right:10px;height:58px;padding:6px 10px;font-size:13px;border-color:#688647;background:#f5ffe5;font-variant-numeric:tabular-nums}
+#defense{bottom:calc(68px + env(safe-area-inset-bottom,0px));left:calc(10px + env(safe-area-inset-left,0px));right:calc(10px + env(safe-area-inset-right,0px));height:58px;padding:6px 10px;font-size:13px;border-color:#688647;background:#f5ffe5;font-variant-numeric:tabular-nums;overflow:hidden}
 #defTop{display:block;line-height:1.3;width:64%;white-space:nowrap}
 #hpBar{position:absolute;right:10px;top:10px;display:block;width:30%;height:9px;border:1px solid #73964e;border-radius:5px;background:#d4e5c2;overflow:hidden}
 #hpBar i{display:block;height:100%;width:100%;background:#70ce46}#hpBar.low i{background:#ee7354}
@@ -90,7 +91,7 @@ body{background:var(--sea);color:var(--ink);font-family:var(--body);touch-action
 <canvas id="game" aria-label="표류 뗏목 마을 게임 화면"></canvas>
 <div class="hud" id="dayCard"><b>해상 생존 <em id="day">1</em>일차</b><span id="km">항해 거리 0 km</span></div>
 <div class="hud" id="money"><i>$</i><span id="moneyVal">0</span></div>
-<div class="hud" id="level"><div><b id="lv">선장 Lv.1</b><s><i id="xpBar"></i></s></div><small id="heroStats">⚔ 4 · ♥ 40/40</small></div>
+<div class="hud" id="level"><div><b id="lv">선장 Lv.1</b><s><i id="xpBar"></i></s></div><small id="heroStats"><span>⚔ 4</span><span>♥ 40/40</span></small></div>
 <div class="hud" id="goal" role="status" aria-live="polite">낚시터에서 생선을 챙기세요</div>
 <div class="hud" id="bag" role="button" tabindex="0" aria-label="가방 비우기">🎒 0/10</div>
 <div class="hud" id="quest"><div id="qTitle">📜 퀘스트</div><div id="qText"></div><span id="qBar"><i id="qFill"></i></span></div>
@@ -228,19 +229,51 @@ scene.add(lampGrill, lampTower, lampPlayer);
 const world = new THREE.Group(); scene.add(world);
 let raftY = 0, frameDt = 0.016;
 let DPR = 1;
+const viewportHost = $('world');
+// Safari의 주소창·회전으로 CSS 화면 크기가 바뀌어도 캔버스가 예전 px 폭에 묶이지 않게 합니다.
+const viewportHeight = window.CSS?.supports('height', '100dvh') ? '100dvh' : '100%';
+viewportHost.style.height = cv.style.height = viewportHeight;
+renderer.domElement.style.width = renderer.domElement.style.height = '100%';
+renderer.domElement.style.position = 'absolute'; renderer.domElement.style.inset = '0';
 function resize() {
-  DPR = Math.min(2, window.devicePixelRatio || 1);
-  W = innerWidth; H = innerHeight;
-  cv.width = W * DPR; cv.height = H * DPR; ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  // 핀치 확대 시 visualViewport.width는 줄어듭니다. 렌더 크기는 CSS 레이아웃을 기준으로 유지합니다.
+  const bounds = viewportHost.getBoundingClientRect();
+  const width = Math.max(1, Math.round(bounds.width || document.documentElement.clientWidth || innerWidth));
+  const height = Math.max(1, Math.round(bounds.height || innerHeight));
+  const pixelRatio = Math.min(2, window.devicePixelRatio || 1);
+  if (W === width && H === height && DPR === pixelRatio &&
+      cv.width === Math.floor(width * pixelRatio) && cv.height === Math.floor(height * pixelRatio) &&
+      cv.style.width === `${width}px` && cv.style.height === `${height}px` &&
+      renderer.domElement.width === cv.width && renderer.domElement.height === cv.height &&
+      renderer.domElement.style.width === '100%' && renderer.domElement.style.height === '100%') return;
+  W = width; H = height; DPR = pixelRatio;
+  cv.style.width = `${W}px`; cv.style.height = `${H}px`;
+  cv.width = Math.floor(W * DPR); cv.height = Math.floor(H * DPR); ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   Z = Math.max(0.92, Math.min(1.2, W / 390));
   const aspect = W / H;
   // 세로 화면에서는 약 8칸 폭을 유지해 캐릭터가 실제 휴대폰에서도 큼직하게 보입니다.
   const viewHeight = aspect < 0.8 ? 8.3 / aspect : aspect > 1.8 ? 10 : 13;
   camera.left = -viewHeight * aspect / 2; camera.right = -camera.left;
   camera.top = viewHeight / 2; camera.bottom = -camera.top;
-  renderer.setSize(W, H); camera.updateProjectionMatrix();
+  if (renderer.getPixelRatio() !== DPR) renderer.setPixelRatio(DPR);
+  renderer.setSize(W, H, false); camera.updateProjectionMatrix();
+  renderer.domElement.style.width = renderer.domElement.style.height = '100%';
+  window.dispatchEvent(new Event('gameviewportresize'));
 }
-window.addEventListener('resize', resize); resize();
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', resize);
+window.addEventListener('pageshow', resize);
+window.visualViewport?.addEventListener('resize', resize);
+window.visualViewport?.addEventListener('scroll', resize);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) resize(); });
+if (typeof ResizeObserver !== 'undefined') new ResizeObserver(resize).observe(viewportHost);
+function watchPixelRatio() {
+  window.matchMedia?.(`(resolution: ${window.devicePixelRatio || 1}dppx)`).addEventListener?.('change', () => {
+    resize(); watchPixelRatio();
+  }, { once: true });
+}
+watchPixelRatio();
+resize();
 
 /* ---------- 데이터 ---------- */
 const ITEMS = {
@@ -507,6 +540,20 @@ const dist = (ax, ay, bx, by) => Math.hypot(ax - bx, ay - by);
 const rnd = (a, b) => a + Math.random() * (b - a);
 const josa = (w, a, b) => { const c = w.charCodeAt(w.length - 1) - 0xAC00; return c >= 0 && c % 28 ? a : b; };
 const fmt = n => Math.floor(n).toLocaleString('ko-KR');
+// HUD에는 부동소수점 계산 흔적이나 끝없이 긴 숫자를 그대로 표시하지 않습니다.
+const hudIntegerFormat = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 0 });
+const hudDecimalFormat = new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 });
+const hudCompactFormat = new Intl.NumberFormat('ko-KR', { notation: 'compact', maximumFractionDigits: 1 });
+function hudNumber(value, fraction = false) {
+  const number = Number.isFinite(value) ? Math.max(0, value) : 0;
+  const text = number < 10000 ? (fraction ? hudDecimalFormat : hudIntegerFormat).format(number) : hudCompactFormat.format(number);
+  return text.length <= 7 ? text : number.toExponential(1).replace('e+', 'e');
+}
+function hudMoney(value) {
+  const number = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+  const text = hudNumber(number);
+  return text.length <= 6 ? text : number.toExponential(0).replace('e+', 'e');
+}
 
 /* ---------- 그리기: 물건 ---------- */
 function drawItem(type, x, y, s = 1) {
@@ -1864,6 +1911,16 @@ function syncPads(vp) {
 }
 
 /* ---------- 3D: 캐릭터 ---------- */
+const CHARACTER_SCALE = 2 / 3;
+const scaledCharacterRoots = new WeakSet();
+// 발 위치와 게임 좌표는 그대로 두고, 장비·운반물을 포함한 모형 전체만 줄입니다.
+function applyCharacterScale(m) {
+  if (!scaledCharacterRoots.has(m.root)) {
+    m.root.scale.multiplyScalar(CHARACTER_SCALE);
+    scaledCharacterRoots.add(m.root);
+  }
+  return m;
+}
 function makeLeg(parent, x, y, legColor, shoeColor, m) {
   const hip = new THREE.Group(); hip.position.set(x, y, 0); parent.add(hip);
   hip.add(mk(cylG(0.072, 0.064, 0.28, 10), mat(legColor), true, 0, -0.14, 0));
@@ -2006,7 +2063,7 @@ function animate3(m, ent, dt, fighting) {
 const models = new Map();
 function charModel(ent, make) {
   let m = models.get(ent);
-  if (!m) { m = make(); world.add(m.root); models.set(ent, m); }
+  if (!m) { m = applyCharacterScale(make()); world.add(m.root); models.set(ent, m); }
   m.seen = true; return m;
 }
 
@@ -2061,10 +2118,10 @@ function makeShip3(big, boss) {
     flag.rotation.y = Math.PI; g.add(flag); (g.userData.flags = g.userData.flags || []).push(flag);
   }
   // 해골 선원
-  const c1 = makeSkelCrew(1); c1.position.set(-0.5, 0.63, 0.05); c1.scale.setScalar(0.55); g.add(c1);
-  if (big) { const c2 = makeSkelCrew(2); c2.position.set(0.2, 0.37, 0.2); c2.scale.setScalar(0.5); g.add(c2); }
+  const c1 = makeSkelCrew(1); c1.position.set(-0.5, 0.63, 0.05); c1.scale.setScalar(0.55); applyCharacterScale({ root: c1 }); g.add(c1);
+  if (big) { const c2 = makeSkelCrew(2); c2.position.set(0.2, 0.37, 0.2); c2.scale.setScalar(0.5); applyCharacterScale({ root: c2 }); g.add(c2); }
   if (boss) { // 보스: 금관 쓴 해골 선장 + 금빛 테두리
-    const cap = makeSkelCrew(2); cap.position.set(-0.5, 0.63, -0.15); cap.scale.setScalar(0.75); g.add(cap);
+    const cap = makeSkelCrew(2); cap.position.set(-0.5, 0.63, -0.15); cap.scale.setScalar(0.75); applyCharacterScale({ root: cap }); g.add(cap);
     for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2; cap.add(mk(coneG(0.04, 0.12, 4), mat(0xf2c240, { metalness: 0.7, roughness: 0.3 }), false, Math.cos(a) * 0.17, 1.12, Math.sin(a) * 0.17)); }
     const trim = mk(new THREE.TorusGeometry(1, 0.035, 6, 30), mat(0xf2c240, { metalness: 0.7, roughness: 0.3 }), false, 0, 0.47, 0); trim.rotation.x = Math.PI / 2; trim.scale.set(0.8, 0.44, 1); g.add(trim);
   }
@@ -2594,6 +2651,9 @@ function animateDolphinCustomer(m, ent, dt) {
 
 // 주인공: 바다 수호 기사 / 일꾼: 뼈다귀 곰 선원 (Henry 바탕) / 손님: 아기 돌고래 / Mako·Sharky: 상륙 해적.
 function mkChar(kind, ent) {
+  return applyCharacterScale(makeCharacterModel(kind, ent));
+}
+function makeCharacterModel(kind, ent) {
   if (kind === 'customer') return makeDolphinCustomer();
   if (!GL.ready) {
     // 로딩 중에도 토끼 모자나 동물 후드 대신 단순한 두건 해적 실루엣을 표시합니다.
@@ -3648,8 +3708,8 @@ if (THREE.EffectComposer && THREE.RenderPass && THREE.UnrealBloomPass) {
   composer.addPass(gammaPass);
 }
 function renderScene() { if (composer) composer.render(); else renderer.render(scene, camera); }
-function resizeFx() { if (composer) { composer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); composer.setSize(W, H); } }
-window.addEventListener('resize', resizeFx); resizeFx();
+function resizeFx() { if (composer) { composer.setPixelRatio(DPR); composer.setSize(W, H); } }
+window.addEventListener('gameviewportresize', resizeFx); resizeFx();
 
 // 캔버스로 만든 질감: 빛 알갱이, 연기, 나뭇결, 돌벽
 function canvasTex(w, h, draw, repeat) {
@@ -4307,17 +4367,17 @@ function overlayWorld() {
     for (const [index, c] of [...runtime[id].queue, ...runtime[id].leaving].entries()) {
       const stage = c.emote ? 0 : c.wait > 12 ? 3 : c.wait > 8 ? 2 : c.wait > 4 ? 1 : 0;
       const emote = c.emote || [null, '😐', '😟', '😡'][stage], mood = ['happy', 'meh', 'worried', 'angry'][stage];
-      if (emote && c.alpha > 0.3 && (index < 2 || index === runtime[id].queue.length)) { const p = S(c.x, c.y, 82); bubble(p.x, p.y + Math.sin(G.t * 3 + (c.ph || 0)) * 1.5 * k, emote, k, emote === '😡' ? '#ffd9d4' : '#ffffff', emote === '😡' ? 1.2 : 0); }
+      if (emote && c.alpha > 0.3 && (index < 2 || index === runtime[id].queue.length)) { const p = S(c.x, c.y, 82 * CHARACTER_SCALE); bubble(p.x, p.y + Math.sin(G.t * 3 + (c.ph || 0)) * 1.5 * k, emote, k, emote === '😡' ? '#ffd9d4' : '#ffffff', emote === '😡' ? 1.2 : 0); }
     }
   }
-  for (const w of workers) { const em = w.repairing ? '🔧' : w.job && w.job.cash ? '💵' : w.idle ? '💤' : null; if (em) { const p = S(w.x, w.y, 82); bubble(p.x, p.y, em, k); } }
-  if (G.stack.length >= cap) { const p = S(player.x, player.y, 92); bubble(p.x, p.y, '🎒', k); }
-  for (const w of workers) if ((w.hp ?? crewHpMax()) < crewHpMax()) hpBar(w.x, w.y, 76, w.hp / crewHpMax(), '#5fd16b', 24, pirateLevel());
-  if (isHeroAvailable() && (raidOn || player.hp < heroMaxHp())) hpBar(player.x, player.y, 86, player.hp / heroMaxHp(), '#f3d15c', 32, heroLevel());
-  for (const s of soldiers) if ((s.hp ?? 12) < 12) hpBar(s.x, s.y, 76, s.hp / 12, '#5fd16b', 24, blv());
+  for (const w of workers) { const em = w.repairing ? '🔧' : w.job && w.job.cash ? '💵' : w.idle ? '💤' : null; if (em) { const p = S(w.x, w.y, 82 * CHARACTER_SCALE); bubble(p.x, p.y, em, k); } }
+  if (G.stack.length >= cap) { const p = S(player.x, player.y, 92 * CHARACTER_SCALE); bubble(p.x, p.y, '🎒', k); }
+  for (const w of workers) if ((w.hp ?? crewHpMax()) < crewHpMax()) hpBar(w.x, w.y, 76 * CHARACTER_SCALE, w.hp / crewHpMax(), '#5fd16b', 24, pirateLevel());
+  if (isHeroAvailable() && (raidOn || player.hp < heroMaxHp())) hpBar(player.x, player.y, 86 * CHARACTER_SCALE, player.hp / heroMaxHp(), '#f3d15c', 32, heroLevel());
+  for (const s of soldiers) if ((s.hp ?? 12) < 12) hpBar(s.x, s.y, 76 * CHARACTER_SCALE, s.hp / 12, '#5fd16b', 24, blv());
   for (const e of enemies) {
     if (!alive(e)) continue;
-    if (e.kind === 'boarder') hpBar(e.x, e.y, e.champion ? 110 : 74, e.hp / e.max, ({ bomber: '#ff9a2e', thief: '#c9a2ff', sniper: '#5ec8ff' })[e.type] || '#ff4d3d', e.champion ? 44 : 26, e.level || pirateLevel());
+    if (e.kind === 'boarder') hpBar(e.x, e.y, (e.champion ? 110 : 74) * CHARACTER_SCALE, e.hp / e.max, ({ bomber: '#ff9a2e', thief: '#c9a2ff', sniper: '#5ec8ff' })[e.type] || '#ff4d3d', e.champion ? 44 : 26, e.level || pirateLevel());
     else if (!e.boss) hpBar(e.x, e.y, e.big ? 120 : 90, e.hp / e.max, '#ff4d3d', e.big ? 50 : 36, e.level || pirateLevel());
   }
 }
@@ -4426,7 +4486,7 @@ function hud(obj) {
   const key = [Math.floor(G.money), day, Math.floor(km), G.stack.length, cap, obj.text, heroLevel(), G.hero.xp, heroAttack(), Math.ceil(player.hp), isHeroAvailable(),
     unlocked.has('tent1'), Math.ceil(G.hp), G.soldiers, workers.length, Math.ceil(crewHealthStatus().hp), G.wave, pirateLevel(), raidOn, Math.ceil(G.raidT), enemies.length, wages(), G.strike, phaseInfo(), G.qi, questInfo().cur, Math.round(incomePerMin() / 5)].join('|');
   const q = questInfo();
-  $('qText').innerHTML = `${q.text} <b>${Math.min(q.cur, q.n)}/${q.n}</b> · $${fmt(q.reward)}`;
+  $('qText').innerHTML = `${q.text} <b>${hudNumber(Math.min(q.cur, q.n))}/${hudNumber(q.n)}</b> · $${hudMoney(q.reward)}`;
   $('qFill').style.width = Math.min(100, q.cur / q.n * 100) + '%';
   if (key === lastHud) return; lastHud = key;
   const def = $('defense');
@@ -4443,9 +4503,11 @@ function hud(obj) {
     def.classList.toggle('raid', raidOn);
   }
   $('lv').textContent = `선장 Lv.${heroLevel()}`;
-  $('heroStats').textContent = `⚔ ${heroAttack()} · ♥ ${Math.ceil(player.hp)}/${heroMaxHp()}`;
+  const shownMaxHp = Math.max(0, Math.ceil(heroMaxHp())), shownHp = Math.min(shownMaxHp, Math.max(0, Math.ceil(player.hp)));
+  $('heroStats').innerHTML = `<span>⚔ ${hudNumber(heroAttack(), true)}</span><span>♥ ${hudNumber(shownHp)}/${hudNumber(shownMaxHp)}</span>`;
+  $('heroStats').title = `공격력 ${hudDecimalFormat.format(heroAttack())} · 체력 ${hudIntegerFormat.format(shownHp)}/${hudIntegerFormat.format(shownMaxHp)}`;
   $('xpBar').style.width = (heroLevel() >= HERO_MAX_LEVEL ? 100 : Math.min(100, G.hero.xp / heroXpNeed() * 100)) + '%';
-  moneyEl.textContent = fmt(G.money);
+  moneyEl.textContent = hudMoney(G.money); moneyEl.title = fmt(G.money);
   $('day').textContent = day; $('km').textContent = `${phaseInfo()} · 수입 $${fmt(incomePerMin())}/분`;
   $('bag').innerHTML = `🎒 ${G.stack.length}/${cap}${G.stack.length ? '<em>비우기</em>' : ''}`; $('bag').classList.toggle('full', G.stack.length >= cap);
 }

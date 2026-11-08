@@ -14,8 +14,8 @@ if (THREE.EffectComposer && THREE.RenderPass && THREE.UnrealBloomPass) {
   composer.addPass(gammaPass);
 }
 function renderScene() { if (composer) composer.render(); else renderer.render(scene, camera); }
-function resizeFx() { if (composer) { composer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); composer.setSize(W, H); } }
-window.addEventListener('resize', resizeFx); resizeFx();
+function resizeFx() { if (composer) { composer.setPixelRatio(DPR); composer.setSize(W, H); } }
+window.addEventListener('gameviewportresize', resizeFx); resizeFx();
 
 // 캔버스로 만든 질감: 빛 알갱이, 연기, 나뭇결, 돌벽
 function canvasTex(w, h, draw, repeat) {
