@@ -8,10 +8,11 @@ ROOT=Path(__file__).resolve().parents[1]
 HOOK=r'''
 window.pokerTest={
  get G(){return G},get state(){return tavernState()},rank:pokerRank,compare:pokerCompare,
- deal:tavernDeal,hold:tavernHold,show:tavernShowdown,open:tavernOpen,save,build,serialize,
+ deal:tavernDeal,hold:tavernHold,show:tavernShowdown,open:tavernOpen,save,build,serialize,load,reloadLatestStorage,
+ get storage(){return {...storageState}},
  get clock(){return G.t},tick(){update(.5)},
  reset(ready=true){resetStorageState();const g=freshState();g.money=100;if(ready)g.unlocked.push('expand1');build(g);paused=true;document.getElementById('helpPanel').hidden=false;},
- fixture(player,dealer){const r=tavernState().round;r.player=player;r.dealer=dealer;r.held=[true,true,true,true,true];},
+ fixture(player,dealer){const r=tavernState().round;r.player=player;r.dealer=dealer;r.held=[true,true,true,true,true];r.deck=Array.from({length:52},(_,i)=>i).filter(c=>![...player,...dealer].includes(c));},
  raid(value){raidOn=value;}
 };
 '''
@@ -105,6 +106,66 @@ def main():
    page.keyboard.press('Escape');assert page.locator('#tavernPanel').is_hidden()
    assert not errors,errors
    print('PASS three mobile layouts, keyboard focus and close; no runtime errors',flush=True)
+   # Optional damaged poker fields cannot corrupt or reset the village.
+   page.evaluate('''() => {pokerTest.reset();const g=pokerTest.serialize();g.st.fishing.pile=9;g.unlocked.push('tent1');delete g.crewRoster;pokerTest.build(g);pokerTest.open();pokerTest.deal(20);}''')
+   original=page.evaluate('pokerTest.serialize()')
+   page.evaluate('''() => {const g=pokerTest.serialize();delete g.tavern.round.held;pokerTest.build(g);pokerTest.open();}''')
+   assert page.evaluate('pokerTest.state.round.held')==[False]*5
+   assert page.evaluate('pokerTest.G.money')==80
+   for field,value in [('player',[]),('deck',[0]*42),('held',[True]),('stake',-10),('phase','unknown')]:
+    bad={**original,'tavern':{**original['tavern'],'round':{**original['tavern']['round'],field:value}}}
+    page.evaluate('(g)=>{pokerTest.build(g);pokerTest.open();}',bad)
+    assert page.evaluate('pokerTest.state.round') is None
+    assert page.evaluate('!!pokerTest.state.damagedRound')
+    assert page.evaluate('pokerTest.G.money')==80
+    assert page.locator('#tavernDeal').is_disabled()
+    assert not page.evaluate('pokerTest.show()')
+    assert page.evaluate('pokerTest.G.unlocked')==original['unlocked']
+    assert page.evaluate('pokerTest.G.st.fishing.pile')==9
+    assert page.evaluate('pokerTest.serialize().crewRoster')==original['crewRoster']
+    page.locator('#tavernClose').click();assert page.locator('#tavernPanel').is_hidden()
+   bad_result={**original,'tavern':{**original['tavern'],'round':{**original['tavern']['round'],'phase':'result','deck':[],'outcome':1,'payout':10000}}}
+   page.evaluate('(g)=>{pokerTest.build(g);pokerTest.open();}',bad_result)
+   assert page.evaluate('!!pokerTest.state.damagedRound')
+   assert not page.evaluate('pokerTest.show()')
+   assert page.evaluate('pokerTest.G.money')==80
+   page.locator('#tavernDiscardDamaged').click()
+   assert not page.evaluate('!!pokerTest.state.damagedRound')
+   assert page.evaluate('pokerTest.G.money')==80
+   page.reload(wait_until='networkidle');page.wait_for_function('!!window.pokerTest');page.evaluate('pokerTest.open()')
+   assert not page.evaluate('!!pokerTest.state.damagedRound')
+   assert page.evaluate('pokerTest.state.round') is None
+   assert page.evaluate('pokerTest.G.money')==80
+   print('PASS missing holds repaired; bad cards/deck/stake/phase isolated without village reset or payouts',flush=True)
+
+   # Two ordinary pages share localStorage but keep independent in-memory villages.
+   page.evaluate('pokerTest.reset();pokerTest.save()')
+   other=ctx.new_page();other.on('pageerror',lambda e:errors.append(str(e)))
+   other.goto(url,wait_until='networkidle');other.wait_for_function('!!window.pokerTest')
+   page.evaluate('pokerTest.open();pokerTest.deal(20)')
+   saved=page.evaluate('localStorage.getItem("raft-village-v1")')
+   other.evaluate('pokerTest.open()')
+   assert not other.evaluate('pokerTest.deal(20)')
+   assert other.evaluate('pokerTest.G.money')==100
+   assert other.evaluate('pokerTest.storage.conflict')
+   assert other.evaluate('localStorage.getItem("raft-village-v1")')==saved
+   assert not other.evaluate('pokerTest.save()')
+   assert other.evaluate('localStorage.getItem("raft-village-v1")')==saved
+   other.locator('#tavernReload').click()
+   assert other.evaluate('pokerTest.G.money')==80
+   assert other.evaluate('pokerTest.state.round.phase')=='draw'
+   # Both pages now hold the same dealt round; one settles and the stale one must stop.
+   page.evaluate('pokerTest.fixture([8,9,10,11,12],[13,15,17,19,21]);pokerTest.show()')
+   settled=page.evaluate('localStorage.getItem("raft-village-v1")')
+   assert not other.evaluate('pokerTest.hold(0)')
+   assert not other.evaluate('pokerTest.save()')
+   assert other.evaluate('localStorage.getItem("raft-village-v1")')==settled
+   other.locator('#tavernReload').click()
+   assert other.evaluate('pokerTest.G.money')==120
+   assert other.evaluate('pokerTest.state.round.phase')=='result'
+   assert not other.evaluate('pokerTest.show()')
+   assert not errors,errors
+   print('PASS two-tab stale deal/hold/autosave blocked; reload preserves latest money and settled result',flush=True)
    browser.close()
  finally:server.shutdown();server.server_close();thread.join(timeout=5)
 if __name__=='__main__':main()

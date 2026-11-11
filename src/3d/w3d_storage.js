@@ -1,10 +1,10 @@
 /* ---------- 자동 저장 상태·실패 복구·파일 백업 ---------- */
 const STORAGE_BACKUP_KEY = KEY + ':backup';
-const storageState = { failed: false, error: '', lastSavedAt: 0, lastGood: '', loadBlocked: false, recovered: false };
+const storageState = { failed: false, error: '', lastSavedAt: 0, lastGood: '', loadBlocked: false, recovered: false, pokerBaseline: undefined, conflict: false };
 const storagePanel = document.createElement('section');
 storagePanel.id = 'storagePanel';
 storagePanel.setAttribute('aria-label', '진행 상황 저장');
-storagePanel.innerHTML = '<p id="storageStatus" role="status" aria-live="polite">진행 상황은 이 기기에 자동 저장됩니다.</p><p id="storageTime"></p><div class="row"><button type="button" id="storageRetry">저장 다시 시도</button><button type="button" id="storageExport">현재 진행 백업</button></div>';
+storagePanel.innerHTML = '<p id="storageStatus" role="status" aria-live="polite">진행 상황은 이 기기에 자동 저장됩니다.</p><p id="storageTime"></p><div class="row"><button type="button" id="storageRetry">저장 다시 시도</button><button type="button" id="storageExport">현재 진행 백업</button><button type="button" id="storageReload" hidden>최신 저장 불러오기</button></div>';
 document.getElementById('resetRow').before(storagePanel);
 const storageStyle = document.createElement('style');
 storageStyle.textContent = '#storagePanel{border-top:2px dashed #ddcda9;padding-top:8px;margin-top:14px}#storagePanel p{font-size:14px;line-height:1.45;margin:5px 0}#storagePanel[data-failed=true] #storageStatus{color:#9a302b;font-weight:bold}#storagePanel .row{display:flex;flex-wrap:wrap;gap:8px}#storagePanel button{flex:1;min-height:44px;font-size:15px;padding:8px;touch-action:manipulation}#storageTime{color:#657565;font-size:12px!important}#menuBtn[data-storage-failed=true]{border-color:#a43b34;background:#ffe5bf}#menuBtn[data-storage-failed=true]::after{content:"!";position:absolute;right:-5px;top:-7px;display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#ac342e;color:#fff;font:bold 16px sans-serif}';
@@ -21,6 +21,7 @@ function updateStorageStatus() {
     : storageState.lastSavedAt ? '진행 상황이 이 기기에 저장되었습니다.' : '진행 상황은 이 기기에 자동 저장됩니다.';
   if (status.textContent !== text) status.textContent = text;
   storagePanel.dataset.failed = String(storageState.failed);
+  document.getElementById('storageReload').hidden = !storageState.conflict;
   const menu = document.getElementById('menuBtn');
   menu.dataset.storageFailed = String(storageState.failed);
   menu.setAttribute('aria-label', storageState.failed ? '저장 실패 · 메뉴에서 재시도하거나 백업하기' : storageMenuLabel);
@@ -42,12 +43,31 @@ function parseStoredGame(raw) {
   if (!data || typeof data.st !== 'object' || !data.st || !Array.isArray(data.unlocked)) throw new Error('Invalid saved game');
   return data;
 }
+// 포커 기록이 바뀐 다른 탭의 저장은 오래된 자동 저장으로 되돌리지 않습니다.
+function storagePokerStamp(raw) {
+  if (!raw) return '[null,0,null]';
+  try { const t=JSON.parse(raw).tavern; return JSON.stringify([t?.round || null,t?.played || 0,t?.damagedRound || null]); }
+  catch (error) { return 'invalid:' + raw; }
+}
+function storageConflict() {
+  storageState.failed = true; storageState.conflict = true;
+  storageState.error = '다른 탭에서 포커 진행이 변경됐습니다. 이 탭의 저장을 멈췄습니다. 현재 진행을 백업하거나 최신 저장을 불러오세요.';
+  updateStorageStatus(); return false;
+}
+function reloadLatestStorage() {
+  const data = load();
+  if (!data || storageState.loadBlocked) return false;
+  build(data); paused = !expeditionBusy(); document.getElementById('helpPanel').hidden = expeditionBusy();
+  return true;
+}
 function save() {
   if (storageState.loadBlocked) return false; // 읽지 못한 기존 저장을 새 게임으로 덮어쓰지 않습니다.
   try {
+    const primary = localStorage.getItem(KEY);
+    if (storageState.pokerBaseline !== undefined && storagePokerStamp(primary) !== storageState.pokerBaseline) return storageConflict();
     const data = JSON.stringify(serialize()), previous = storageState.lastGood;
     localStorage.setItem(KEY, data);
-    storageState.lastGood = data;
+    storageState.lastGood = data; storageState.pokerBaseline = storagePokerStamp(data); storageState.conflict = false;
     storageState.lastSavedAt = Date.now();
     storageState.failed = false; storageState.error = ''; storageState.recovered = false;
     // 백업 용량 부족은 이미 성공한 기본 저장을 실패로 바꾸지 않습니다.
@@ -61,6 +81,7 @@ function save() {
 function load() {
   try {
     const raw = localStorage.getItem(KEY);
+    storageState.pokerBaseline = storagePokerStamp(raw); storageState.conflict = false;
     if (!raw) {
       storageState.loadBlocked = false;
       storageState.failed = false; storageState.error = ''; updateStorageStatus();
@@ -86,6 +107,7 @@ function load() {
   }
 }
 function retryStorage() {
+  if (storageState.conflict) return false; // 새 저장을 불러오기 전에는 오래된 상태를 다시 쓰지 않습니다.
   if (storageState.loadBlocked) {
     const recovered = load();
     if (storageState.loadBlocked) return false;
@@ -97,6 +119,8 @@ function retryStorage() {
 }
 // 기존의 두 번 확인하는 초기화 동작에서만 호출합니다.
 function resetStorageState() {
+  try { storageState.pokerBaseline = storagePokerStamp(localStorage.getItem(KEY)); } catch (error) { storageState.pokerBaseline = undefined; }
+  storageState.conflict = false;
   storageState.loadBlocked = false;
   storageState.lastGood = ''; storageState.lastSavedAt = 0;
   storageState.failed = false; storageState.error = ''; storageState.recovered = false;
@@ -121,3 +145,5 @@ function exportSave() {
 }
 document.getElementById('storageRetry').onclick = retryStorage;
 document.getElementById('storageExport').onclick = exportSave;
+
+document.getElementById('storageReload').onclick = reloadLatestStorage;
