@@ -4,7 +4,7 @@ const heroLevel = () => G.hero?.level || 1;
 const heroXpNeed = (level = heroLevel()) => 20 + 10 * (level - 1);
 const heroBaseAttack = level => (4 + 2 * (level - 1)) * allyMultiplier(level);
 const heroBaseHp = level => (40 + 6 * (level - 1)) * allyMultiplier(level);
-const heroAttack = () => heroBaseAttack(heroLevel()) + (G.hero?.legacyAttackBonus || 0) + 2 * ck('playerGun') + 3 * trainingLevel('hero');
+const heroAttack = () => (heroBaseAttack(heroLevel()) + (G.hero?.legacyAttackBonus || 0) + 2 * ck('playerGun') + 3 * trainingLevel('hero')) * expeditionHeroBonus();
 const heroMaxHp = () => heroBaseHp(heroLevel()) + (G.hero?.legacyHpBonus || 0) + 10 * trainingLevel('hero');
 const isHeroAvailable = () => !!player && !player.dead && player.hp > 0 && !(G.hero?.downT > 0);
 function initializeHeroState() {

@@ -361,6 +361,7 @@ function build(data) {
   cam = { x: player.x, y: player.y };
   if (G.combat && G.combat.raidOn) { enemies = G.combat.enemies; raidOn = true; looted = !!G.combat.looted; }
   strategyPanel.hidden = true; recruitPanel.hidden = true; trainingPanel.hidden = true;
+  expeditionRestore();
 }
 function applyUnlock(id) {
   const d = DEFS[id];
@@ -1874,6 +1875,8 @@ function payWages() {
 }
 function removeFromStack(type) { const i = G.stack.lastIndexOf(type); if (i >= 0) { G.stack.splice(i, 1); return true; } return false; }
 function update(dt) {
+  if (expeditionUpdate(dt)) return;
+  expeditionVillageTick(dt);
   G.t += dt; tickHeroState(dt);
   const dayNow = 1 + Math.floor(G.t / 40);
   if (G.lastDay && dayNow > G.lastDay) payWages();
@@ -1906,7 +1909,7 @@ function update(dt) {
     } else if (d.type === 'shop') updateShop(id, dt);
   }
   balanceAssignments();
-  for (const w of workers) updateWorker(w, dt);
+  for (const w of workers) if (expeditionWorkerAvailable(w)) updateWorker(w, dt);
   separateWorkers(dt);
   updateSea(dt);
   updateMilitary(dt); tickTrainingInteraction(dt); tickRepairs(dt);
@@ -2290,6 +2293,7 @@ $('startBtn').onclick = () => { $('helpPanel').hidden = true; paused = false; la
 // 가방 비우기: 든 물건을 바다로 던져 버림
 const tossed = [];
 function emptyBag() {
+  if (expeditionBusy()) return;
   const n = G.stack.length; if (!n) return;
   const p = S(player.x, player.y, 40);
   for (let i = 0; i < Math.min(n, 14); i++) tossed.push({ type: G.stack[n - 1 - i], x: p.x, y: p.y - i * 3, vx: rnd(-170, 170), vy: rnd(-340, -200), a: 0, r: rnd(-8, 8), t: -i * 0.035 });
@@ -2312,6 +2316,7 @@ function start(data) {
   build(data && data.st ? data : (load() || freshState()));
   if (G.t > 0) { $('startBtn').textContent = '이어서 하기'; $('resetRow').hidden = false; }
   window.claude?.hot?.snapshot?.(() => serialize());
+  expeditionInit();
   const go = () => requestAnimationFrame(frame);
   if (document.fonts && document.fonts.load) Promise.race([document.fonts.load('16px "Do Hyeon"'), new Promise(r => setTimeout(r, 1500))]).then(go, go);
   else go();

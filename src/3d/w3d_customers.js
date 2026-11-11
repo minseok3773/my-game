@@ -122,6 +122,7 @@ function updateCustomerShop(id, dt) {
   s.saleElapsed = 0; r.serveT = 0;
   const price = priceOf(d);
   s.stock--; s.cash += price; customer.got++; customer.carry.push(d.item);
+  expeditionCustomerSale(d, s, customer);
   addXp(price); earn(price);
   G.stats.sold = (G.stats.sold || 0) + 1;
   G.stats['sold_' + d.item] = (G.stats['sold_' + d.item] || 0) + 1;

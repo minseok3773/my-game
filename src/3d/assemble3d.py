@@ -125,6 +125,8 @@ let last = performance.now(), paused = false, saveT = 0;
 function frame(now) {
   const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now; frameDt = dt;
   if (!paused) { update(dt); saveT += dt; if (saveT > 2.5) { saveT = 0; save(); } }
+  // 원정 화면이 마을을 덮는 동안 불필요한 WebGL 렌더링을 쉬어 모바일 입력을 유지합니다.
+  if (!expeditionPanel.hidden) { requestAnimationFrame(frame); return; }
   const obj = render(dt);
   hud(obj);
   requestAnimationFrame(frame);
@@ -163,7 +165,7 @@ for c in chunks:
     if c.startswith("function dockRect("):
         out.append("function dockRect(id) { return customerDockRect(id); }\n"); continue
     if c.startswith("/* ---------- HUD ---------- */"):
-        out.append(B('w3d_storage.js'))
+        out.append(B('w3d_storage.js')); out.append(B('w3d_expedition.js'))
         out.append(B('w3d_world.js')); out.append(B('w3d_chars.js')); out.append(B('w3d_game.js')); out.append(B('w3d_progression.js')); out.append(B('w3d_melee.js')); out.append(B('w3d_hero.js')); out.append(B('w3d_crew.js')); out.append(B('w3d_training.js')); out.append(B('w3d_customers.js')); out.append(B('w3d_fx.js')); out.append(B('w3d_scenery.js')); out.append(B('w3d_defense.js')); out.append(B('w3d_logistics.js')); out.append(overlay); out.append(c); continue
     if c.startswith("/* ---------- 루프 ---------- */") or c.startswith("let last = performance.now()"):
         continue

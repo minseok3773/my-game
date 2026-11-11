@@ -90,7 +90,7 @@ function retryStorage() {
     const recovered = load();
     if (storageState.loadBlocked) return false;
     if (recovered) {
-      build(recovered); paused = true; document.getElementById('helpPanel').hidden = false;
+      build(recovered); paused = !expeditionBusy(); document.getElementById('helpPanel').hidden = expeditionBusy();
     }
   }
   return save();
