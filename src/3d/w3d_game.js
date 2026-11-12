@@ -130,9 +130,9 @@ function updateBoarder(e, dt) { updateSwordBoarder(e, dt); }
 
 // 해적 Lv.5·10·15마다 보스선에서 상어 대장이 직접 상륙합니다.
 function spawnBoss() {
-  if (!bossDueNextRaid(G.wave)) return false;
+  if (G.scoutRaid || !bossDueNextRaid(G.wave)) return false; // 정찰선 습격에는 보스가 오지 않음
   const level = pirateLevel();
-  G.lastBossLevel = level;
+  G.lastBossLevel = bossMilestone(level);
   const a = rnd(0, 6.28), r = raftC.r + 16;
   const hp = normalPirateShipHp(level) * BOSS_POWER_MULTIPLIER;
   enemies.push({ x: raftC.x + Math.cos(a) * r, y: raftC.y + Math.sin(a) * r, hp, max: hp, level, big: true, boss: true, state: 'approach', fireT: 2, bob: 0, sinkT: 0, ang: 0, salvoT: 4, summonT: 6 });

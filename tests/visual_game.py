@@ -129,7 +129,7 @@ def check_movement(page, mobile):
                 page.keyboard.down(key)
             page.wait_for_function("""() => Math.hypot(
               visualTest.player.x - movementStart.x,
-              visualTest.player.y - movementStart.y) > .15""", timeout=10000)
+              visualTest.player.y - movementStart.y) > .15""", timeout=10000, polling=100)
         finally:
             if mobile and session:
                 session.send("Input.dispatchTouchEvent", {
@@ -182,7 +182,7 @@ def check_dialog_scroll(page, panel_selector, close_selector):
         })
         page.wait_for_function(
             "selector => document.querySelector(selector).scrollTop > 0",
-            arg=panel_selector + " > div", timeout=10000,
+            arg=panel_selector + " > div", timeout=10000, polling=100,
         )
         session.detach()
     close = page.locator(close_selector)
@@ -245,7 +245,7 @@ def main():
                 ), content_type="text/html",
             ))
             page.goto(URL, wait_until="networkidle")
-            page.wait_for_function("!!window.visualTest")
+            page.wait_for_function("!!window.visualTest", polling=100)
             settle(page)
             if mobile:
                 page.screenshot(path=str(screenshots / "start.png"))

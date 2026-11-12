@@ -1,4 +1,4 @@
-/* ---------- 해적 성장: 침공마다 1레벨 (상한 없음), 레벨마다 체력·공격력 3%, 5레벨마다 보스 1회 ---------- */
+/* ---------- 해적 성장: 침공마다 1레벨 (상한 없음), 레벨마다 체력·공격력 3% (Lv.15부터 7%), 5레벨마다 보스 1회 ---------- */
 const PIRATE_RAIDS_PER_LEVEL = 1;
 const PIRATE_PROGRESSION_VERSION = 2;
 const BOSS_POWER_MULTIPLIER = 5;
@@ -11,7 +11,9 @@ const ALLY_GROWTH = 1.06;    // 선장·선원: 단계별 6% (후반에 해적�
 const PIRATE_CREW_MULTIPLIER = 3; // 상륙 인원 3배
 // 갑판에 동시에 있을 수 있는 해적 수: 휴대폰(터치 화면)은 30명, 그 외 48명. 총 상륙 인원은 같고 나눠서 올라옴
 const MAX_LIVE_PIRATES = (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) ? 30 : 48;
-const pirateMultiplier = (level = pirateLevel()) => Math.pow(PIRATE_GROWTH, Math.max(0, level - 1));
+// 후반(Lv.15~)에는 해적이 7%씩 자라 선원 성장(6%, 선장 Lv.50 상한)을 따라잡습니다. 방어가 다시 자동화되지 않게 합니다.
+const PIRATE_LATE_FROM = 15, PIRATE_LATE_GROWTH = 1.07;
+const pirateMultiplier = (level = pirateLevel()) => Math.pow(PIRATE_GROWTH, Math.max(0, Math.min(level, PIRATE_LATE_FROM) - 1)) * Math.pow(PIRATE_LATE_GROWTH, Math.max(0, level - PIRATE_LATE_FROM));
 const allyMultiplier = level => Math.pow(ALLY_GROWTH, Math.max(0, level - 1));
 const normalPirateHp = (level = pirateLevel()) => PIRATE_BALANCE.health * Math.round((6 + 2 * level) * pirateMultiplier(level));
 const normalPirateAttack = (level = pirateLevel()) => 2.5 * pirateMultiplier(level) * PIRATE_BALANCE.damage;
@@ -26,9 +28,11 @@ function normalPirateShipHp(level = pirateLevel(), wave = G.wave, big = false) {
   const base = Math.round((big ? 3 : 1) * (12 + 5 * level) * pirateMultiplier(level));
   return PIRATE_BALANCE.health * Math.round(base * raidPlan(wave).armor);
 }
+// 5·10·15… 단계마다 보스 1회. 정찰선이 그 단계를 지나쳐도 다음 정식 습격에서 보스가 나옵니다.
+const bossMilestone = level => Math.floor(level / 5) * 5;
 function bossDueNextRaid(wave = G.wave + 1) {
-  const level = pirateLevel(wave);
-  return level % 5 === 0 && level > (G.lastBossLevel || 0);
+  const milestone = bossMilestone(pirateLevel(wave));
+  return milestone >= 5 && milestone > (G.lastBossLevel || 0);
 }
 function boarderHpAtLevel(level, type, big) {
   let hp = Math.round((big ? 1.6 : 1) * (6 + 2 * level) * pirateMultiplier(level));

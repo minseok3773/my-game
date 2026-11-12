@@ -1371,7 +1371,7 @@ strategyBtn.onclick = () => {
   if (paused || raidOn || !unlocked.has('expand1')) return;
   paused = true; strategyPanel.hidden = false;
   const plan = raidPlan();
-  strategyPanel.querySelector('.forecast').textContent = `제${G.wave + 1}파 · 해적 Lv.${pirateLevel(G.wave + 1)} · ${plan.name}${bossDueNextRaid() ? ' · 보스 침공!' : ''} — ${plan.hint}`;
+  strategyPanel.querySelector('.forecast').textContent = `제${G.wave + 1}파 · 해적 Lv.${pirateLevel(G.wave + 1)} · ${plan.name}${bossDueNextRaid() && raidGateOpen() ? ' · 보스 침공!' : ''} — ${plan.hint}`;
   strategyPanel.querySelector('.progress').textContent = `방어 성공 ${G.defended || 0}/5 · 보유 $${fmt(G.money)} · 준비 선택은 습격마다 한 번입니다. 기본 태세로 기다려도 됩니다.`;
   const box = strategyPanel.querySelector('.choices'); box.replaceChildren();
   for (const tactic of TACTICS) {
@@ -1595,14 +1595,46 @@ async function copySaveCode() {
   catch (error) { window.prompt('아래 저장 코드를 전부 복사해 보관하세요.', code); setStorageNote('저장 코드를 보관해 두세요.'); }
   return code;
 }
+// 불러온 저장이 실제로 열리는지 먼저 시험합니다. 열리지 않으면 지금 진행과 기존 저장을 전혀 건드리지 않습니다.
+function trialBuild(data) {
+  build(JSON.parse(JSON.stringify(data)));
+  const obj = objective(); if (!obj || typeof obj.text !== 'string') throw new Error('objective');
+  hud(obj); JSON.stringify(serialize());
+}
 function importSaveData(data, ask = true) {
-  if (ask && !window.confirm('지금 진행을 불러온 저장으로 바꿀까요? 현재 진행은 사라집니다.')) return false;
-  try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (error) { return storageError(error); }
-  const loaded = load();
-  if (!loaded) return false;
-  build(loaded); paused = !expeditionBusy(); document.getElementById('helpPanel').hidden = expeditionBusy();
-  save(); setStorageNote('✅ 저장을 불러왔어요. 이어서 즐겨 주세요!');
+  if (ask && !window.confirm('지금 진행을 불러온 저장으로 바꿀까요? 현재 진행은 백업으로 남겨 둡니다.')) return false;
+  const current = JSON.stringify(serialize());
+  let previousRaw = null;
+  try { previousRaw = localStorage.getItem(KEY); } catch (error) { /* 아래 저장에서 실패를 표시합니다. */ }
+  try { trialBuild(data); }
+  catch (error) {
+    try { build(JSON.parse(current)); } catch (restoreError) { /* 현재 진행은 메모리에 있던 그대로 */ }
+    setStorageNote('⚠️ 이 저장은 게임에서 열 수 없어 불러오지 않았어요. 지금 진행과 기존 저장은 그대로입니다.');
+    return false;
+  }
+  try {
+    if (previousRaw) localStorage.setItem(STORAGE_BACKUP_KEY, previousRaw);
+    localStorage.setItem(KEY, JSON.stringify(serialize()));
+  } catch (error) { build(JSON.parse(current)); return storageError(error); }
+  load(); // 저장 상태(충돌 기준 등)를 새 저장에 맞춤
+  paused = !expeditionBusy(); document.getElementById('helpPanel').hidden = expeditionBusy();
+  setStorageNote('✅ 저장을 불러왔어요. 이전 진행은 백업으로 남겨 두었습니다.');
   return true;
+}
+// 시작할 때 저장이 손상돼 게임을 열 수 없으면: 백업으로 열고, 그것도 안 되면 새 게임으로 시작하되 원래 저장은 지우지 않습니다.
+function bootRecover(error) {
+  try {
+    const raw = localStorage.getItem(STORAGE_BACKUP_KEY);
+    trialBuild(parseStoredGame(raw));
+    storageState.lastGood = raw; storageState.recovered = true; storageState.loadBlocked = false;
+    storageState.failed = false; storageState.error = ''; updateStorageStatus();
+    return 'backup';
+  } catch (backupError) { /* 새 게임으로 */ }
+  build(freshState());
+  storageState.loadBlocked = true; storageState.failed = true;
+  storageState.error = '저장된 진행을 열지 못해 새 게임으로 시작했습니다. 원래 저장은 지우지 않았어요. 저장 코드나 백업 파일로 불러오거나, "처음부터 다시"를 두 번 눌러 새로 시작하세요.';
+  updateStorageStatus();
+  return 'fresh';
 }
 function importSaveText(text, ask = true) {
   let data;
@@ -1631,6 +1663,8 @@ function expeditionState() {
   for (const k of ['shell','anchor']) if (typeof e.rewards[k] !== 'boolean') e.rewards[k] = false; e.specialty = Number.isFinite(e.specialty) ? Math.max(0,Math.min(20,e.specialty)) : 0;
   e.tier = Number.isFinite(e.tier) ? Math.max(0, Math.floor(e.tier)) : 0; e.pearls = Number.isFinite(e.pearls) ? Math.max(0, Math.min(DEEP_PEARL_MAX, Math.floor(e.pearls))) : 0;
   e.challengeMode = !!e.challengeMode;
+  // 섬 지도 이전 버전에서 진행 중이던 원정: 그때 안내하던 '다음 섬'으로 맞춰 안내와 보상을 일치시킵니다.
+  if (e.run && typeof e.run === 'object' && !Number.isInteger(e.run.island) && !Number.isInteger(e.run.challenge)) e.run.island = Math.max(1, Math.min(ISLANDS.length, islandsCleared(e) + 1));
   return e;
 }
 // ---------- 섬 지도: 단계별로 어려워지는 5개의 섬, 첫 성공마다 고유 보상 ----------
@@ -1659,9 +1693,17 @@ function islandDef(i) { return ISLANDS[Math.max(1, Math.min(ISLANDS.length, i ||
  * 성공하면 자금과 '심해 진주'(판매가 +3%, 최대 10개)를 받고 다음 층이 열립니다. */
 const DEEP_PEARL_MAX = 10;
 const challengeMoney = t => 300 + 100 * t;
+// 층마다 바뀌는 변주(1층은 기본): 같은 수집·회피·귀환이 반복되지 않게 합니다.
+const DEEP_MODS = [
+  { id: 'whirl', name: '🌀 소용돌이', desc: '공격 예고가 한 번에 두 곳(내 위치 + 무작위)에 떨어집니다' },
+  { id: 'fog', name: '🌫 짙은 안개', desc: '선장 주변만 보입니다. 생존자와 상자 위치를 기억하세요' },
+  { id: 'swift', name: '⚡ 쾌속 포격', desc: '공격 예고가 짧아집니다(1.3초 → 0.85초)' },
+];
+const deepMod = tier => tier > 0 ? DEEP_MODS[(tier - 1) % DEEP_MODS.length] : null;
 function challengeIsland(tier) {
   const base = ISLANDS[tier % ISLANDS.length];
-  return { ...base, name: `🌊 심해 ${tier + 1}층 · ${base.name}`, stars: 5, challenge: true, tier, baseIndex: tier % ISLANDS.length + 1,
+  const mod = deepMod(tier);
+  return { ...base, name: `🌊 심해 ${tier + 1}층 · ${mod ? mod.name + ' · ' : ''}${base.name}`, stars: 5, challenge: true, tier, mod, baseIndex: tier % ISLANDS.length + 1,
     reward: 'pearl', rewardName: `심해 진주 (판매가 +3%, 최대 ${DEEP_PEARL_MAX}개)`,
     every: Math.max(0.8, Math.min(base.every, 1.5) * Math.pow(0.95, tier)), dmg: Math.round(30 * (1 + 0.12 * tier)),
     radius: Math.min(80, base.radius + 2 * tier), time: Math.max(-40, -20 - 4 * tier) };
@@ -1737,7 +1779,7 @@ function expeditionRenderPanel() {
   expeditionPanel.innerHTML=`<div id="expeditionContent"><h2>🗺 섬 지도 · ${isl.challenge?'':islandIndex(e)+'. '}${isl.name} ${'★'.repeat(isl.stars)}</h2><div class="expRow" id="islandMap">${islandMap}</div><p>정복 ${cleared}/${ISLANDS.length} · 이 섬: 구조 ${isl.survivors.length}명 · 자원 ${isl.crates.length}개 · 공격 간격 ${isl.every}초 · 피해 ${isl.dmg}${isl.time?` · 활동 시간 ${isl.time}초`:''} · 첫 정복 보상: ${isl.rewardName}${e.rewards[isl.reward]?' (획득 완료)':''}</p><p>식량과 물을 준비해 첫 원정을 떠나자! 마을을 확장하고 해적을 5회 막으면 안전 항로가 열립니다.</p><p id="expeditionRequirements">${unlocked.has('expand1')?'✅':'⬜'} 첫 뗏목 확장 · ${unlocked.has('water')?'✅':'⬜'} 정수기 건설 · 방어 ${Math.min(5,G.defended||0)}/5 ${G.expeditionWon?'(항로 보상 $200 획득)':''}</p><p>출항 시 선장과 동행 선원은 마을을 떠납니다. 준비 화면과 원정 동안 마을 생산·손님 거래·수금·수리·모집·훈련·급여·습격 시계는 모두 정지합니다. 복귀 후 같은 시점부터 재개하며 습격 중에는 떠날 수 없습니다.</p><label>식량 꾸러미 · 개당 $20<select id="expeditionFood">${options(3,e.draft.food)}</select></label><label>물통 · 개당 $15<select id="expeditionWater">${options(3,e.draft.water)}</select></label><label>동행 선원 · 보급비 $10/명<select id="expeditionCrew">${options(maxCrew,e.draft.crew,0)}</select></label><p id="expeditionCost"></p><p>동행 1명마다 구조·회수 범위 +12, 위험 피해 -3. 최소 2명은 마을에 남깁니다. 원정 실패에도 선원은 모두 돌아오며 마을은 유지됩니다.</p><p id="expeditionRewardGuide">${expeditionRewardGuide()}</p>${e.rewards.medic?`<button id="expeditionMedic">${e.medicEnabled===false?'의무병 배치 (생산 1명 감소)':'의무병 생산 복귀'}</button>`:''}<div class="expRow"><button id="expeditionDepart">출항</button><button id="expeditionClose">마을로</button></div><p id="expeditionNotice" role="status"></p></div>`;
   const refresh=()=>{
     e.draft={food:+document.getElementById('expeditionFood').value,water:+document.getElementById('expeditionWater').value,crew:+document.getElementById('expeditionCrew').value};
-    document.getElementById('expeditionCost').textContent=`비용 $${e.draft.food*20+e.draft.water*15+e.draft.crew*10} / 보유 $${Math.floor(G.money)} · 남는 선원 ${workers.length-e.draft.crew}명 · 원정 체력 ${60+e.draft.food*20} · 활동 시간 ${60+e.draft.water*30}초`;
+    document.getElementById('expeditionCost').textContent=`비용 $${e.draft.food*20+e.draft.water*15+e.draft.crew*10} / 보유 $${Math.floor(G.money)} · 남는 선원 ${workers.length-e.draft.crew}명 · 원정 체력 ${60+e.draft.food*20} · 활동 시간 ${Math.max(45,60+e.draft.water*30+isl.time)}초`;
     document.getElementById('expeditionDepart').disabled=!expeditionReady()||raidOn||!isHeroAvailable()||workers.length<2||G.money<e.draft.food*20+e.draft.water*15+e.draft.crew*10;
     document.getElementById('expeditionNotice').textContent=raidOn?'습격을 끝낸 뒤 출항할 수 있습니다.':!isHeroAvailable()?'선장이 회복된 뒤 출항할 수 있습니다.':!expeditionReady()?'확장·정수기·5회 방어 조건을 달성하세요.':workers.length<2?'마을에 남을 일꾼을 최소 2명 충원하세요.':G.money<e.draft.food*20+e.draft.water*15+e.draft.crew*10?'원정 물자를 살 자금이 부족합니다.':'';
   };
@@ -1748,9 +1790,9 @@ function expeditionRenderPanel() {
 }
 function expeditionRewardGuide(){
  const e=expeditionState();
- const isl=currentIsland(e);
- if(isl.challenge)return `심해 도전 성공 보상: $${challengeMoney(isl.tier)} + 심해 진주 1개 (판매가 +3%씩, 최대 ${DEEP_PEARL_MAX}개 · 지금 ${e.pearls||0}개). 성공할 때마다 다음 층이 더 어려워집니다.`;
- return `이번 섬 성공 보상: ${e.rewards[isl.reward]?`다시 도전 보상 $${120*Math.max(1,islandIndex(e)-2)}${e.rewards.kelp?'·보존식 5개':''}`:isl.rewardName+' + $'+(120*Math.max(1,islandIndex(e)-2))}. ${e.rewards.shell?'거북 방패로 일꾼 최대 체력 +25%. ':''}${e.rewards.anchor?'황금 닻으로 판매가 +25%. ':''} ${e.rewards.kelp?`보존식 ${e.specialty}/20개 · 생선+물 각 1개로 12초에 1개 제조, 생선 가게·식당 손님이 함께 구매하면 $18 추가 수금. `:''}${e.rewards.medic?(e.medicEnabled===false?'의무병 비활성 · 전원 생산 중. ':'첫 생존 일꾼이 의무병: 생산·운반·수금 1명 감소, 전투 참가, 비전투 중 전원 초당 1 추가 회복. ')+ '준비 화면에서 생산 복귀/재배치 가능. ':''}${e.rewards.compass?'나침반으로 선장 공격력 +20%.':''}`;
+ const isl=e.run?runIsland(e.run):currentIsland(e);
+ if(isl.challenge)return `${isl.mod?`이번 층 변주 ${isl.mod.name}: ${isl.mod.desc}. `:''}심해 도전 성공 보상: $${challengeMoney(isl.tier)} + 심해 진주 1개 (판매가 +3%씩, 최대 ${DEEP_PEARL_MAX}개 · 지금 ${e.pearls||0}개). 성공할 때마다 다음 층이 더 어려워집니다.`;
+ return `이번 섬 성공 보상: ${e.rewards[isl.reward]?`다시 도전 보상 $${120*Math.max(1,(e.run?.island||islandIndex(e))-2)}${e.rewards.kelp?'·보존식 5개':''}`:isl.rewardName+' + $'+(120*Math.max(1,(e.run?.island||islandIndex(e))-2))}. ${e.rewards.shell?'거북 방패로 일꾼 최대 체력 +25%. ':''}${e.rewards.anchor?'황금 닻으로 판매가 +25%. ':''} ${e.rewards.kelp?`보존식 ${e.specialty}/20개 · 생선+물 각 1개로 12초에 1개 제조, 생선 가게·식당 손님이 함께 구매하면 $18 추가 수금. `:''}${e.rewards.medic?(e.medicEnabled===false?'의무병 비활성 · 전원 생산 중. ':'첫 생존 일꾼이 의무병: 생산·운반·수금 1명 감소, 전투 참가, 비전투 중 전원 초당 1 추가 회복. ')+ '준비 화면에서 생산 복귀/재배치 가능. ':''}${e.rewards.compass?'나침반으로 선장 공격력 +20%.':''}`;
 }
 function expeditionDepart(){
  const e=expeditionState(),d=e.draft,cost=d.food*20+d.water*15+d.crew*10;
@@ -1815,7 +1857,8 @@ function expeditionUpdate(dt){
  isl.survivors.forEach((p,i)=>{if(!r.rescued.includes(i)&&Math.hypot(r.x-p.x,r.y-p.y)<reach)r.rescued.push(i);});
  isl.crates.forEach((p,i)=>{if(!r.collected.includes(i)&&Math.hypot(r.x-p.x,r.y-p.y)<reach)r.collected.push(i);});
  r.time-=dt;r.elapsed+=dt;r.nextHazard-=dt;
- if(r.nextHazard<=0){r.nextHazard=isl.every;r.hazards.push({x:r.x,y:r.y,radius:isl.radius,t:1.3,hit:false});}
+ if(r.nextHazard<=0){const warn=isl.mod?.id==='swift'?0.85:1.3;r.nextHazard=isl.every;r.hazards.push({x:r.x,y:r.y,radius:isl.radius,t:warn,hit:false});
+  if(isl.mod?.id==='whirl')r.hazards.push({x:60+Math.random()*380,y:60+Math.random()*380,radius:isl.radius,t:warn,hit:false});}
  for(const h of r.hazards){h.t-=dt;if(h.t<=0&&!h.hit){h.hit=true;if(Math.hypot(r.x-h.x,r.y-h.y)<h.radius)r.hp-=Math.max(6,isl.dmg-r.party.length*3);}}
  r.hazards=r.hazards.filter(h=>h.t>-.35);
  if(r.hp<=0||r.time<=0){expeditionFinish('failure');return true;}
@@ -1854,6 +1897,7 @@ function expeditionDraw(){
  for(const h of r.hazards){c.fillStyle=h.hit?'#ff3b38b0':'#f23c3950';c.strokeStyle='#ba2424';c.lineWidth=3;c.beginPath();c.arc(h.x,h.y,h.radius,0,Math.PI*2);c.fill();c.stroke();c.fillStyle='#fff';c.font='bold 18px sans-serif';c.fillText(h.hit?'피해':'!',h.x,h.y);}
  r.party.forEach((_,i)=>{c.font='20px sans-serif';c.fillText('👷',r.x-18-i*13,r.y+20);});c.fillStyle='#f8f5c1';c.beginPath();c.ellipse(r.x,r.y+12,13,5,0,0,Math.PI*2);c.fill();c.font='30px sans-serif';c.fillText('🧑‍✈️',r.x,r.y);
  if(isl.fog){c.fillStyle='rgba(255,255,255,.16)';c.fillRect(0,0,500,500);}
+ if(isl.mod?.id==='fog'){c.save();c.fillStyle='rgba(18,32,44,.86)';c.beginPath();c.rect(0,0,500,500);c.arc(r.x,r.y,125,0,Math.PI*2,true);c.fill('evenodd');c.restore();text('귀환선',52,487);}
  document.getElementById('expeditionStatus').textContent=`체력 ${Math.max(0,Math.ceil(r.hp))}/${r.maxHp} · ${Math.max(0,Math.ceil(r.time))}초 · 구조 ${r.rescued.length}/${isl.survivors.length} · 자원 ${r.collected.length}/${isl.crates.length}${r.rescued.length===isl.survivors.length&&r.collected.length===isl.crates.length?' · 왼쪽 아래 배로 귀환!':''}`;
 }
 window.addEventListener('keydown',ev=>{if(!expeditionPanel.hidden && !ev.ctrlKey && !ev.metaKey){if(ev.key==='Tab'&&!expeditionPanel.contains(document.activeElement)){ev.preventDefault();ev.stopImmediatePropagation();expeditionPanel.querySelector('button:not(:disabled),select,canvas')?.focus();return;}if(ev.key!=='Tab')ev.stopImmediatePropagation();if(ev.key==='Escape'&&expeditionState().phase==='idle'){expeditionClose();return;}}if(G?.expedition?.phase==='exploring'&&['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d'].includes(ev.key.toLowerCase())){ev.preventDefault();ev.stopImmediatePropagation();expeditionKeys.add(ev.key.toLowerCase());}},true);
@@ -3340,9 +3384,9 @@ function updateBoarder(e, dt) { updateSwordBoarder(e, dt); }
 
 // 해적 Lv.5·10·15마다 보스선에서 상어 대장이 직접 상륙합니다.
 function spawnBoss() {
-  if (!bossDueNextRaid(G.wave)) return false;
+  if (G.scoutRaid || !bossDueNextRaid(G.wave)) return false; // 정찰선 습격에는 보스가 오지 않음
   const level = pirateLevel();
-  G.lastBossLevel = level;
+  G.lastBossLevel = bossMilestone(level);
   const a = rnd(0, 6.28), r = raftC.r + 16;
   const hp = normalPirateShipHp(level) * BOSS_POWER_MULTIPLIER;
   enemies.push({ x: raftC.x + Math.cos(a) * r, y: raftC.y + Math.sin(a) * r, hp, max: hp, level, big: true, boss: true, state: 'approach', fireT: 2, bob: 0, sinkT: 0, ang: 0, salvoT: 4, summonT: 6 });
@@ -3372,7 +3416,7 @@ function bossHud() {
   bossBar.querySelector('.fill').style.width = `${Math.max(0, b.hp / b.max) * 100}%`;
 }
 
-/* ---------- 해적 성장: 침공마다 1레벨 (상한 없음), 레벨마다 체력·공격력 3%, 5레벨마다 보스 1회 ---------- */
+/* ---------- 해적 성장: 침공마다 1레벨 (상한 없음), 레벨마다 체력·공격력 3% (Lv.15부터 7%), 5레벨마다 보스 1회 ---------- */
 const PIRATE_RAIDS_PER_LEVEL = 1;
 const PIRATE_PROGRESSION_VERSION = 2;
 const BOSS_POWER_MULTIPLIER = 5;
@@ -3385,7 +3429,9 @@ const ALLY_GROWTH = 1.06;    // 선장·선원: 단계별 6% (후반에 해적�
 const PIRATE_CREW_MULTIPLIER = 3; // 상륙 인원 3배
 // 갑판에 동시에 있을 수 있는 해적 수: 휴대폰(터치 화면)은 30명, 그 외 48명. 총 상륙 인원은 같고 나눠서 올라옴
 const MAX_LIVE_PIRATES = (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) ? 30 : 48;
-const pirateMultiplier = (level = pirateLevel()) => Math.pow(PIRATE_GROWTH, Math.max(0, level - 1));
+// 후반(Lv.15~)에는 해적이 7%씩 자라 선원 성장(6%, 선장 Lv.50 상한)을 따라잡습니다. 방어가 다시 자동화되지 않게 합니다.
+const PIRATE_LATE_FROM = 15, PIRATE_LATE_GROWTH = 1.07;
+const pirateMultiplier = (level = pirateLevel()) => Math.pow(PIRATE_GROWTH, Math.max(0, Math.min(level, PIRATE_LATE_FROM) - 1)) * Math.pow(PIRATE_LATE_GROWTH, Math.max(0, level - PIRATE_LATE_FROM));
 const allyMultiplier = level => Math.pow(ALLY_GROWTH, Math.max(0, level - 1));
 const normalPirateHp = (level = pirateLevel()) => PIRATE_BALANCE.health * Math.round((6 + 2 * level) * pirateMultiplier(level));
 const normalPirateAttack = (level = pirateLevel()) => 2.5 * pirateMultiplier(level) * PIRATE_BALANCE.damage;
@@ -3400,9 +3446,11 @@ function normalPirateShipHp(level = pirateLevel(), wave = G.wave, big = false) {
   const base = Math.round((big ? 3 : 1) * (12 + 5 * level) * pirateMultiplier(level));
   return PIRATE_BALANCE.health * Math.round(base * raidPlan(wave).armor);
 }
+// 5·10·15… 단계마다 보스 1회. 정찰선이 그 단계를 지나쳐도 다음 정식 습격에서 보스가 나옵니다.
+const bossMilestone = level => Math.floor(level / 5) * 5;
 function bossDueNextRaid(wave = G.wave + 1) {
-  const level = pirateLevel(wave);
-  return level % 5 === 0 && level > (G.lastBossLevel || 0);
+  const milestone = bossMilestone(pirateLevel(wave));
+  return milestone >= 5 && milestone > (G.lastBossLevel || 0);
 }
 function boarderHpAtLevel(level, type, big) {
   let hp = Math.round((big ? 1.6 : 1) * (6 + 2 * level) * pirateMultiplier(level));
@@ -3760,8 +3808,9 @@ function recruitmentHud() {
   recruitHint.hidden = paused || !heroReady || !pad;
   if (pad) recruitHint.textContent = pad.pending ? `⛺ 모집 중 ${Math.ceil(pad.remaining)}초 · ${pad.live}/${pad.capacity}명`
     : pad.live>=pad.capacity ? `⛺ ${DEFS[pad.tent].name} · 정원 ${pad.capacity}명 충원 완료`
-    : G.money<30 ? `⛺ 일꾼 충원 $30 · 자금이 부족합니다`
-    : `⛺ 네모 칸에 서 있으면 $30씩 · 1초에 1명 충원 · ${pad.live}/${pad.capacity}명`;
+    : recruitPrice()===0 ? `⛺ 무료 충원 · 네모 칸에 서 있으면 1명 충원 · ${pad.live}/${pad.capacity}명`
+    : G.money<recruitPrice() ? `⛺ 일꾼 충원 $${recruitPrice()} · 자금이 부족합니다`
+    : `⛺ 네모 칸에 서 있으면 $${recruitPrice()}씩 · 1초에 1명 충원 · ${pad.live}/${pad.capacity}명`;
   document.body.classList.toggle('has-recruit',!recruitHint.hidden);
 }
 
@@ -4723,6 +4772,8 @@ skillStyle.textContent = `
 #skillBtn{position:fixed;right:12px;bottom:calc(262px + env(safe-area-inset-bottom,0px));z-index:9;width:76px;height:76px;border-radius:50%;border:3px solid #fff3c4;
  background:radial-gradient(circle at 35% 30%,#ffd56a,#f08a2c);color:#4a2a0c;font:bold 13px/1.15 sans-serif;box-shadow:0 4px 0 #a5521b,0 6px 14px #0004;padding:0;touch-action:manipulation}
 #skillBtn .ic{display:block;font-size:26px;line-height:1}
+@media(orientation:portrait) and (max-height:620px){#skillBtn{width:64px;height:64px;font-size:11px;bottom:calc(182px + env(safe-area-inset-bottom,0px))}#skillBtn .ic{font-size:22px}}
+@media(orientation:landscape) and (max-height:500px){#skillBtn{right:auto;left:calc(12px + env(safe-area-inset-left,0px));bottom:calc(66px + env(safe-area-inset-bottom,0px));width:64px;height:64px;font-size:11px}#skillBtn .ic{font-size:22px}}
 #skillBtn:disabled{filter:grayscale(.7) brightness(.85);box-shadow:0 2px 0 #7b5a3c}
 #skillBtn .cd{position:absolute;inset:0;border-radius:50%;display:grid;place-items:center;background:#0006;color:#fff;font:bold 22px sans-serif}
 #skillBtn:focus-visible{outline:3px solid #fff;outline-offset:3px}
@@ -5359,7 +5410,8 @@ $('resetBtn').onclick = () => {
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
 
 function start(data) {
-  build(data && data.st ? data : (load() || freshState()));
+  try { build(data && data.st ? data : (load() || freshState())); objective(); }
+  catch (error) { bootRecover(error); }
   if (G.t > 0) { $('startBtn').textContent = '이어서 하기'; $('resetRow').hidden = false; }
   window.claude?.hot?.snapshot?.(() => serialize());
   expeditionInit();

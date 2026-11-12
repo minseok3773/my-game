@@ -177,14 +177,46 @@ async function copySaveCode() {
   catch (error) { window.prompt('아래 저장 코드를 전부 복사해 보관하세요.', code); setStorageNote('저장 코드를 보관해 두세요.'); }
   return code;
 }
+// 불러온 저장이 실제로 열리는지 먼저 시험합니다. 열리지 않으면 지금 진행과 기존 저장을 전혀 건드리지 않습니다.
+function trialBuild(data) {
+  build(JSON.parse(JSON.stringify(data)));
+  const obj = objective(); if (!obj || typeof obj.text !== 'string') throw new Error('objective');
+  hud(obj); JSON.stringify(serialize());
+}
 function importSaveData(data, ask = true) {
-  if (ask && !window.confirm('지금 진행을 불러온 저장으로 바꿀까요? 현재 진행은 사라집니다.')) return false;
-  try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (error) { return storageError(error); }
-  const loaded = load();
-  if (!loaded) return false;
-  build(loaded); paused = !expeditionBusy(); document.getElementById('helpPanel').hidden = expeditionBusy();
-  save(); setStorageNote('✅ 저장을 불러왔어요. 이어서 즐겨 주세요!');
+  if (ask && !window.confirm('지금 진행을 불러온 저장으로 바꿀까요? 현재 진행은 백업으로 남겨 둡니다.')) return false;
+  const current = JSON.stringify(serialize());
+  let previousRaw = null;
+  try { previousRaw = localStorage.getItem(KEY); } catch (error) { /* 아래 저장에서 실패를 표시합니다. */ }
+  try { trialBuild(data); }
+  catch (error) {
+    try { build(JSON.parse(current)); } catch (restoreError) { /* 현재 진행은 메모리에 있던 그대로 */ }
+    setStorageNote('⚠️ 이 저장은 게임에서 열 수 없어 불러오지 않았어요. 지금 진행과 기존 저장은 그대로입니다.');
+    return false;
+  }
+  try {
+    if (previousRaw) localStorage.setItem(STORAGE_BACKUP_KEY, previousRaw);
+    localStorage.setItem(KEY, JSON.stringify(serialize()));
+  } catch (error) { build(JSON.parse(current)); return storageError(error); }
+  load(); // 저장 상태(충돌 기준 등)를 새 저장에 맞춤
+  paused = !expeditionBusy(); document.getElementById('helpPanel').hidden = expeditionBusy();
+  setStorageNote('✅ 저장을 불러왔어요. 이전 진행은 백업으로 남겨 두었습니다.');
   return true;
+}
+// 시작할 때 저장이 손상돼 게임을 열 수 없으면: 백업으로 열고, 그것도 안 되면 새 게임으로 시작하되 원래 저장은 지우지 않습니다.
+function bootRecover(error) {
+  try {
+    const raw = localStorage.getItem(STORAGE_BACKUP_KEY);
+    trialBuild(parseStoredGame(raw));
+    storageState.lastGood = raw; storageState.recovered = true; storageState.loadBlocked = false;
+    storageState.failed = false; storageState.error = ''; updateStorageStatus();
+    return 'backup';
+  } catch (backupError) { /* 새 게임으로 */ }
+  build(freshState());
+  storageState.loadBlocked = true; storageState.failed = true;
+  storageState.error = '저장된 진행을 열지 못해 새 게임으로 시작했습니다. 원래 저장은 지우지 않았어요. 저장 코드나 백업 파일로 불러오거나, "처음부터 다시"를 두 번 눌러 새로 시작하세요.';
+  updateStorageStatus();
+  return 'fresh';
 }
 function importSaveText(text, ask = true) {
   let data;

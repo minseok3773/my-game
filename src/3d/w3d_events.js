@@ -18,6 +18,8 @@ skillStyle.textContent = `
 #skillBtn{position:fixed;right:12px;bottom:calc(262px + env(safe-area-inset-bottom,0px));z-index:9;width:76px;height:76px;border-radius:50%;border:3px solid #fff3c4;
  background:radial-gradient(circle at 35% 30%,#ffd56a,#f08a2c);color:#4a2a0c;font:bold 13px/1.15 sans-serif;box-shadow:0 4px 0 #a5521b,0 6px 14px #0004;padding:0;touch-action:manipulation}
 #skillBtn .ic{display:block;font-size:26px;line-height:1}
+@media(orientation:portrait) and (max-height:620px){#skillBtn{width:64px;height:64px;font-size:11px;bottom:calc(182px + env(safe-area-inset-bottom,0px))}#skillBtn .ic{font-size:22px}}
+@media(orientation:landscape) and (max-height:500px){#skillBtn{right:auto;left:calc(12px + env(safe-area-inset-left,0px));bottom:calc(66px + env(safe-area-inset-bottom,0px));width:64px;height:64px;font-size:11px}#skillBtn .ic{font-size:22px}}
 #skillBtn:disabled{filter:grayscale(.7) brightness(.85);box-shadow:0 2px 0 #7b5a3c}
 #skillBtn .cd{position:absolute;inset:0;border-radius:50%;display:grid;place-items:center;background:#0006;color:#fff;font:bold 22px sans-serif}
 #skillBtn:focus-visible{outline:3px solid #fff;outline-offset:3px}

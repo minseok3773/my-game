@@ -2138,7 +2138,7 @@ strategyBtn.onclick = () => {
   if (paused || raidOn || !unlocked.has('expand1')) return;
   paused = true; strategyPanel.hidden = false;
   const plan = raidPlan();
-  strategyPanel.querySelector('.forecast').textContent = `제${G.wave + 1}파 · 해적 Lv.${pirateLevel(G.wave + 1)} · ${plan.name}${bossDueNextRaid() ? ' · 보스 침공!' : ''} — ${plan.hint}`;
+  strategyPanel.querySelector('.forecast').textContent = `제${G.wave + 1}파 · 해적 Lv.${pirateLevel(G.wave + 1)} · ${plan.name}${bossDueNextRaid() && raidGateOpen() ? ' · 보스 침공!' : ''} — ${plan.hint}`;
   strategyPanel.querySelector('.progress').textContent = `방어 성공 ${G.defended || 0}/5 · 보유 $${fmt(G.money)} · 준비 선택은 습격마다 한 번입니다. 기본 태세로 기다려도 됩니다.`;
   const box = strategyPanel.querySelector('.choices'); box.replaceChildren();
   for (const tactic of TACTICS) {
@@ -2330,7 +2330,8 @@ $('resetBtn').onclick = () => {
 document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
 
 function start(data) {
-  build(data && data.st ? data : (load() || freshState()));
+  try { build(data && data.st ? data : (load() || freshState())); objective(); }
+  catch (error) { bootRecover(error); }
   if (G.t > 0) { $('startBtn').textContent = '이어서 하기'; $('resetRow').hidden = false; }
   window.claude?.hot?.snapshot?.(() => serialize());
   expeditionInit();
