@@ -9,6 +9,8 @@ function pirateLevel(wave = G.wave) {
 const PIRATE_GROWTH = 1.03; // 해적: 레벨마다 체력·공격력 3%
 const ALLY_GROWTH = 1.06;    // 선장·선원: 단계별 6% (후반에 해적보다 지나치게 강해지지 않게)
 const PIRATE_CREW_MULTIPLIER = 3; // 상륙 인원 3배
+// 갑판에 동시에 있을 수 있는 해적 수: 휴대폰(터치 화면)은 30명, 그 외 48명. 총 상륙 인원은 같고 나눠서 올라옴
+const MAX_LIVE_PIRATES = (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) ? 30 : 48;
 const pirateMultiplier = (level = pirateLevel()) => Math.pow(PIRATE_GROWTH, Math.max(0, level - 1));
 const allyMultiplier = level => Math.pow(ALLY_GROWTH, Math.max(0, level - 1));
 const normalPirateHp = (level = pirateLevel()) => PIRATE_BALANCE.health * Math.round((6 + 2 * level) * pirateMultiplier(level));

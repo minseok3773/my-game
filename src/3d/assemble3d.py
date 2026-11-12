@@ -248,7 +248,7 @@ js = js.replace(old_board, """      if (e.boardT <= 0) {
         const budget = e.landingBudget || (e.boss ? 8 : e.big ? 4 : 2) * PIRATE_CREW_MULTIPLIER;
         const burst = (e.boarded ? 1 : e.big ? 3 : 2) * PIRATE_CREW_MULTIPLIER;
         for (let k = 0; k < burst && (e.boarded || 0) < budget; k++) {
-          if (enemies.filter(b => b.kind === 'boarder' && alive(b)).length >= Math.min(16, 4 + pirateLevel() * 2) * PIRATE_CREW_MULTIPLIER) break;
+          if (enemies.filter(b => b.kind === 'boarder' && alive(b)).length >= Math.min(MAX_LIVE_PIRATES, (4 + pirateLevel() * 2) * PIRATE_CREW_MULTIPLIER)) break;
           spawnBoarder(e); e.boarded = (e.boarded || 0) + 1;
         }
         if ((e.boarded || 0) >= budget) e.state = 'flee';

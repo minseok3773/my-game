@@ -151,10 +151,32 @@ const HERO_PAIRS = [
 ];
 // 뼈대의 처음 자세 기준으로 캐릭터 좌표(미터)에서 만든 부품을 붙임 → 이후 뼈를 따라 움직임
 const _bp = new THREE.Vector3(), _bq = new THREE.Quaternion(), _bs = new THREE.Vector3();
+// 같은 재질의 작은 부품을 한 덩어리로 합쳐 그리기 횟수를 줄임 (모양·색은 그대로)
+const _mergeInv = new THREE.Matrix4(), _mergeRel = new THREE.Matrix4();
+function mergeByMaterial(group) {
+  group.updateMatrixWorld(true);
+  _mergeInv.copy(group.matrixWorld).invert();
+  const buckets = new Map();
+  group.traverse(o => { if (o.isMesh && !o.isSkinnedMesh && !o.material.map) { const k = o.material.uuid; if (!buckets.has(k)) buckets.set(k, []); buckets.get(k).push(o); } });
+  for (const list of buckets.values()) {
+    if (list.length < 2) continue;
+    const parts = list.map(o => { const gm = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone(); gm.applyMatrix4(_mergeRel.multiplyMatrices(_mergeInv, o.matrixWorld)); return gm; });
+    let total = 0; for (const p of parts) total += p.attributes.position.count;
+    const pos = new Float32Array(total * 3), nor = new Float32Array(total * 3);
+    let off = 0;
+    for (const p of parts) { pos.set(p.attributes.position.array, off * 3); if (p.attributes.normal) nor.set(p.attributes.normal.array, off * 3); off += p.attributes.position.count; p.dispose(); }
+    const merged = new THREE.BufferGeometry();
+    merged.setAttribute('position', new THREE.BufferAttribute(pos, 3)); merged.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    const mesh = new THREE.Mesh(merged, list[0].material);
+    mesh.castShadow = list.some(o => o.castShadow); mesh.receiveShadow = true;
+    for (const o of list) o.parent.remove(o);
+    group.add(mesh);
+  }
+}
 function boneMount(bone, build) {
   bone.updateWorldMatrix(true, false); bone.matrixWorld.decompose(_bp, _bq, _bs);
   const holder = new THREE.Group(); holder.quaternion.copy(_bq).invert(); holder.scale.set(1 / _bs.x, 1 / _bs.y, 1 / _bs.z);
-  const g = new THREE.Group(); holder.add(g); bone.add(holder); build(g); return g;
+  const g = new THREE.Group(); holder.add(g); bone.add(holder); build(g); mergeByMaterial(g); return g;
 }
 function makeHero() {
   const m = makeGL('henry', { height: 1.66, weapon: 'never' });

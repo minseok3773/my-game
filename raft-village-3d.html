@@ -1080,7 +1080,7 @@ function updateMilitary(dt) {
         const budget = e.landingBudget || (e.boss ? 8 : e.big ? 4 : 2) * PIRATE_CREW_MULTIPLIER;
         const burst = (e.boarded ? 1 : e.big ? 3 : 2) * PIRATE_CREW_MULTIPLIER;
         for (let k = 0; k < burst && (e.boarded || 0) < budget; k++) {
-          if (enemies.filter(b => b.kind === 'boarder' && alive(b)).length >= Math.min(16, 4 + pirateLevel() * 2) * PIRATE_CREW_MULTIPLIER) break;
+          if (enemies.filter(b => b.kind === 'boarder' && alive(b)).length >= Math.min(MAX_LIVE_PIRATES, (4 + pirateLevel() * 2) * PIRATE_CREW_MULTIPLIER)) break;
           spawnBoarder(e); e.boarded = (e.boarded || 0) + 1;
         }
         if ((e.boarded || 0) >= budget) e.state = 'flee';
@@ -2782,10 +2782,32 @@ const HERO_PAIRS = [
 ];
 // 뼈대의 처음 자세 기준으로 캐릭터 좌표(미터)에서 만든 부품을 붙임 → 이후 뼈를 따라 움직임
 const _bp = new THREE.Vector3(), _bq = new THREE.Quaternion(), _bs = new THREE.Vector3();
+// 같은 재질의 작은 부품을 한 덩어리로 합쳐 그리기 횟수를 줄임 (모양·색은 그대로)
+const _mergeInv = new THREE.Matrix4(), _mergeRel = new THREE.Matrix4();
+function mergeByMaterial(group) {
+  group.updateMatrixWorld(true);
+  _mergeInv.copy(group.matrixWorld).invert();
+  const buckets = new Map();
+  group.traverse(o => { if (o.isMesh && !o.isSkinnedMesh && !o.material.map) { const k = o.material.uuid; if (!buckets.has(k)) buckets.set(k, []); buckets.get(k).push(o); } });
+  for (const list of buckets.values()) {
+    if (list.length < 2) continue;
+    const parts = list.map(o => { const gm = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone(); gm.applyMatrix4(_mergeRel.multiplyMatrices(_mergeInv, o.matrixWorld)); return gm; });
+    let total = 0; for (const p of parts) total += p.attributes.position.count;
+    const pos = new Float32Array(total * 3), nor = new Float32Array(total * 3);
+    let off = 0;
+    for (const p of parts) { pos.set(p.attributes.position.array, off * 3); if (p.attributes.normal) nor.set(p.attributes.normal.array, off * 3); off += p.attributes.position.count; p.dispose(); }
+    const merged = new THREE.BufferGeometry();
+    merged.setAttribute('position', new THREE.BufferAttribute(pos, 3)); merged.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+    const mesh = new THREE.Mesh(merged, list[0].material);
+    mesh.castShadow = list.some(o => o.castShadow); mesh.receiveShadow = true;
+    for (const o of list) o.parent.remove(o);
+    group.add(mesh);
+  }
+}
 function boneMount(bone, build) {
   bone.updateWorldMatrix(true, false); bone.matrixWorld.decompose(_bp, _bq, _bs);
   const holder = new THREE.Group(); holder.quaternion.copy(_bq).invert(); holder.scale.set(1 / _bs.x, 1 / _bs.y, 1 / _bs.z);
-  const g = new THREE.Group(); holder.add(g); bone.add(holder); build(g); return g;
+  const g = new THREE.Group(); holder.add(g); bone.add(holder); build(g); mergeByMaterial(g); return g;
 }
 function makeHero() {
   const m = makeGL('henry', { height: 1.66, weapon: 'never' });
@@ -3252,6 +3274,8 @@ function pirateLevel(wave = G.wave) {
 const PIRATE_GROWTH = 1.03; // 해적: 레벨마다 체력·공격력 3%
 const ALLY_GROWTH = 1.06;    // 선장·선원: 단계별 6% (후반에 해적보다 지나치게 강해지지 않게)
 const PIRATE_CREW_MULTIPLIER = 3; // 상륙 인원 3배
+// 갑판에 동시에 있을 수 있는 해적 수: 휴대폰(터치 화면)은 30명, 그 외 48명. 총 상륙 인원은 같고 나눠서 올라옴
+const MAX_LIVE_PIRATES = (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) ? 30 : 48;
 const pirateMultiplier = (level = pirateLevel()) => Math.pow(PIRATE_GROWTH, Math.max(0, level - 1));
 const allyMultiplier = level => Math.pow(ALLY_GROWTH, Math.max(0, level - 1));
 const normalPirateHp = (level = pirateLevel()) => PIRATE_BALANCE.health * Math.round((6 + 2 * level) * pirateMultiplier(level));
