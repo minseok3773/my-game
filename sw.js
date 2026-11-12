@@ -3,12 +3,13 @@
  * - 게임 페이지(HTML)는 인터넷이 되면 항상 최신본을 받아 오고, 안 되면 저장본으로 실행합니다.
  * - 엔진·모형·그림은 저장본을 바로 쓰고, 뒤에서 새 버전이 있으면 다음 실행 때를 위해 갱신합니다.
  */
-const CACHE = 'raft-village-v1';
+const CACHE = 'raft-village-v2';
 const CORE = [
   './',
   'index.html',
   'raft-village-3d.html',
   'manifest.webmanifest',
+  'fonts/fonts.css', // 글꼴 파일(fonts/files)은 처음 쓰일 때 저장됩니다
   'assets/icon-192.png',
   'assets/icon-512.png',
   'assets/icon-maskable-512.png',

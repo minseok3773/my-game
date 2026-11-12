@@ -155,6 +155,7 @@ function buildCustomerDock(d) {
   counter.add(bx(0.8, 0.13, 0.04, 0xfff4d9, {}, false, 0, 0.32, 0.46));
   for (const x of [-0.55, 0.55]) counter.add(mk(cylG(0.025, 0.025, 0.66, 6), mat(wood), true, x, 0.89, 0.08));
   counter.add(bx(1.28, 0.07, 0.56, accent, {}, true, 0, 1.24, 0.18));
+  mergeByMaterial(g); // 부두는 움직이지 않으므로 재질별로 합쳐 그리기 호출을 줄임
   world.add(g); return g;
 }
 function syncCustomerDocks() {

@@ -198,6 +198,8 @@ function decorate() {
     } else if (d.type === 'converter') {
       o.g.add(mk(sphG(0.12, 10, 8), new THREE.MeshStandardMaterial({ color: 0xff9a3a, emissive: 0xff7a20, emissiveIntensity: 2 }), false, 0, 0.6, 0));
     }
+    // 장식까지 붙은 뒤 정적인 부품을 재질별로 합침 (깃발·대포·찌·쌓인 물건 등 움직이는 것은 제외)
+    mergeByMaterial(o.g, new Set(Object.values(o).filter(v => v && v.isObject3D && v !== o.g)));
   }
 }
 

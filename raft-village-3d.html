@@ -17,9 +17,7 @@ if ('serviceWorker' in navigator && ((location.protocol === 'https:' && !navigat
   addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 }
 </script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=Gowun+Dodum&display=swap">
+<link rel="stylesheet" href="fonts/fonts.css">
 <style>
 /* 밝은 색·두툼한 테두리·큼직한 숫자의 모바일 타이쿤 HUD */
 :root{
@@ -1311,9 +1309,14 @@ function objective() {
     const e = nearestEnemy(player.x, player.y, 999);
     if (e) { const p = shorePoint(e.x, e.y); return { x: p.x, y: p.y, text: heroLevel() < HERO_MAX_LEVEL ? '⚔️ 해적에게 다가가 검으로 싸우세요 · 참전 후 승리하면 선장 레벨 UP!' : '⚔️ 갑판 전투 · 훈련한 선원들과 함께 해적을 막으세요' }; }
   }
-  const pads = visiblePads().sort((a, b) => (a.cost - (G.paid[a.id] || 0)) - (b.cost - (G.paid[b.id] || 0)));
+  // 살 수 있는 칸 중 우선순위: 습격이 곧 오면 방어(망루·포탑·기지 강화) → 새 시설(진행이 열림) → 업그레이드, 같은 순위면 싼 것
+  const need = p => p.cost - (G.paid[p.id] || 0);
+  const raidSoon = typeof raidGateOpen === 'function' && raidGateOpen() && G.raidT < 30;
+  const isDefense = p => /^tower/.test(p.id) || p.up === 'base';
+  const tier = p => raidSoon && isDefense(p) ? 0 : p.up ? 2 : 1;
+  const pads = visiblePads().filter(p => G.money >= need(p)).sort((a, b) => tier(a) - tier(b) || need(a) - need(b));
   const p = pads[0];
-  if (p && G.money >= p.cost - (G.paid[p.id] || 0)) return { x: p.x, y: p.y, text: `${p.icon} ${p.up ? upName(p.up) + ' 업그레이드' : DEFS[p.id].name + ' 짓기'} · 표시된 칸 위에 서 있으세요` };
+  if (p) return { x: p.x, y: p.y, text: `${p.icon} ${p.up ? upName(p.up) + ' 업그레이드' : DEFS[p.id].name + ' 짓기'} · 표시된 칸 위에 서 있으세요` };
   let best = null;
   for (const id of STATION_IDS) { const d = DEFS[id], s = G.st[id]; if (d.type === 'shop' && s.cash > 0 && (!best || s.cash > G.st[best].cash)) best = id; }
   if (best && G.st[best].cash >= 6) return { x: DEFS[best].cx, y: DEFS[best].cy, text: '💵 쌓인 돈을 주우세요' };
@@ -2888,11 +2891,13 @@ const HERO_PAIRS = [
 const _bp = new THREE.Vector3(), _bq = new THREE.Quaternion(), _bs = new THREE.Vector3();
 // 같은 재질의 작은 부품을 한 덩어리로 합쳐 그리기 횟수를 줄임 (모양·색은 그대로)
 const _mergeInv = new THREE.Matrix4(), _mergeRel = new THREE.Matrix4();
-function mergeByMaterial(group) {
+// 같은 재질의 정적 메시를 하나로 합쳐 그리기 호출을 줄입니다. skip에 든 물체(와 그 자식)는 움직이므로 건드리지 않습니다.
+function mergeByMaterial(group, skip = null) {
   group.updateMatrixWorld(true);
   _mergeInv.copy(group.matrixWorld).invert();
   const buckets = new Map();
-  group.traverse(o => { if (o.isMesh && !o.isSkinnedMesh && !o.material.map) { const k = o.material.uuid; if (!buckets.has(k)) buckets.set(k, []); buckets.get(k).push(o); } });
+  const moving = o => { if (!skip) return false; for (let p = o; p && p !== group; p = p.parent) if (skip.has(p)) return true; return false; };
+  group.traverse(o => { if (o.isMesh && !o.isSkinnedMesh && !o.isInstancedMesh && !o.material.map && !Array.isArray(o.material) && !moving(o)) { const k = o.material.uuid; if (!buckets.has(k)) buckets.set(k, []); buckets.get(k).push(o); } });
   for (const list of buckets.values()) {
     if (list.length < 2) continue;
     const parts = list.map(o => { const gm = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone(); gm.applyMatrix4(_mergeRel.multiplyMatrices(_mergeInv, o.matrixWorld)); return gm; });
@@ -4181,6 +4186,7 @@ function buildCustomerDock(d) {
   counter.add(bx(0.8, 0.13, 0.04, 0xfff4d9, {}, false, 0, 0.32, 0.46));
   for (const x of [-0.55, 0.55]) counter.add(mk(cylG(0.025, 0.025, 0.66, 6), mat(wood), true, x, 0.89, 0.08));
   counter.add(bx(1.28, 0.07, 0.56, accent, {}, true, 0, 1.24, 0.18));
+  mergeByMaterial(g); // 부두는 움직이지 않으므로 재질별로 합쳐 그리기 호출을 줄임
   world.add(g); return g;
 }
 function syncCustomerDocks() {
@@ -4397,6 +4403,8 @@ function decorate() {
     } else if (d.type === 'converter') {
       o.g.add(mk(sphG(0.12, 10, 8), new THREE.MeshStandardMaterial({ color: 0xff9a3a, emissive: 0xff7a20, emissiveIntensity: 2 }), false, 0, 0.6, 0));
     }
+    // 장식까지 붙은 뒤 정적인 부품을 재질별로 합침 (깃발·대포·찌·쌓인 물건 등 움직이는 것은 제외)
+    mergeByMaterial(o.g, new Set(Object.values(o).filter(v => v && v.isObject3D && v !== o.g)));
   }
 }
 
