@@ -119,8 +119,7 @@ function raidEventHud() {
     cdEl.hidden = cd <= 0; cdEl.textContent = cd > 0 ? cd : '';
     skillBtn.disabled = cd > 0;
   }
-  raidEventBadge.hidden = !(raidOn && G.raidEvent);
-  if (!raidEventBadge.hidden) raidEventBadge.textContent = RAID_EVENTS[G.raidEvent].name;
+  raidEventBadge.hidden = true; // 특수 습격 이름은 아래 방어 정보 줄에 함께 표시 (작은 화면에서 안내 문구를 가리지 않게)
 }
 // 진행 불가 방지: 한 습격에서 선장이 3번 쓰러지고 다른 방어 인원도 없으면, 해적은 돈 25%를 약탈하고 물러남
 const LOOT_RETREAT_DOWNS = 3, LOOT_SHARE = 0.25;

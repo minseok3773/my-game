@@ -59,8 +59,20 @@ function tavernTransaction(change){
  if(save()){tavernRender();if(focusCard!==undefined)tavernPanel.querySelector(`[data-card="${focusCard}"]`)?.focus();return true;}
  G.tavern=old;G.money=money;tavernRender();document.getElementById('tavernNotice').textContent=storageState.conflict?storageState.error:'저장 실패로 이번 동작을 취소했습니다. 진행을 백업하거나 저장을 다시 시도하세요.';return false;
 }
+// 이용 제한: 하루 20판, 3연패하면 1분 쉬어 가기 (가상 돈이라도 '잃은 걸 되찾으려는' 흐름을 막음)
+const TAVERN_DAILY_HANDS = 20, TAVERN_LOSS_STREAK = 3, TAVERN_REST_MS = 60000;
+function tavernToday(){const d=new Date();return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;}
+function tavernLimitReason(){
+ const t=tavernState();
+ if(t.dayKey!==tavernToday()){t.dayKey=tavernToday();t.dayPlayed=0;}
+ if((t.dayPlayed||0)>=TAVERN_DAILY_HANDS)return `오늘은 ${TAVERN_DAILY_HANDS}판을 모두 했습니다. 내일 다시 오세요. 마을로 돌아가 쉬어 가요 🌙`;
+ const rest=(t.restUntil||0)-Date.now();
+ if(rest>0)return `3번 연속으로 졌어요. ${Math.ceil(rest/1000)}초 쉬었다가 다시 해요 ☕ 잃은 돈을 되찾으려고 서두르지 않아도 괜찮아요.`;
+ return '';
+}
 function tavernDeal(stake){
  const t=tavernState();
+ if(tavernLimitReason())return false;
  if(t.damagedRound||storageState.conflict||!unlocked.has('expand1')||raidOn||expeditionBusy()||t.round?.phase==='draw'||![10,20,30].includes(stake)||G.money<stake)return false;
  return tavernTransaction(()=>{
   const deck=Array.from({length:52},(_,i)=>i);
@@ -78,6 +90,8 @@ function tavernShowdown(){
   if(pokerRank(r.dealer)[0]<4)r.dealer=r.dealer.map(c=>counts[c%13]>=2?c:r.deck.shift());
   r.outcome=pokerCompare(r.player,r.dealer);r.payout=r.outcome>0?r.stake*2:r.outcome===0?r.stake:0;
   G.money+=r.payout;r.phase='result';r.deck=[];t.played++;
+  t.dayPlayed=(t.dayPlayed||0)+1;t.lossStreak=r.outcome<0?(t.lossStreak||0)+1:0;
+  if(t.lossStreak>=TAVERN_LOSS_STREAK){t.lossStreak=0;t.restUntil=Date.now()+TAVERN_REST_MS;}
  });
 }
 function tavernCards(cards,interactive=false){return cards.map((c,i)=>{
@@ -92,7 +106,8 @@ function tavernRender(){
  else {
   const stake=document.getElementById('tavernStake'),deal=document.getElementById('tavernDeal');
   deal.onclick=()=>tavernDeal(+stake.value);
-  stake.onchange=()=>{deal.disabled=!ready||G.money<+stake.value;if(ready)document.getElementById('tavernNotice').textContent=G.money<+stake.value?'선택한 판돈보다 보유 자금이 적습니다.':'';};
+  {const why=tavernLimitReason();if(why){deal.disabled=true;document.getElementById('tavernNotice').textContent=why;}}
+  stake.onchange=()=>{deal.disabled=!ready||G.money<+stake.value||!!tavernLimitReason();if(ready)document.getElementById('tavernNotice').textContent=G.money<+stake.value?'선택한 판돈보다 보유 자금이 적습니다.':'';};
  }
  if(t.damagedRound) document.getElementById('tavernDiscardDamaged').onclick=()=>tavernTransaction(()=>{delete t.damagedRound;});
  if(storageState.conflict) document.getElementById('tavernReload').onclick=()=>{if(reloadLatestStorage())tavernOpen();};

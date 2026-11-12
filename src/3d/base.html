@@ -2187,7 +2187,7 @@ function hud(obj) {
     $('defTop').textContent = `⚔️ 방어 ${workers.length + soldiers.length + (isHeroAvailable() ? 1 : 0)}명`;
     $('hpFill').style.width = Math.max(0, ch.ratio * 100) + '%';
     $('hpBar').classList.toggle('low', ch.ratio < 0.3);
-    $('defInfo').textContent = raidOn ? `⚠️ Lv.${pirateLevel()} · 해적선 ${alive}척 · 상륙 ${enemies.filter(e => e.kind === 'boarder' && e.state === 'walk').length}명` : !raidGateOpen() ? `🛡️ 일꾼 ${aliveWorkers()}/${RAID_MIN_CREW}명 · 6명이 모이면 해적 침공` : `⚔️ 다음 해적 Lv.${pirateLevel(G.wave + 1)}${bossDueNextRaid() ? ' · 보스' : ''} · ${Math.ceil(G.raidT)}초`;
+    $('defInfo').textContent = raidOn ? `${G.raidEvent ? RAID_EVENTS[G.raidEvent].name + ' · ' : ''}⚠️ Lv.${pirateLevel()} · 해적선 ${alive}척 · 상륙 ${enemies.filter(e => e.kind === 'boarder' && e.state === 'walk').length}명` : !raidGateOpen() ? `🛡️ 일꾼 ${aliveWorkers()}/${RAID_MIN_CREW}명 · 6명이 모이면 해적 침공` : `⚔️ 다음 해적 Lv.${pirateLevel(G.wave + 1)}${bossDueNextRaid() ? ' · 보스' : ''} · ${Math.ceil(G.raidT)}초`;
     if (!raidOn && !workers.length && !soldiers.length) $('defInfo').textContent = crewTents().length ? '⛺ 텐트 앞 칸에서 $30씩 자동 충원' : '⛺ 텐트를 지어 방어 인원을 모으세요';
     def.classList.toggle('raid', raidOn);
   }
