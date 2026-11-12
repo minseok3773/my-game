@@ -38,6 +38,7 @@ function updateSwordBoarder(e, dt) {
     return;
   }
   if (!alive(e)) return;
+  if (e.type === 'tentacle') { updateTentacle(e, dt); return; } // 바다 괴물 촉수는 제자리에서 내려침
   const foe = nearestCrew(e, Infinity);
   e.fighting = false;
   if (!foe) { boarderWreck(e, dt); return; } // 싸울 상대가 없으면 시설을 부숨
@@ -45,7 +46,7 @@ function updateSwordBoarder(e, dt) {
   const d = dist(e.x, e.y, foe.x, foe.y);
   if (d > MELEE_REACH) {
     const speed = e.type === 'bomber' ? 2.3 : e.type === 'thief' ? 2.4 : e.type === 'sniper' ? 1.6 : 1.7;
-    moveTo(e, foe.x, foe.y, speed * Math.min(1.5, 1 + 0.03 * ((e.level || pirateLevel()) - 1)), dt, null, true); return;
+    moveTo(e, foe.x, foe.y, speed * Math.min(1.5, 1 + 0.03 * ((e.level || pirateLevel()) - 1)) * stormMul(), dt, null, true); return;
   }
   stopMove(e, dt); e.fighting = true;
   e.atkT = (e.atkT ?? 0.8) - dt;

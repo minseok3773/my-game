@@ -7,7 +7,7 @@ function pirateLevel(wave = G.wave) {
   return Math.max(1, Math.ceil(count / PIRATE_RAIDS_PER_LEVEL));
 }
 const PIRATE_GROWTH = 1.03; // 해적: 레벨마다 체력·공격력 3%
-const ALLY_GROWTH = 1.1;     // 선장·선원: 기존 단계별 10% 성장 유지
+const ALLY_GROWTH = 1.06;    // 선장·선원: 단계별 6% (후반에 해적보다 지나치게 강해지지 않게)
 const PIRATE_CREW_MULTIPLIER = 3; // 상륙 인원 3배
 const pirateMultiplier = (level = pirateLevel()) => Math.pow(PIRATE_GROWTH, Math.max(0, level - 1));
 const allyMultiplier = level => Math.pow(ALLY_GROWTH, Math.max(0, level - 1));

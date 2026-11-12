@@ -375,7 +375,7 @@ const lv = () => G.level || 1;
 const levelNeed = n => Math.round(25 * Math.pow(n, 1.6));
 const slv = id => G.slv[id] || 1;
 const maxPile = id => MAXP + (lv() - 1) * 3 + (id ? (slv(id) - 1) * 5 : 0);
-const priceOf = d => Math.round(strategySale() * d.price * 2 * (1 + 0.15 * (lv() - 1)) * (1 + 0.3 * (slv(d.id) - 1)));
+const priceOf = d => Math.round((G.expedition?.rewards?.anchor ? 1.25 : 1) * strategySale() * d.price * 2 * (1 + 0.15 * (lv() - 1)) * (1 + 0.3 * (slv(d.id) - 1)));
 const fishPerCatch = () => 1 + Math.floor((lv() - 1) / 2);
 function visiblePads() {
   const list = PADS.filter(p => !unlocked.has(p.id) && p.after.every(a => unlocked.has(a)));
@@ -1912,7 +1912,7 @@ function update(dt) {
   for (const w of workers) if (expeditionWorkerAvailable(w)) updateWorker(w, dt);
   separateWorkers(dt);
   updateSea(dt);
-  updateMilitary(dt); tickTrainingInteraction(dt); tickRepairs(dt);
+  updateMilitary(dt); tickTrainingInteraction(dt); tickRepairs(dt); tickRaidEvents(dt);
   // 상호작용
   player.timer -= dt;
   if (isHeroAvailable() && player.timer <= 0) {
@@ -2169,7 +2169,7 @@ function finishStrategyRaid(wasLooted) {
 /* ---------- HUD ---------- */
 let lastHud = '';
 function hud(obj) {
-  strategyHud(); recruitmentHud(); trainingHud();
+  strategyHud(); recruitmentHud(); trainingHud(); raidEventHud();
   refreshGoalMessage(obj);
   const day = 1 + Math.floor(G.t / 40), km = G.t * 1.7 * (unlocked.has('solar') ? 1.4 : 1);
   const key = [Math.floor(G.money), day, Math.floor(km), G.stack.length, cap, obj.text, heroLevel(), G.hero.xp, heroAttack(), Math.ceil(player.hp), isHeroAvailable(),

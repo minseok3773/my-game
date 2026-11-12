@@ -33,7 +33,7 @@ function boarderWreck(e, dt) {
   if (!id) { stopMove(e, dt); return; }
   const d = DEFS[id], dd = dist(e.x, e.y, d.x, d.y);
   e.aimYaw = Math.atan2(d.x - e.x, d.y - e.y);
-  if (dd > 1.35) { moveTo(e, d.x, d.y, 1.8, dt, null, true); return; }
+  if (dd > 1.35) { moveTo(e, d.x, d.y, 1.8 * stormMul(), dt, null, true); return; }
   stopMove(e, dt); e.fighting = true;
   e.atkT = (e.atkT ?? 0.8) - dt;
   if (e.atkT > 0) return;

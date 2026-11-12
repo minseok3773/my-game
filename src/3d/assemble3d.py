@@ -64,6 +64,7 @@ function padBadge(p, full) {
   if (paid > 0) hpBar(p.x, p.y, 10, paid / p.cost, '#67cf48', 46);
 }
 function overlayWorld() {
+  drawWeather();
   drawBrokenSigns();
   const n = nightAmt();
   if (n > 0) {
@@ -166,7 +167,7 @@ for c in chunks:
         out.append("function dockRect(id) { return customerDockRect(id); }\n"); continue
     if c.startswith("/* ---------- HUD ---------- */"):
         out.append(B('w3d_storage.js')); out.append(B('w3d_expedition.js')); out.append(B('w3d_tavern.js'))
-        out.append(B('w3d_world.js')); out.append(B('w3d_chars.js')); out.append(B('w3d_game.js')); out.append(B('w3d_progression.js')); out.append(B('w3d_melee.js')); out.append(B('w3d_hero.js')); out.append(B('w3d_crew.js')); out.append(B('w3d_training.js')); out.append(B('w3d_customers.js')); out.append(B('w3d_fx.js')); out.append(B('w3d_scenery.js')); out.append(B('w3d_defense.js')); out.append(B('w3d_logistics.js')); out.append(overlay); out.append(c); continue
+        out.append(B('w3d_world.js')); out.append(B('w3d_chars.js')); out.append(B('w3d_game.js')); out.append(B('w3d_progression.js')); out.append(B('w3d_melee.js')); out.append(B('w3d_hero.js')); out.append(B('w3d_crew.js')); out.append(B('w3d_training.js')); out.append(B('w3d_customers.js')); out.append(B('w3d_fx.js')); out.append(B('w3d_scenery.js')); out.append(B('w3d_defense.js')); out.append(B('w3d_events.js')); out.append(B('w3d_logistics.js')); out.append(overlay); out.append(c); continue
     if c.startswith("/* ---------- 루프 ---------- */") or c.startswith("let last = performance.now()"):
         continue
     if keep(c): out.append(c)

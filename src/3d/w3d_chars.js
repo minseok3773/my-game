@@ -390,6 +390,7 @@ function animateDolphinCustomer(m, ent, dt) {
 
 // 주인공: 바다 수호 기사 / 일꾼: 뼈다귀 곰 선원 (Henry 바탕) / 손님: 아기 돌고래 / Mako·Sharky: 상륙 해적.
 function mkChar(kind, ent) {
+  if (kind === 'boarder' && ent.type === 'tentacle') return makeTentacle();
   return applyCharacterScale(makeCharacterModel(kind, ent));
 }
 function makeCharacterModel(kind, ent) {
@@ -415,6 +416,7 @@ function makeCharacterModel(kind, ent) {
   return m;
 }
 function animChar(m, ent, dt, st = {}) {
+  if (m.tentacle) { animateTentacle(m, ent, dt, st); return; }
   if (m.dolphin) { animateDolphinCustomer(m, ent, dt); return; }
   if (m.gl) animateGL(m, ent, dt, st); else animate3(m, ent, dt, !!(st.fighting || ent.fighting));
   if (m.hideHead && m.head) m.head.scale.setScalar(0.001); // 원래 머리(두건·얼굴)는 숨기고 곰 해골 머리로
