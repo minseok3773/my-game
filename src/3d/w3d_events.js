@@ -107,7 +107,8 @@ function updateTentacle(e, dt) {
 }
 function tickRaidEvents(dt) {
   G.skillCd = Math.max(0, (G.skillCd || 0) - dt);
-  if (raidOn && G.raidEventWave !== G.wave) { G.raidEventWave = G.wave; startRaidEvent(); }
+  if (raidOn && G.raidEventWave !== G.wave) { G.raidEventWave = G.wave; G.raidHeroDowns = 0; startRaidEvent(); }
+  checkLootRetreat();
   if (!raidOn && G.raidEvent) G.raidEvent = null;
 }
 function raidEventHud() {
@@ -120,6 +121,23 @@ function raidEventHud() {
   }
   raidEventBadge.hidden = !(raidOn && G.raidEvent);
   if (!raidEventBadge.hidden) raidEventBadge.textContent = RAID_EVENTS[G.raidEvent].name;
+}
+// 진행 불가 방지: 한 습격에서 선장이 3번 쓰러지고 다른 방어 인원도 없으면, 해적은 돈 25%를 약탈하고 물러남
+const LOOT_RETREAT_DOWNS = 3, LOOT_SHARE = 0.25;
+function checkLootRetreat() {
+  if (!raidOn || (G.raidHeroDowns || 0) < LOOT_RETREAT_DOWNS) return false;
+  if (workers.some(w => w.hp > 0 && !w.dead) || soldiers.some(s => s.hp > 0)) return false;
+  const loot = Math.floor(Math.max(0, G.money) * LOOT_SHARE);
+  G.money -= loot; looted = true; G.raidHeroDowns = 0;
+  for (const e of enemies) {
+    if (!alive(e)) continue;
+    e.fighting = false;
+    if (e.type === 'tentacle') { e.state = 'sink'; e.sinkT = 0; }
+    else if (e.kind === 'boarder') { e.state = 'retreat'; e.retreatT = 2.5; }
+    else e.state = 'flee';
+  }
+  toast(`🏴‍☠️ 해적이 $${fmt(loot)}를 약탈하고 물러났습니다 · 부서진 시설을 고치고 일꾼을 다시 모으세요`); save();
+  return true;
 }
 // 폭풍: 화면 위에 비와 어두운 하늘
 function drawWeather() {

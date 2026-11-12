@@ -2,6 +2,8 @@
 const tentCapacity = id => DEFS[id]?.type === 'tent' ? DEFS[id].workers + (slv(id) - 1) * 2 : 0;
 const crewCount = id => workers.filter(w => w.tent === id && w.hp > 0).length;
 const recruitmentCost = () => 30;
+// 긴급 충원: 일꾼이 한 명도 없고 돈이 $30 미만이면 (습격 중 아닐 때) 무료
+const recruitPrice = () => (!raidOn && !workers.some(w => w.hp > 0 && !w.dead) && G.money < 30) ? 0 : 30;
 const RECRUIT_SECONDS = 1;
 const crewTents = () => [...unlocked].filter(id => DEFS[id]?.type === 'tent');
 function restoreRecruitmentJobs() {
@@ -68,17 +70,17 @@ function recruitmentPads() {
     const point = recruitmentPadPosition(tent);
     if (!point) return null;
     const live = crewCount(tent), capacity = tentCapacity(tent), job = G.recruitment?.[tent];
-    return { id:'recruit:'+tent, tent, recruit:true, x:point.x, y:point.y, cost:30,
+    return { id:'recruit:'+tent, tent, recruit:true, x:point.x, y:point.y, cost:recruitPrice(),
       icon:'⛺', live, capacity, remaining:job ? Math.max(0,job.remaining) : 0, duration:RECRUIT_SECONDS,
       progress:job ? Math.max(0, Math.min(1, 1-job.remaining/RECRUIT_SECONDS)) : 0,
-      pending:!!job, canRecruit:live<capacity && !job && G.money>=30 };
+      pending:!!job, canRecruit:live<capacity && !job && G.money>=recruitPrice() };
   }).filter(Boolean);
 }
 function recruitWorker(id) {
   const pad = recruitmentPads().find(p => p.tent === id);
   const heroReady = typeof isHeroAvailable === 'function' ? isHeroAvailable() : true;
   if (!heroReady || !pad || dist(player.x,player.y,pad.x,pad.y)>0.6 || !pad.canRecruit) return false;
-  G.money -= 30; G.recruitment[id] = { remaining:RECRUIT_SECONDS, duration:RECRUIT_SECONDS, paid:30 };
+  const price = recruitPrice(); G.money -= price; G.recruitment[id] = { remaining:RECRUIT_SECONDS, duration:RECRUIT_SECONDS, paid:price };
   save(); return true;
 }
 function tickRecruitment(dt) {

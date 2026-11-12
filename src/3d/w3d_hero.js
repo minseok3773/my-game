@@ -51,7 +51,7 @@ function awardHeroVictory() {
 }
 function knockOutHero() {
   player.hp = 0; player.dead = true; player.fighting = false; player.swingT = 0;
-  player.vx = player.vy = 0; G.hero.downT = 8; snapshotHero();
+  player.vx = player.vy = 0; G.hero.downT = 8; if (raidOn) G.raidHeroDowns = (G.raidHeroDowns || 0) + 1; snapshotHero();
   toast('💫 선장이 쓰러졌습니다 · 8초 뒤 회복합니다'); save();
 }
 function tickHeroState(dt) {

@@ -2252,7 +2252,7 @@ function syncPads(vp) {
     // 패드마다 바뀌는 재질은 공유하지 않아 다른 칸의 상태를 덮어쓰지 않습니다.
     if (!o.base.userData.ownMaterial) { o.base.material = o.base.material.clone(); o.base.userData.ownMaterial = true; }
     o.base.material.color.setHex(p.recruit ? 0xd2fff0 : p.train ? (p.kind === 'hero' ? 0xffecc0 : 0xd9f0ff) : afford ? 0xffec9b : 0xfffbeb);
-    const labelSig = `${p.icon}|${Math.ceil(left)}|${afford}|${p.live}|${p.capacity}|${p.pending}|${Math.ceil(p.remaining || 0)}|${p.level}|${p.maxed}`;
+    const labelSig = `${p.icon}|${p.cost}|${Math.ceil(left)}|${afford}|${p.live}|${p.capacity}|${p.pending}|${Math.ceil(p.remaining || 0)}|${p.level}|${p.maxed}`;
     if (o.labelSig !== labelSig && (o.labelSig === '' || G.t - o.labelTime > 0.15 || o.labelTime > G.t)) {
       const c = o.labelCanvas.getContext('2d'); c.clearRect(0, 0, 128, 128);
       c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#415a43';
@@ -2264,7 +2264,7 @@ function syncPads(vp) {
       } else if (p.recruit) {
         c.font = 'bold 26px sans-serif'; c.fillText(`일꾼 ${p.live}/${p.capacity}`,64,27,120);
         c.font = 'bold 36px sans-serif'; c.fillStyle = '#178c74';
-        c.fillText(p.pending ? `${Math.ceil(p.remaining)}초` : p.live >= p.capacity ? '완료' : '$30',64,77,120);
+        c.fillText(p.pending ? `${Math.ceil(p.remaining)}초` : p.live >= p.capacity ? '완료' : p.cost ? '$' + p.cost : '무료',64,77,120);
         c.font = 'bold 17px sans-serif'; c.fillText(p.pending ? '모집 중' : p.live >= p.capacity ? '정원 충원' : '서서 자동 충원',64,110,120);
       } else {
         c.font = '42px sans-serif'; c.fillText(p.icon, 64, 35);
@@ -3467,7 +3467,7 @@ function awardHeroVictory() {
 }
 function knockOutHero() {
   player.hp = 0; player.dead = true; player.fighting = false; player.swingT = 0;
-  player.vx = player.vy = 0; G.hero.downT = 8; snapshotHero();
+  player.vx = player.vy = 0; G.hero.downT = 8; if (raidOn) G.raidHeroDowns = (G.raidHeroDowns || 0) + 1; snapshotHero();
   toast('💫 선장이 쓰러졌습니다 · 8초 뒤 회복합니다'); save();
 }
 function tickHeroState(dt) {
@@ -3497,6 +3497,8 @@ function updateHeroCombat(dt) {
 const tentCapacity = id => DEFS[id]?.type === 'tent' ? DEFS[id].workers + (slv(id) - 1) * 2 : 0;
 const crewCount = id => workers.filter(w => w.tent === id && w.hp > 0).length;
 const recruitmentCost = () => 30;
+// 긴급 충원: 일꾼이 한 명도 없고 돈이 $30 미만이면 (습격 중 아닐 때) 무료
+const recruitPrice = () => (!raidOn && !workers.some(w => w.hp > 0 && !w.dead) && G.money < 30) ? 0 : 30;
 const RECRUIT_SECONDS = 1;
 const crewTents = () => [...unlocked].filter(id => DEFS[id]?.type === 'tent');
 function restoreRecruitmentJobs() {
@@ -3563,17 +3565,17 @@ function recruitmentPads() {
     const point = recruitmentPadPosition(tent);
     if (!point) return null;
     const live = crewCount(tent), capacity = tentCapacity(tent), job = G.recruitment?.[tent];
-    return { id:'recruit:'+tent, tent, recruit:true, x:point.x, y:point.y, cost:30,
+    return { id:'recruit:'+tent, tent, recruit:true, x:point.x, y:point.y, cost:recruitPrice(),
       icon:'⛺', live, capacity, remaining:job ? Math.max(0,job.remaining) : 0, duration:RECRUIT_SECONDS,
       progress:job ? Math.max(0, Math.min(1, 1-job.remaining/RECRUIT_SECONDS)) : 0,
-      pending:!!job, canRecruit:live<capacity && !job && G.money>=30 };
+      pending:!!job, canRecruit:live<capacity && !job && G.money>=recruitPrice() };
   }).filter(Boolean);
 }
 function recruitWorker(id) {
   const pad = recruitmentPads().find(p => p.tent === id);
   const heroReady = typeof isHeroAvailable === 'function' ? isHeroAvailable() : true;
   if (!heroReady || !pad || dist(player.x,player.y,pad.x,pad.y)>0.6 || !pad.canRecruit) return false;
-  G.money -= 30; G.recruitment[id] = { remaining:RECRUIT_SECONDS, duration:RECRUIT_SECONDS, paid:30 };
+  const price = recruitPrice(); G.money -= price; G.recruitment[id] = { remaining:RECRUIT_SECONDS, duration:RECRUIT_SECONDS, paid:price };
   save(); return true;
 }
 function tickRecruitment(dt) {
@@ -4645,7 +4647,8 @@ function updateTentacle(e, dt) {
 }
 function tickRaidEvents(dt) {
   G.skillCd = Math.max(0, (G.skillCd || 0) - dt);
-  if (raidOn && G.raidEventWave !== G.wave) { G.raidEventWave = G.wave; startRaidEvent(); }
+  if (raidOn && G.raidEventWave !== G.wave) { G.raidEventWave = G.wave; G.raidHeroDowns = 0; startRaidEvent(); }
+  checkLootRetreat();
   if (!raidOn && G.raidEvent) G.raidEvent = null;
 }
 function raidEventHud() {
@@ -4658,6 +4661,23 @@ function raidEventHud() {
   }
   raidEventBadge.hidden = !(raidOn && G.raidEvent);
   if (!raidEventBadge.hidden) raidEventBadge.textContent = RAID_EVENTS[G.raidEvent].name;
+}
+// 진행 불가 방지: 한 습격에서 선장이 3번 쓰러지고 다른 방어 인원도 없으면, 해적은 돈 25%를 약탈하고 물러남
+const LOOT_RETREAT_DOWNS = 3, LOOT_SHARE = 0.25;
+function checkLootRetreat() {
+  if (!raidOn || (G.raidHeroDowns || 0) < LOOT_RETREAT_DOWNS) return false;
+  if (workers.some(w => w.hp > 0 && !w.dead) || soldiers.some(s => s.hp > 0)) return false;
+  const loot = Math.floor(Math.max(0, G.money) * LOOT_SHARE);
+  G.money -= loot; looted = true; G.raidHeroDowns = 0;
+  for (const e of enemies) {
+    if (!alive(e)) continue;
+    e.fighting = false;
+    if (e.type === 'tentacle') { e.state = 'sink'; e.sinkT = 0; }
+    else if (e.kind === 'boarder') { e.state = 'retreat'; e.retreatT = 2.5; }
+    else e.state = 'flee';
+  }
+  toast(`🏴‍☠️ 해적이 $${fmt(loot)}를 약탈하고 물러났습니다 · 부서진 시설을 고치고 일꾼을 다시 모으세요`); save();
+  return true;
 }
 // 폭풍: 화면 위에 비와 어두운 하늘
 function drawWeather() {

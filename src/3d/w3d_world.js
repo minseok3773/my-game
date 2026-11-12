@@ -360,7 +360,7 @@ function syncPads(vp) {
     // 패드마다 바뀌는 재질은 공유하지 않아 다른 칸의 상태를 덮어쓰지 않습니다.
     if (!o.base.userData.ownMaterial) { o.base.material = o.base.material.clone(); o.base.userData.ownMaterial = true; }
     o.base.material.color.setHex(p.recruit ? 0xd2fff0 : p.train ? (p.kind === 'hero' ? 0xffecc0 : 0xd9f0ff) : afford ? 0xffec9b : 0xfffbeb);
-    const labelSig = `${p.icon}|${Math.ceil(left)}|${afford}|${p.live}|${p.capacity}|${p.pending}|${Math.ceil(p.remaining || 0)}|${p.level}|${p.maxed}`;
+    const labelSig = `${p.icon}|${p.cost}|${Math.ceil(left)}|${afford}|${p.live}|${p.capacity}|${p.pending}|${Math.ceil(p.remaining || 0)}|${p.level}|${p.maxed}`;
     if (o.labelSig !== labelSig && (o.labelSig === '' || G.t - o.labelTime > 0.15 || o.labelTime > G.t)) {
       const c = o.labelCanvas.getContext('2d'); c.clearRect(0, 0, 128, 128);
       c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillStyle = '#415a43';
@@ -372,7 +372,7 @@ function syncPads(vp) {
       } else if (p.recruit) {
         c.font = 'bold 26px sans-serif'; c.fillText(`일꾼 ${p.live}/${p.capacity}`,64,27,120);
         c.font = 'bold 36px sans-serif'; c.fillStyle = '#178c74';
-        c.fillText(p.pending ? `${Math.ceil(p.remaining)}초` : p.live >= p.capacity ? '완료' : '$30',64,77,120);
+        c.fillText(p.pending ? `${Math.ceil(p.remaining)}초` : p.live >= p.capacity ? '완료' : p.cost ? '$' + p.cost : '무료',64,77,120);
         c.font = 'bold 17px sans-serif'; c.fillText(p.pending ? '모집 중' : p.live >= p.capacity ? '정원 충원' : '서서 자동 충원',64,110,120);
       } else {
         c.font = '42px sans-serif'; c.fillText(p.icon, 64, 35);
