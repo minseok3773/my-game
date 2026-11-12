@@ -389,7 +389,7 @@ const lv = () => G.level || 1;
 const levelNeed = n => Math.round(25 * Math.pow(n, 1.6));
 const slv = id => G.slv[id] || 1;
 const maxPile = id => MAXP + (lv() - 1) * 3 + (id ? (slv(id) - 1) * 5 : 0);
-const priceOf = d => Math.round((G.expedition?.rewards?.anchor ? 1.25 : 1) * strategySale() * d.price * 2 * (1 + 0.15 * (lv() - 1)) * (1 + 0.3 * (slv(d.id) - 1)));
+const priceOf = d => Math.round((G.expedition?.rewards?.anchor ? 1.25 : 1) * (1 + 0.03 * Math.min(10, G.expedition?.pearls || 0)) * strategySale() * d.price * 2 * (1 + 0.15 * (lv() - 1)) * (1 + 0.3 * (slv(d.id) - 1)));
 const fishPerCatch = () => 1 + Math.floor((lv() - 1) / 2);
 function visiblePads() {
   const list = PADS.filter(p => !unlocked.has(p.id) && p.after.every(a => unlocked.has(a)));
@@ -1568,7 +1568,7 @@ function hitVillage(s) {
   for (const w of [...workers]) if (dist(w.x, w.y, s.x1, s.y1) < 1.1) { w.hp = (w.hp ?? CREW_HP) - 4; if (w.hp <= 0) killCrew(w); }
   booms.push({ x: s.x1, y: s.y1, t: 0, kind: 'fire' });
   if (G.hp > 0) return;
-  const amt = Math.floor(G.money * 0.5), lost = G.soldiers;
+  const amt = Math.min(500, Math.floor(G.money * 0.5)), lost = G.soldiers;
   G.money -= amt; looted = true; G.hp = Math.round(hpMax() * 0.5);
   G.soldiers = 0; soldiers.length = 0;
   const ups = Object.keys(G.slv).filter(id => G.slv[id] > 1);
@@ -1926,7 +1926,7 @@ function update(dt) {
   for (const w of workers) if (expeditionWorkerAvailable(w)) updateWorker(w, dt);
   separateWorkers(dt);
   updateSea(dt);
-  updateMilitary(dt); tickTrainingInteraction(dt); tickRepairs(dt); tickRaidEvents(dt);
+  updateMilitary(dt); tickTrainingInteraction(dt); tickRepairs(dt); tickRaidEvents(dt); tickScout(dt);
   // 상호작용
   player.timer -= dt;
   if (isHeroAvailable() && player.timer <= 0) {
@@ -1990,7 +1990,7 @@ function objective() {
   }
   const pads = visiblePads().sort((a, b) => (a.cost - (G.paid[a.id] || 0)) - (b.cost - (G.paid[b.id] || 0)));
   const p = pads[0];
-  if (p && G.money >= p.cost - (G.paid[p.id] || 0)) return { x: p.x, y: p.y, text: `${p.icon} ${p.up ? upName(p.up) + ' 업그레이드' : DEFS[p.id].name + ' 짓기'} · 점선 칸 위에 서 있으세요` };
+  if (p && G.money >= p.cost - (G.paid[p.id] || 0)) return { x: p.x, y: p.y, text: `${p.icon} ${p.up ? upName(p.up) + ' 업그레이드' : DEFS[p.id].name + ' 짓기'} · 표시된 칸 위에 서 있으세요` };
   let best = null;
   for (const id of STATION_IDS) { const d = DEFS[id], s = G.st[id]; if (d.type === 'shop' && s.cash > 0 && (!best || s.cash > G.st[best].cash)) best = id; }
   if (best && G.st[best].cash >= 6) return { x: DEFS[best].cx, y: DEFS[best].cy, text: '💵 쌓인 돈을 주우세요' };
@@ -2165,7 +2165,7 @@ function strategyHud() {
   strategyBtn.hidden = !unlocked.has('expand1') || raidOn || paused;
   const plan = raidPlan(), tactic = TACTICS.find(t => t.id === G.tactic);
   const seconds = Math.max(0, Math.ceil(G.raidT));
-  strategyBtn.innerHTML = !raidGateOpen() ? `🛡️ 일꾼 ${aliveWorkers()}/${RAID_MIN_CREW}명<span>6명이 모이면 해적 침공</span>` : `🧭 습격 ${seconds}초<span>${tactic ? tactic.name : '준비 선택 ›'} · Lv.${pirateLevel(G.wave + 1)}</span>`;
+  strategyBtn.innerHTML = !raidGateOpen() ? `🛡️ 일꾼 ${aliveWorkers()}/${RAID_MIN_CREW}명<span>${(G.stallT || 0) > 60 ? '🔭 정찰선 ' + scoutSeconds() + '초 뒤 접근' : '6명이 모이면 해적 침공'}</span>` : `🧭 습격 ${seconds}초<span>${tactic ? tactic.name : '준비 선택 ›'} · Lv.${pirateLevel(G.wave + 1)}</span>`;
   strategyBtn.setAttribute('aria-label', `제${G.wave + 1}파 해적 레벨 ${pirateLevel(G.wave + 1)}, ${plan.name}, ${seconds}초 후 습격. ${tactic ? tactic.name : '준비 선택'}. 방어 ${G.defended || 0}/5${G.expeditionWon ? ', 항로 확보 완료' : ''}`);
 }
 function finishStrategyRaid(wasLooted) {

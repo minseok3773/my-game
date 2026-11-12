@@ -19,7 +19,8 @@ function pirateAttack(e) {
   const level = e.level || pirateLevel();
   if (e.champion) return normalPirateAttack(level) * BOSS_POWER_MULTIPLIER;
   const base = e.type === 'bomber' ? 6 : e.type === 'sniper' ? 3 : 2.5;
-  return base * pirateMultiplier(level) * PIRATE_BALANCE.damage;
+  // 정찰선 해적은 살피러 온 것이라 공격력이 절반입니다(w3d_defense.js).
+  return base * pirateMultiplier(level) * PIRATE_BALANCE.damage * (G.scoutRaid ? 0.5 : 1);
 }
 function normalPirateShipHp(level = pirateLevel(), wave = G.wave, big = false) {
   const base = Math.round((big ? 3 : 1) * (12 + 5 * level) * pirateMultiplier(level));

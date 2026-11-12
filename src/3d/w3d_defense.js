@@ -119,3 +119,31 @@ function drawBrokenSigns() {
     sign(pct > 0 ? `🔧 수리 중 ${pct}%` : '🔧 부서짐 · 일꾼이 곧 고쳐요', d.x, d.y, 100, 'rgba(255,232,226,.93)', '#a3392a', 15);
   }
 }
+
+// ---------- 정찰선: 일꾼을 5명 이하로 묶어 두고 습격을 피하는 것을 막습니다 ----------
+// 일꾼 3명 이상 · 자금 $150 이상인데 6명을 채우지 않은 채 3분이 지나면 작은 정찰선 1척이 옵니다.
+// 정찰선은 1척·상륙 2명·공격력 절반으로 약하지만, 습격 1회로 세므로 해적 레벨이 오릅니다(버티기로 해적 성장을 멈출 수 없음).
+const SCOUT_AFTER = 180, SCOUT_MIN_CREW = 3, SCOUT_MIN_MONEY = 150;
+const scoutSeconds = () => Math.max(0, Math.ceil(SCOUT_AFTER - (G.stallT || 0)));
+function tickScout(dt) {
+  if (!raidOn && G.scoutRaid) G.scoutRaid = false;
+  if (raidOn || !unlocked.has('expand1') || expeditionBusy()) return;
+  if (raidGateOpen()) { G.stallT = 0; return; }
+  if (aliveWorkers() < SCOUT_MIN_CREW || G.money < SCOUT_MIN_MONEY) return;
+  G.stallT = (G.stallT || 0) + dt;
+  if (G.stallT >= SCOUT_AFTER) launchScoutRaid();
+}
+function launchScoutRaid() {
+  G.stallT = 0;
+  const before = enemies.length;
+  G.scoutRaid = true;
+  startRaid(); raidOn = true;
+  enemies.splice(before + 1); // 해적선 1척만
+  const ship = enemies[before];
+  if (ship) {
+    const hp = Math.round(ship.max / (ship.big ? 3 : 1));
+    Object.assign(ship, { big: false, boss: false, hp, max: hp, landingBudget: 2 }); // 해적 2명만 상륙
+  }
+  raidIntro = { t: 0, n: 1 };
+  toast('🔭 정찰선 접근! 일꾼이 6명이 안 돼도 오래 머물면 해적이 살피러 와요', 3);
+}

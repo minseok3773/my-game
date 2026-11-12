@@ -1,4 +1,4 @@
-"""Five-card poker ranking, money transactions, reloads and mobile controls."""
+"""Free five-card duel (no stakes): ranking, prizes, daily limit, reloads and mobile controls."""
 import functools
 import http.server
 import threading
@@ -6,7 +6,7 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 ROOT=Path(__file__).resolve().parents[1]
 HOOK=r'''
-window.pokerTest={
+window.tavernToday=tavernToday;window.pokerTest={
  get G(){return G},get state(){return tavernState()},rank:pokerRank,compare:pokerCompare,
  deal:tavernDeal,hold:tavernHold,show:tavernShowdown,open:tavernOpen,save,build,serialize,load,reloadLatestStorage,
  get storage(){return {...storageState}},
@@ -49,16 +49,18 @@ def main():
    print('PASS all nine poker ranks, low ace and kicker comparison',flush=True)
    page.evaluate('pokerTest.reset(false);pokerTest.open()')
    assert page.locator('#tavernDeal').is_disabled()
-   assert not page.evaluate('pokerTest.deal(10)')
-   page.evaluate('pokerTest.reset();pokerTest.G.money=9;pokerTest.open()')
-   assert not page.evaluate('pokerTest.deal(10)')
-   page.evaluate('pokerTest.G.money=100;pokerTest.raid(true)')
-   assert not page.evaluate('pokerTest.deal(10)')
-   page.evaluate('pokerTest.raid(false);pokerTest.open()')
-   assert not page.evaluate('pokerTest.deal(-10)')
-   page.locator('#tavernStake').select_option('20');page.locator('#tavernDeal').click()
-   assert page.evaluate('pokerTest.G.money')==80
-   assert not page.evaluate('pokerTest.deal(20)')
+   assert not page.evaluate('pokerTest.deal()')
+   page.evaluate('pokerTest.reset();pokerTest.raid(true)')
+   assert not page.evaluate('pokerTest.deal()')
+   page.evaluate('pokerTest.raid(false);pokerTest.state.dayKey=tavernToday();pokerTest.state.dayPlayed=10;pokerTest.open()')
+   assert page.locator('#tavernDeal').is_disabled() and not page.evaluate('pokerTest.deal()')
+   assert '내일' in page.locator('#tavernNotice').inner_text()
+   page.evaluate('pokerTest.reset();pokerTest.G.money=0;pokerTest.open()')
+   assert page.locator('#tavernStake').count()==0
+   page.locator('#tavernDeal').click()
+   assert page.evaluate('pokerTest.G.money')==0  # 판돈 없음: 돈이 없어도 할 수 있고 차감도 없음
+   page.evaluate('pokerTest.G.money=100;pokerTest.save()')
+   assert not page.evaluate('pokerTest.deal()')
    cards=page.evaluate('pokerTest.state.round')
    assert len(set(cards['player']+cards['dealer']+cards['deck']))==52
    page.locator('[data-card="2"]').click();assert page.locator('[data-card="2"]').get_attribute('aria-pressed')=='true'
@@ -66,36 +68,36 @@ def main():
    before=page.evaluate('pokerTest.state.round')
    page.reload(wait_until='networkidle');page.wait_for_function('!!window.pokerTest');page.evaluate('pokerTest.open()')
    assert page.evaluate('pokerTest.state.round')==before
-   assert page.evaluate('pokerTest.G.money')==80
-   print('PASS unlock, funds and raid guards; one stake, unique deck, holds and reload, frozen village',flush=True)
+   assert page.evaluate('pokerTest.G.money')==100
+   print('PASS unlock, daily limit and raid guards; free deal, unique deck, holds and reload, frozen village',flush=True)
    # Force a winning showdown but use real UI to settle; dealer flush remains unchanged.
    page.evaluate('pokerTest.fixture([8,9,10,11,12],[13,15,17,19,21])')
    page.locator('#tavernDraw').click()
    assert page.evaluate('pokerTest.G.money')==120
-   assert page.evaluate('pokerTest.state.round.payout')==40
+   assert page.evaluate('pokerTest.state.round.payout')==20
    assert not page.evaluate('pokerTest.show()')
    page.reload(wait_until='networkidle');page.wait_for_function('!!window.pokerTest');page.evaluate('pokerTest.open()')
    assert page.evaluate('pokerTest.G.money')==120
    assert '정산 완료' in page.locator('#tavernPanel').inner_text()
-   print('PASS win pays pot once and remains settled through reload',flush=True)
-   for player,dealer,outcome,money in [([0,1,2,3,4],[13,14,15,16,17],0,100),([0,2,4,6,8],[21,22,23,24,25],-1,90)]:
-    page.evaluate('pokerTest.reset();pokerTest.open();pokerTest.deal(10)')
+   print('PASS win pays the $20 prize once and remains settled through reload',flush=True)
+   for player,dealer,outcome,money in [([0,1,2,3,4],[13,14,15,16,17],0,105),([0,2,4,6,8],[21,22,23,24,25],-1,100)]:
+    page.evaluate('pokerTest.reset();pokerTest.open();pokerTest.deal()')
     page.evaluate('(a)=>pokerTest.fixture(a[0],a[1])',[player,dealer]);page.locator('#tavernDraw').click()
     assert page.evaluate('pokerTest.state.round.outcome')==outcome
     assert page.evaluate('pokerTest.G.money')==money
-   print('PASS draw refunds stake and loss consumes only stake',flush=True)
+   print('PASS tie pays $5 and a loss costs nothing',flush=True)
    # Failed primary save must roll back both charging and payouts.
    page.evaluate('() => {pokerTest.reset();pokerTest.open();window.realSet=Storage.prototype.setItem;Storage.prototype.setItem=()=>{throw new DOMException("full","QuotaExceededError")}; }')
-   assert not page.evaluate('pokerTest.deal(10)')
+   assert not page.evaluate('pokerTest.deal()')
    assert page.evaluate('pokerTest.G.money')==100
    assert page.evaluate('pokerTest.state.round') is None
-   page.evaluate('() => {Storage.prototype.setItem=window.realSet;pokerTest.deal(10);pokerTest.fixture([8,9,10,11,12],[13,15,17,19,21]);Storage.prototype.setItem=()=>{throw new DOMException("full","QuotaExceededError")}; }')
+   page.evaluate('() => {Storage.prototype.setItem=window.realSet;pokerTest.deal();pokerTest.fixture([8,9,10,11,12],[13,15,17,19,21]);Storage.prototype.setItem=()=>{throw new DOMException("full","QuotaExceededError")}; }')
    assert not page.evaluate('pokerTest.show()')
-   assert page.evaluate('pokerTest.G.money')==90
+   assert page.evaluate('pokerTest.G.money')==100
    assert page.evaluate('pokerTest.state.round.phase')=='draw'
    page.evaluate('() => {Storage.prototype.setItem=window.realSet; }');page.locator('#tavernDraw').click()
-   assert page.evaluate('pokerTest.G.money')==110
-   print('PASS failed charging and settlement roll back; retry pays once',flush=True)
+   assert page.evaluate('pokerTest.G.money')==120
+   print('PASS failed deal and settlement roll back; retry pays once',flush=True)
    for width,height in [(320,568),(390,844),(844,390)]:
     page.set_viewport_size({'width':width,'height':height})
     assert page.evaluate('document.documentElement.scrollWidth<=innerWidth')
@@ -107,17 +109,17 @@ def main():
    assert not errors,errors
    print('PASS three mobile layouts, keyboard focus and close; no runtime errors',flush=True)
    # Optional damaged poker fields cannot corrupt or reset the village.
-   page.evaluate('''() => {pokerTest.reset();const g=pokerTest.serialize();g.st.fishing.pile=9;g.unlocked.push('tent1');delete g.crewRoster;pokerTest.build(g);pokerTest.open();pokerTest.deal(20);}''')
+   page.evaluate('''() => {pokerTest.reset();const g=pokerTest.serialize();g.st.fishing.pile=9;g.unlocked.push('tent1');delete g.crewRoster;pokerTest.build(g);pokerTest.open();pokerTest.deal();}''')
    original=page.evaluate('pokerTest.serialize()')
    page.evaluate('''() => {const g=pokerTest.serialize();delete g.tavern.round.held;pokerTest.build(g);pokerTest.open();}''')
    assert page.evaluate('pokerTest.state.round.held')==[False]*5
-   assert page.evaluate('pokerTest.G.money')==80
+   assert page.evaluate('pokerTest.G.money')==100
    for field,value in [('player',[]),('deck',[0]*42),('held',[True]),('stake',-10),('phase','unknown')]:
     bad={**original,'tavern':{**original['tavern'],'round':{**original['tavern']['round'],field:value}}}
     page.evaluate('(g)=>{pokerTest.build(g);pokerTest.open();}',bad)
     assert page.evaluate('pokerTest.state.round') is None
     assert page.evaluate('!!pokerTest.state.damagedRound')
-    assert page.evaluate('pokerTest.G.money')==80
+    assert page.evaluate('pokerTest.G.money')==100
     assert page.locator('#tavernDeal').is_disabled()
     assert not page.evaluate('pokerTest.show()')
     assert page.evaluate('pokerTest.G.unlocked')==original['unlocked']
@@ -128,31 +130,31 @@ def main():
    page.evaluate('(g)=>{pokerTest.build(g);pokerTest.open();}',bad_result)
    assert page.evaluate('!!pokerTest.state.damagedRound')
    assert not page.evaluate('pokerTest.show()')
-   assert page.evaluate('pokerTest.G.money')==80
+   assert page.evaluate('pokerTest.G.money')==100
    page.locator('#tavernDiscardDamaged').click()
    assert not page.evaluate('!!pokerTest.state.damagedRound')
-   assert page.evaluate('pokerTest.G.money')==80
+   assert page.evaluate('pokerTest.G.money')==100
    page.reload(wait_until='networkidle');page.wait_for_function('!!window.pokerTest');page.evaluate('pokerTest.open()')
    assert not page.evaluate('!!pokerTest.state.damagedRound')
    assert page.evaluate('pokerTest.state.round') is None
-   assert page.evaluate('pokerTest.G.money')==80
+   assert page.evaluate('pokerTest.G.money')==100
    print('PASS missing holds repaired; bad cards/deck/stake/phase isolated without village reset or payouts',flush=True)
 
    # Two ordinary pages share localStorage but keep independent in-memory villages.
    page.evaluate('pokerTest.reset();pokerTest.save()')
    other=ctx.new_page();other.on('pageerror',lambda e:errors.append(str(e)))
    other.goto(url,wait_until='networkidle');other.wait_for_function('!!window.pokerTest')
-   page.evaluate('pokerTest.open();pokerTest.deal(20)')
+   page.evaluate('pokerTest.open();pokerTest.deal()')
    saved=page.evaluate('localStorage.getItem("raft-village-v1")')
    other.evaluate('pokerTest.open()')
-   assert not other.evaluate('pokerTest.deal(20)')
+   assert not other.evaluate('pokerTest.deal()')
    assert other.evaluate('pokerTest.G.money')==100
    assert other.evaluate('pokerTest.storage.conflict')
    assert other.evaluate('localStorage.getItem("raft-village-v1")')==saved
    assert not other.evaluate('pokerTest.save()')
    assert other.evaluate('localStorage.getItem("raft-village-v1")')==saved
    other.locator('#tavernReload').click()
-   assert other.evaluate('pokerTest.G.money')==80
+   assert other.evaluate('pokerTest.G.money')==100
    assert other.evaluate('pokerTest.state.round.phase')=='draw'
    # Both pages now hold the same dealt round; one settles and the stale one must stop.
    page.evaluate('pokerTest.fixture([8,9,10,11,12],[13,15,17,19,21]);pokerTest.show()')

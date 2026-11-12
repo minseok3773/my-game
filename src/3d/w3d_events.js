@@ -73,6 +73,7 @@ window.addEventListener('keydown', ev => {
 // ---------- 특수 습격 ----------
 function startRaidEvent() {
   G.raidEvent = null;
+  if (G.scoutRaid) return;
   if (pirateLevel() < RAID_EVENT_FROM || Math.random() >= RAID_EVENT_CHANCE) return;
   const type = G.lastRaidEvent === 'storm' ? 'kraken' : G.lastRaidEvent === 'kraken' ? 'storm' : (Math.random() < 0.5 ? 'storm' : 'kraken');
   G.raidEvent = type; G.lastRaidEvent = type;
@@ -121,12 +122,12 @@ function raidEventHud() {
   }
   raidEventBadge.hidden = true; // 특수 습격 이름은 아래 방어 정보 줄에 함께 표시 (작은 화면에서 안내 문구를 가리지 않게)
 }
-// 진행 불가 방지: 한 습격에서 선장이 3번 쓰러지고 다른 방어 인원도 없으면, 해적은 돈 25%를 약탈하고 물러남
-const LOOT_RETREAT_DOWNS = 3, LOOT_SHARE = 0.25;
+// 진행 불가 방지: 한 습격에서 선장이 3번 쓰러지고 다른 방어 인원도 없으면, 해적은 돈 25%(최대 $300)를 약탈하고 물러남
+const LOOT_RETREAT_DOWNS = 3, LOOT_SHARE = 0.25, LOOT_CAP = 300; // 많이 모은 사람도 한 번에 최대 $300만 잃음
 function checkLootRetreat() {
   if (!raidOn || (G.raidHeroDowns || 0) < LOOT_RETREAT_DOWNS) return false;
   if (workers.some(w => w.hp > 0 && !w.dead) || soldiers.some(s => s.hp > 0)) return false;
-  const loot = Math.floor(Math.max(0, G.money) * LOOT_SHARE);
+  const loot = Math.min(LOOT_CAP, Math.floor(Math.max(0, G.money) * LOOT_SHARE));
   G.money -= loot; looted = true; G.raidHeroDowns = 0;
   for (const e of enemies) {
     if (!alive(e)) continue;

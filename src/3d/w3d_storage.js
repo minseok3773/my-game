@@ -51,7 +51,7 @@ function storagePokerStamp(raw) {
 }
 function storageConflict() {
   storageState.failed = true; storageState.conflict = true;
-  storageState.error = '다른 탭에서 포커 진행이 변경됐습니다. 이 탭의 저장을 멈췄습니다. 현재 진행을 백업하거나 최신 저장을 불러오세요.';
+  storageState.error = '다른 탭에서 선술집 카드 대결 진행이 변경됐습니다. 이 탭의 저장을 멈췄습니다. 현재 진행을 백업하거나 최신 저장을 불러오세요.';
   updateStorageStatus(); return false;
 }
 function reloadLatestStorage() {
@@ -147,3 +147,56 @@ document.getElementById('storageRetry').onclick = retryStorage;
 document.getElementById('storageExport').onclick = exportSave;
 
 document.getElementById('storageReload').onclick = reloadLatestStorage;
+
+// ---------- 저장 코드: 휴대폰을 바꾸거나 브라우저 데이터를 지워도 이어서 하기 ----------
+const SAVE_CODE_PREFIX = 'RAFT1:';
+const storageMoveRow = document.createElement('div');
+storageMoveRow.className = 'row'; storageMoveRow.id = 'storageMoveRow';
+storageMoveRow.innerHTML = '<button type="button" id="storageCopyCode">저장 코드 복사</button><button type="button" id="storagePasteCode">저장 코드 붙여넣기</button><button type="button" id="storageImportFile">백업 파일 불러오기</button><input type="file" id="storageFile" accept=".json,.txt,application/json,text/plain" hidden>';
+const storageNote = document.createElement('p');
+storageNote.id = 'storageNote'; storageNote.setAttribute('role', 'status');
+storageNote.textContent = '저장 코드를 카카오톡 "나와의 채팅"이나 메모장에 보관해 두면, 휴대폰을 바꿔도 이어서 할 수 있어요.';
+storagePanel.append(storageMoveRow, storageNote);
+function setStorageNote(text) { storageNote.textContent = text; }
+function saveCode() {
+  const bytes = new TextEncoder().encode(JSON.stringify(serialize()));
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return SAVE_CODE_PREFIX + btoa(bin);
+}
+function parseSaveCode(text) {
+  text = String(text || '').trim();
+  if (text.startsWith('{')) return parseStoredGame(text); // 백업 파일(JSON)
+  const body = (text.startsWith(SAVE_CODE_PREFIX) ? text.slice(SAVE_CODE_PREFIX.length) : text).replace(/\s+/g, '');
+  const bin = atob(body);
+  return parseStoredGame(new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0))));
+}
+async function copySaveCode() {
+  const code = saveCode();
+  try { await navigator.clipboard.writeText(code); setStorageNote('✅ 저장 코드를 복사했어요. 카카오톡 "나와의 채팅"이나 메모장에 붙여 넣어 보관하세요.'); }
+  catch (error) { window.prompt('아래 저장 코드를 전부 복사해 보관하세요.', code); setStorageNote('저장 코드를 보관해 두세요.'); }
+  return code;
+}
+function importSaveData(data, ask = true) {
+  if (ask && !window.confirm('지금 진행을 불러온 저장으로 바꿀까요? 현재 진행은 사라집니다.')) return false;
+  try { localStorage.setItem(KEY, JSON.stringify(data)); } catch (error) { return storageError(error); }
+  const loaded = load();
+  if (!loaded) return false;
+  build(loaded); paused = !expeditionBusy(); document.getElementById('helpPanel').hidden = expeditionBusy();
+  save(); setStorageNote('✅ 저장을 불러왔어요. 이어서 즐겨 주세요!');
+  return true;
+}
+function importSaveText(text, ask = true) {
+  let data;
+  try { data = parseSaveCode(text); }
+  catch (error) { setStorageNote('⚠️ 저장 코드를 읽지 못했어요. 코드 전체를 빠짐없이 붙여 넣었는지 확인해 주세요.'); return false; }
+  return importSaveData(data, ask);
+}
+document.getElementById('storageCopyCode').onclick = copySaveCode;
+document.getElementById('storagePasteCode').onclick = () => { const text = window.prompt('보관해 둔 저장 코드를 붙여 넣으세요.'); if (text) importSaveText(text); };
+document.getElementById('storageImportFile').onclick = () => document.getElementById('storageFile').click();
+document.getElementById('storageFile').onchange = ev => {
+  const file = ev.target.files?.[0]; ev.target.value = '';
+  if (!file) return;
+  file.text().then(text => importSaveText(text)).catch(() => setStorageNote('⚠️ 백업 파일을 열지 못했어요.'));
+};
