@@ -726,8 +726,10 @@ function sync3D(dt) {
   if (unlocked.has('lighthouse')) { const d = DEFS.lighthouse; lampTower.position.set(d.x, 3.6, d.y); lampTower.intensity = n * 2.2; }
   lampPlayer.position.set(player.x, 1.6, player.y); lampPlayer.intensity = n * 1.1;
   // 카메라: 높은 곳에서 내려다보며 부드럽게 따라감 (흔들림 포함)
-  _pv.set(player.x - 0.45, 0.3, player.y - 0.45);
-  cameraFocus.lerp(_pv, Math.min(1, dt * 8));
+  // 안내문을 누르면 잠깐 목표 칸을 비춘 뒤 돌아옵니다(w3d_guide.js).
+  const camT = guideCameraTarget(dt);
+  _pv.set(camT.x - 0.45, 0.3, camT.y - 0.45);
+  cameraFocus.lerp(_pv, Math.min(1, dt * camT.speed));
   camera.position.copy(cameraFocus).add(cameraOffset);
   if (shake > 0) camera.position.add(_pv.set(rnd(-1, 1), rnd(-1, 1), rnd(-1, 1)).multiplyScalar(shake * 0.5));
   camera.lookAt(cameraFocus);

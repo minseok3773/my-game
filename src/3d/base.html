@@ -59,6 +59,7 @@ body{position:fixed;inset:0;background:var(--sea);color:var(--ink);font-family:v
 #level s i{display:block;height:100%;width:0;background:#f7bc39;transition:width .2s}
 #goal{top:calc(118px + env(safe-area-inset-top,0px));left:calc(10px + env(safe-area-inset-left,0px));right:calc(10px + env(safe-area-inset-right,0px));max-width:none;padding:6px 10px;font-size:14px;line-height:1.35;word-break:keep-all;overflow-wrap:anywhere;border-color:#349ca8;background:#edffff;box-shadow:0 3px 0 #227c8b50;text-align:center;white-space:normal}
 #goal::before{content:attr(data-label);display:inline-block;margin-right:6px;padding:2px 5px;border-radius:5px;background:#78dbd4;color:#225961;font-size:10px;vertical-align:1px;white-space:nowrap}
+#goal.peekable{pointer-events:auto;cursor:pointer}#goal.peekable::after{content:' 👀';font-size:12px}
 #goal[data-kind=build]{border-color:#9b6b2d;background:#fff6d6}#goal[data-kind=build]::before{background:#ffd86c;color:#765020}
 #goal[data-kind=danger]{border-color:#9a3d36;background:#ffe8de}#goal[data-kind=danger]::before{background:#fa8a75;color:#763029}
 #bag{bottom:calc(10px + env(safe-area-inset-bottom,0px));left:calc(10px + env(safe-area-inset-left,0px));width:90px;height:48px;display:flex;align-items:center;justify-content:center;padding:4px;font-size:15px;font-variant-numeric:tabular-nums;pointer-events:auto;cursor:pointer;background:#fff3cc}
