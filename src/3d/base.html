@@ -2183,7 +2183,7 @@ function finishStrategyRaid(wasLooted) {
 /* ---------- HUD ---------- */
 let lastHud = '';
 function hud(obj) {
-  strategyHud(); recruitmentHud(); trainingHud(); raidEventHud();
+  strategyHud(); recruitmentHud(); trainingHud();
   refreshGoalMessage(obj);
   const day = 1 + Math.floor(G.t / 40), km = G.t * 1.7 * (unlocked.has('solar') ? 1.4 : 1);
   const key = [Math.floor(G.money), day, Math.floor(km), G.stack.length, cap, obj.text, heroLevel(), G.hero.xp, heroAttack(), Math.ceil(player.hp), isHeroAvailable(),
@@ -2191,7 +2191,7 @@ function hud(obj) {
   const q = questInfo();
   $('qText').innerHTML = `${q.text} <b>${hudNumber(Math.min(q.cur, q.n))}/${hudNumber(q.n)}</b> · $${hudMoney(q.reward)}`;
   $('qFill').style.width = Math.min(100, q.cur / q.n * 100) + '%';
-  if (key === lastHud) return; lastHud = key;
+  if (key === lastHud) { raidEventHud(); return; } lastHud = key;
   const def = $('defense');
   def.hidden = !unlocked.has('expand1');
   if (!def.hidden) {
@@ -2202,7 +2202,7 @@ function hud(obj) {
     $('hpFill').style.width = Math.max(0, ch.ratio * 100) + '%';
     $('hpBar').classList.toggle('low', ch.ratio < 0.3);
     $('defInfo').textContent = raidOn ? `${G.raidEvent ? RAID_EVENTS[G.raidEvent].name + ' · ' : ''}⚠️ Lv.${pirateLevel()} · 해적선 ${alive}척 · 상륙 ${enemies.filter(e => e.kind === 'boarder' && e.state === 'walk').length}명` : !raidGateOpen() ? `🛡️ 일꾼 ${aliveWorkers()}/${RAID_MIN_CREW}명 · 6명이 모이면 해적 침공` : `⚔️ 다음 해적 Lv.${pirateLevel(G.wave + 1)}${bossDueNextRaid() ? ' · 보스' : ''} · ${Math.ceil(G.raidT)}초`;
-    if (!raidOn && !workers.length && !soldiers.length) $('defInfo').textContent = crewTents().length ? '⛺ 텐트 앞 칸에서 $30씩 자동 충원' : '⛺ 텐트를 지어 방어 인원을 모으세요';
+    if (!raidOn && !workers.length && !soldiers.length) $('defInfo').textContent = crewTents().length ? (recruitPrice() === 0 ? '⛺ 텐트 앞 칸에서 긴급 무료 충원' : '⛺ 텐트 앞 칸에서 $30씩 자동 충원') : '⛺ 텐트를 지어 방어 인원을 모으세요';
     def.classList.toggle('raid', raidOn);
   }
   $('lv').textContent = `선장 Lv.${heroLevel()}`;
@@ -2213,6 +2213,7 @@ function hud(obj) {
   moneyEl.textContent = hudMoney(G.money); moneyEl.title = fmt(G.money);
   $('day').textContent = day; $('km').textContent = `${phaseInfo()} · 수입 $${fmt(incomePerMin())}/분`;
   $('bag').innerHTML = `🎒 ${G.stack.length}/${cap}${G.stack.length ? '<em>비우기</em>' : ''}`; $('bag').classList.toggle('full', G.stack.length >= cap);
+  raidEventHud();
 }
 
 /* ---------- 루프 ---------- */

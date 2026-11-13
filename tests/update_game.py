@@ -266,7 +266,7 @@ def main(argv=None):
                     page.goto(args.url, wait_until="networkidle")
                     page.wait_for_function("!!window.updateTest", timeout=30000)
                     if section in ("visual", "mobile"):
-                        page.wait_for_function("updateTest.ready", timeout=30000)
+                        page.wait_for_function("updateTest.ready", timeout=30000, polling=100)
                     globals()[f"check_{section}"](page, args.screenshots)
                     assert not errors, errors
                     print(f"PASS section {section}; no JavaScript runtime errors", flush=True)

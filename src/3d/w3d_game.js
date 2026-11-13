@@ -41,9 +41,9 @@ const CARDS = [
 ];
 function ck(id) { return (G && G.cards && G.cards[id]) || 0; }
 const lootMul = () => 1 + 0.5 * ck('loot');
-const crewHpMax = () => Math.round((15 + 6 * (pirateLevel() - 1)) * allyMultiplier(pirateLevel()) * (1 + 0.5 * ck('crewHp')) * (G.expedition?.rewards?.shell ? 1.25 : 1)) + 10 * ck('villageHp') + 5 * trainingLevel('crew');
+const crewHpMax = () => Math.round((15 + 6 * (pirateLevel() - 1)) * crewAllyMultiplier(pirateLevel()) * (1 + 0.5 * ck('crewHp')) * (G.expedition?.rewards?.shell ? 1.25 : 1)) + 10 * ck('villageHp') + 5 * trainingLevel('crew');
 const crewMul = () => 1 + 0.4 * ck('crewPower');
-const crewAttack = () => 3 * (1 + 0.1 * (Math.max(lv(), pirateLevel()) - 1)) * allyMultiplier(pirateLevel()) * crewMul() + trainingLevel('crew');
+const crewAttack = () => 3 * (1 + 0.1 * (Math.max(lv(), pirateLevel()) - 1)) * crewAllyMultiplier(pirateLevel()) * crewMul() + trainingLevel('crew');
 
 const cardStyle = document.createElement('style');
 cardStyle.textContent = `
@@ -58,7 +58,7 @@ cardStyle.textContent = `
 #cardPanel button.card b{display:block;font-size:17px;font-family:var(--display)}
 #cardPanel button.card span{display:block;font-size:13px;line-height:1.4}
 #cardPanel button.card .lv{margin-left:auto;font:11px var(--display);background:#fffdf1;color:#76603b;border:1px solid #c8b085;border-radius:8px;padding:3px 5px;flex:none}
-#bossBar{position:fixed;left:50%;bottom:calc(136px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(320px,70vw);z-index:5;pointer-events:none;text-align:center;font-family:var(--display);color:#fff;text-shadow:0 2px 0 #78392c}
+#bossBar{position:fixed;left:50%;bottom:calc(204px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(320px,70vw);z-index:5;pointer-events:none;text-align:center;font-family:var(--display);color:#fff;text-shadow:0 2px 0 #78392c}
 #bossBar .bar{height:12px;border-radius:7px;background:rgba(10,10,20,.75);border:2px solid #f2d16b;overflow:hidden;margin-top:3px}
 #bossBar .fill{height:100%;background:linear-gradient(#ff8a7a,#d8231a);width:100%}
 `;
@@ -130,14 +130,22 @@ function updateBoarder(e, dt) { updateSwordBoarder(e, dt); }
 
 // 해적 Lv.5·10·15마다 보스선에서 상어 대장이 직접 상륙합니다.
 function spawnBoss() {
-  if (!bossDueNextRaid(G.wave)) return false;
+  // 정찰선은 정규 보스·출현 기록·지연 경고를 만들지 않습니다.
+  if (G.scoutRaid || !bossDueNextRaid(G.wave)) return false;
   const level = pirateLevel();
-  G.lastBossLevel = level;
+  // 정찰로 미뤄진 5단계 보스가 여러 명이면 정규 습격마다 오래된 단계부터 처리합니다.
+  const milestone = Math.min(Math.floor(level / 5) * 5, (Math.floor((G.lastBossLevel || 0) / 5) + 1) * 5);
+  G.lastBossLevel = milestone;
   const a = rnd(0, 6.28), r = raftC.r + 16;
   const hp = normalPirateShipHp(level) * BOSS_POWER_MULTIPLIER;
-  enemies.push({ x: raftC.x + Math.cos(a) * r, y: raftC.y + Math.sin(a) * r, hp, max: hp, level, big: true, boss: true, state: 'approach', fireT: 2, bob: 0, sinkT: 0, ang: 0, salvoT: 4, summonT: 6 });
-  setTimeout(() => toast(`☠️ 보스 침공! 상어 대장 Lv.${level} · 체력·공격력 5배`), 1600);
-  return enemies[enemies.length - 1];
+  const ship = { x: raftC.x + Math.cos(a) * r, y: raftC.y + Math.sin(a) * r, hp, max: hp, level, bossMilestone: milestone, big: true, boss: true, state: 'approach', fireT: 2, bob: 0, sinkT: 0, ang: 0, salvoT: 4, summonT: 6 };
+  enemies.push(ship);
+  const wave = G.wave;
+  setTimeout(() => {
+    if (G.wave !== wave || !raidOn || !enemies.includes(ship) || !alive(ship)) return;
+    toast(`☠️ ${milestone < level ? `Lv.${milestone} 단계에서 이월된 ` : ''}보스 침공! 상어 대장 Lv.${level} · 체력·공격력 5배`);
+  }, 1600);
+  return ship;
 }
 
 function spawnBossBoarder(ship) {

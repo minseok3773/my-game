@@ -13,6 +13,29 @@ const PIRATE_CREW_MULTIPLIER = 3; // 상륙 인원 3배
 const MAX_LIVE_PIRATES = (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) ? 30 : 48;
 const pirateMultiplier = (level = pirateLevel()) => Math.pow(PIRATE_GROWTH, Math.max(0, level - 1));
 const allyMultiplier = level => Math.pow(ALLY_GROWTH, Math.max(0, level - 1));
+// 선장은 50레벨까지 기존 6% 성장을 유지합니다. 선원은 그 뒤 성장 배율을
+// 50레벨 배율의 2%씩만 더해, 해적보다 높은 복리 성장으로 격차가 벌어지는 것을 막습니다.
+const CREW_GROWTH_SOFT_CAP = 50, CREW_LATE_GROWTH = 0.02, ALLY_GROWTH_VERSION = 1;
+function crewGrowthMultiplier(level = pirateLevel()) {
+  const n = Math.max(1, Number.isFinite(Number(level)) ? Math.floor(Number(level)) : 1);
+  return allyMultiplier(Math.min(n, CREW_GROWTH_SOFT_CAP)) *
+    (1 + CREW_LATE_GROWTH * Math.max(0, n - CREW_GROWTH_SOFT_CAP));
+}
+function crewAllyMultiplier(level = pirateLevel()) {
+  const floor = Number.isFinite(G.crewGrowthFloor) ? Math.max(1, G.crewGrowthFloor) : 1;
+  return Math.max(crewGrowthMultiplier(level), floor);
+}
+function initializeAllyProgression() {
+  if ((G.allyGrowthVersion || 0) >= ALLY_GROWTH_VERSION) {
+    G.crewGrowthFloor = Number.isFinite(G.crewGrowthFloor) ? Math.max(1, G.crewGrowthFloor) : 1;
+    return;
+  }
+  // 구버전이 이미 얻은 선원 능력치는 한 번만 보존합니다. 기존 카드·훈련·상처는
+  // 그대로이며, 이후에는 새 성장 배율이 이 보존 배율을 넘을 때부터 다시 증가합니다.
+  const previous = pirateLevel() > CREW_GROWTH_SOFT_CAP ? allyMultiplier(pirateLevel()) : 1;
+  G.crewGrowthFloor = Number.isFinite(previous) ? previous : 1;
+  G.allyGrowthVersion = ALLY_GROWTH_VERSION;
+}
 const normalPirateHp = (level = pirateLevel()) => PIRATE_BALANCE.health * Math.round((6 + 2 * level) * pirateMultiplier(level));
 const normalPirateAttack = (level = pirateLevel()) => 2.5 * pirateMultiplier(level) * PIRATE_BALANCE.damage;
 function pirateAttack(e) {
@@ -28,7 +51,7 @@ function normalPirateShipHp(level = pirateLevel(), wave = G.wave, big = false) {
 }
 function bossDueNextRaid(wave = G.wave + 1) {
   const level = pirateLevel(wave);
-  return level % 5 === 0 && level > (G.lastBossLevel || 0);
+  return Math.floor(level / 5) * 5 > (G.lastBossLevel || 0);
 }
 function boarderHpAtLevel(level, type, big) {
   let hp = Math.round((big ? 1.6 : 1) * (6 + 2 * level) * pirateMultiplier(level));
@@ -37,6 +60,7 @@ function boarderHpAtLevel(level, type, big) {
   return hp * PIRATE_BALANCE.health;
 }
 function initializePirateProgression() {
+  initializeAllyProgression();
   if ((G.pirateProgressVersion || 0) >= PIRATE_PROGRESSION_VERSION) return;
   const level = pirateLevel(), oldWave = Math.max(1, G.wave || 1), combat = G.combat;
   const legacyEnemies = combat?.raidOn ? combat.enemies || [] : [];

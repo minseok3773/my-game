@@ -131,7 +131,8 @@ function recruitmentHud() {
   recruitHint.hidden = paused || !heroReady || !pad;
   if (pad) recruitHint.textContent = pad.pending ? `⛺ 모집 중 ${Math.ceil(pad.remaining)}초 · ${pad.live}/${pad.capacity}명`
     : pad.live>=pad.capacity ? `⛺ ${DEFS[pad.tent].name} · 정원 ${pad.capacity}명 충원 완료`
-    : G.money<30 ? `⛺ 일꾼 충원 $30 · 자금이 부족합니다`
-    : `⛺ 네모 칸에 서 있으면 $30씩 · 1초에 1명 충원 · ${pad.live}/${pad.capacity}명`;
+    : !pad.canRecruit ? `⛺ 일꾼 충원 $${pad.cost} · 자금이 부족합니다`
+    : pad.cost === 0 ? `⛺ 긴급 무료 충원 · 네모 칸에 서 있으면 1초에 1명 합류 · ${pad.live}/${pad.capacity}명`
+    : `⛺ 네모 칸에 서 있으면 $${pad.cost}씩 · 1초에 1명 충원 · ${pad.live}/${pad.capacity}명`;
   document.body.classList.toggle('has-recruit',!recruitHint.hidden);
 }

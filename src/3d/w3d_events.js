@@ -21,6 +21,7 @@ skillStyle.textContent = `
 #skillBtn:disabled{filter:grayscale(.7) brightness(.85);box-shadow:0 2px 0 #7b5a3c}
 #skillBtn .cd{position:absolute;inset:0;border-radius:50%;display:grid;place-items:center;background:#0006;color:#fff;font:bold 22px sans-serif}
 #skillBtn:focus-visible{outline:3px solid #fff;outline-offset:3px}
+#skillBtn.compact{font-size:11px;line-height:1.05}#skillBtn.compact .ic{font-size:22px}
 #raidEventBadge{position:fixed;left:50%;top:calc(126px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:6;padding:5px 12px;border-radius:999px;
  background:#2b2350e6;color:#fff;font:bold 14px sans-serif;border:2px solid #f2d16b;pointer-events:none;white-space:nowrap}
 `;
@@ -112,13 +113,48 @@ function tickRaidEvents(dt) {
   checkLootRetreat();
   if (!raidOn && G.raidEvent) G.raidEvent = null;
 }
+let skillLayoutKey = '';
+function positionSkillButton() {
+  const width = document.documentElement.clientWidth || innerWidth;
+  const height = document.documentElement.clientHeight || innerHeight;
+  const protectedIds = ['quest','money','level','goal','assignmentBtn','expeditionBtn','defense','bag','menuBtn','strategyBtn','bossBar','recruitHint'];
+  const boxes = protectedIds.map(id => document.getElementById(id)).filter(e => e && !e.hidden).map(e => e.getBoundingClientRect()).filter(r => r.width > 0 && r.height > 0);
+  const key = [width,height,...boxes.flatMap(r => [r.left,r.top,r.right,r.bottom].map(Math.round))].join('|');
+  if (key === skillLayoutKey) return;
+  skillLayoutKey = key;
+  const margin = 12, gap = 6;
+  const overlaps = (x,y,size,r) => x < r.right + gap && x + size > r.left - gap && y < r.bottom + gap && y + size > r.top - gap;
+  let chosen = null;
+  // HUD를 덮지 않는 가장자리 빈 공간을 먼저 찾습니다. 작은 화면에서는 버튼만 줄입니다.
+  for (const size of [76,64,56]) {
+    if (width < size + margin * 2 || height < size + margin * 2) continue;
+    const preferY = Math.max(margin, Math.min(height - margin - size, height - 262 - size));
+    const ys = [preferY];
+    for (let y = margin; y <= height - margin - size; y += 4) ys.push(y);
+    let best = null;
+    for (const x of [width - margin - size, margin]) for (const y of ys) {
+      if (boxes.some(r => overlaps(x,y,size,r))) continue;
+      const score = Math.abs(y - preferY) + (x === margin ? 40 : 0);
+      if (!best || score < best.score) best = { x,y,size,score };
+    }
+    if (best) { chosen = best; break; }
+  }
+  if (!chosen) {
+    // 극단적으로 낮은 창에서도 조작 버튼은 화면 안에 둡니다.
+    chosen = { x:margin,y:Math.max(margin,Math.round(height / 2 - 28)),size:56 };
+  }
+  Object.assign(skillBtn.style,{left:`${chosen.x}px`,top:`${chosen.y}px`,right:'auto',bottom:'auto',width:`${chosen.size}px`,height:`${chosen.size}px`});
+  skillBtn.classList.toggle('compact', chosen.size < 76);
+}
 function raidEventHud() {
-  const show = raidOn && isHeroAvailable() && !(typeof expeditionBusy === 'function' && expeditionBusy());
+  expeditionButton.hidden = raidOn; // 전투 중에는 보스·전투 조작 공간을 우선하고, 종료 후 원정 안내를 다시 표시합니다.
+  const show = raidOn && isHeroAvailable() && !paused && !(typeof expeditionBusy === 'function' && expeditionBusy());
   skillBtn.hidden = !show;
   if (show) {
     const cd = Math.ceil(G.skillCd || 0), cdEl = skillBtn.querySelector('.cd');
     cdEl.hidden = cd <= 0; cdEl.textContent = cd > 0 ? cd : '';
     skillBtn.disabled = cd > 0;
+    positionSkillButton();
   }
   raidEventBadge.hidden = true; // 특수 습격 이름은 아래 방어 정보 줄에 함께 표시 (작은 화면에서 안내 문구를 가리지 않게)
 }
