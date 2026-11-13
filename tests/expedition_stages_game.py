@@ -21,7 +21,7 @@ window.stageTest={
  },
  open:expeditionOpen,close:expeditionClose,depart:expeditionDepart,finish:expeditionFinish,back:expeditionReturn,save,serialize,build,
  island:runIsland,rewardIsland:expeditionRewardIsland,guide:expeditionRewardGuide,
- hazard:makeExpeditionHazard,hits:expeditionHazardHits,drawHazard:drawExpeditionHazard,step:expeditionUpdate,
+ hazard:makeExpeditionHazard,hits:expeditionHazardHits,drawHazard:drawExpeditionHazard,step:expeditionUpdate,draw:expeditionDraw,
  complete(){const r=expeditionState().run,isl=runIsland(r);r.rescued=isl.survivors.map((_,i)=>i);r.collected=isl.crates.map((_,i)=>i);r.x=50;r.y=450;return expeditionFinish('success');},
  hpMax:crewHpMax,heroMax:heroMaxHp,
  oldReset(){resetStorageState();const d=freshState();d.money=3000;d.ws=1;d.level=3;d.defended=5;d.unlocked.push('expand1','water','tent1','tent2','tent3');build(d);paused=false;raidOn=false;document.getElementById('helpPanel').hidden=true;}
@@ -138,6 +138,31 @@ def main():
    page.evaluate('stageTest.complete()');page.locator('#expeditionReturn').click()
    assert page.evaluate('stageTest.e.pearls')==1 and page.evaluate('stageTest.e.tier')==6
    print('PASS deep time penalty, pearl and next-floor progression',flush=True)
+
+   # Upstream deep modifiers combine with island shapes and persist exact warnings.
+   for tier,mod,warning,count in [(1,'whirl',1.3,2),(2,'fog',1.3,1),(3,'swift',.85,1)]:
+    page.evaluate('(tier)=>stageTest.reset(1,tier)',tier)
+    assert f'{warning}초' in page.locator('#expeditionPattern').inner_text()
+    page.locator('#expeditionDepart').click()
+    assert page.evaluate('stageTest.r.deepModVersion')==1
+    assert page.evaluate('stageTest.island(stageTest.r).mod.id')==mod
+    page.evaluate('stageTest.r.nextHazard=0;stageTest.step(.01);stageTest.save()')
+    hazards=page.evaluate('stageTest.r.hazards')
+    assert len(hazards)==count,(mod,hazards)
+    assert all(abs(h['t']-(warning-.01))<1e-9 for h in hazards),(mod,hazards)
+    page.reload(wait_until='networkidle');page.wait_for_function('!!window.stageTest')
+    assert page.evaluate('stageTest.r.hazards')==hazards
+    assert f'{warning}초' in page.locator('#expeditionContent').inner_text()
+    if mod=='fog':
+     pixel=page.evaluate("""() => {const c=document.getElementById('expeditionCanvas').getContext('2d');stageTest.draw();const fog=[...c.getImageData(250,250,1,1).data];stageTest.r.deepModVersion=0;stageTest.draw();const clear=[...c.getImageData(250,250,1,1).data];return {fog,clear};}""")
+     assert sum(pixel['fog'][:3])<sum(pixel['clear'][:3]),pixel
+   # Existing in-flight rules remain 1.3s circles, with no surprise extra targets.
+   page.evaluate('''() => {stageTest.reset(1,3);stageTest.depart();const d=stageTest.serialize();delete d.expedition.run.deepModVersion;d.expedition.run.hazardVersion=1;d.expedition.run.hazards=[{x:400,y:400,radius:48,t:.71,hit:false}];stageTest.build(d);stageTest.save();}''')
+   assert '1.3초' in page.locator('#expeditionContent').inner_text()
+   assert page.evaluate('stageTest.hazard(stageTest.r,stageTest.island(stageTest.r)).kind')=='circle'
+   assert page.evaluate('stageTest.hazard(stageTest.r,stageTest.island(stageTest.r)).t')==1.3
+   assert page.evaluate('stageTest.r.hazards[0].t')==.71
+   print('PASS whirl double warnings, fog visibility, swift0.85s, saved modifiers and legacy circle compatibility',flush=True)
 
    for choice in ['trade','supplies']:
     page.evaluate('stageTest.reset(1,10,10)')

@@ -281,10 +281,18 @@ async function copySaveCode() {
   catch (error) { window.prompt('아래 저장 코드를 전부 복사해 보관하세요.', code); setStorageNote('저장 코드를 보관해 두세요.'); }
   return code;
 }
+// 가져온 저장의 첫 화면까지 확인합니다. 실패 시 호출자가 기존 실행 상태를 복원합니다.
+function trialBuild(data) {
+  build(parseStoredGame(JSON.stringify(data)));
+  const obj = objective();
+  if (!obj || typeof obj.text !== 'string') throw new Error('Invalid saved objective');
+  hud(obj);
+  JSON.stringify(serialize());
+}
 // build()는 전역 실행 상태를 바꾸므로, 실패 시 저장뿐 아니라 진행 중 작업도 되돌립니다.
 function snapshotImportRuntime() {
   return {G,unlocked,tiles,cap,workers,runtime,player,cam,restoringCrewRoster,fallenCrew,raftC,edges,
-    soldiers,enemies,shots,booms,raidOn,looted,trainT,paused,tower:{...towerSt},
+    soldiers,enemies,shots,booms,raidOn,looted,trainT,paused,tower:{...towerSt},income:earnLog.map(row=>[...row]),
     activeTrainingKind,trainingContact,trainingPanelSignature,trainingButtonSignature,
     ui:{help:document.getElementById('helpPanel').hidden,strategy:strategyPanel.hidden,
       recruit:recruitPanel.hidden,training:trainingPanel.hidden,expedition:expeditionPanel.hidden,tavern:tavernPanel.hidden}};
@@ -299,6 +307,8 @@ function restoreImportRuntime(old) {
   document.getElementById('helpPanel').hidden=old.ui.help;
   strategyPanel.hidden=old.ui.strategy; recruitPanel.hidden=old.ui.recruit; trainingPanel.hidden=old.ui.training;
   paused=old.paused; clearMovementInput();
+  earnLog.splice(0,earnLog.length,...old.income);
+  lastHud = ''; // 다음 프레임에서 원래 화면을 다시 그리되 복구 중 저장 상태는 바꾸지 않습니다.
 }
 function importSaveData(data, ask = true) {
   let candidate;
@@ -313,7 +323,8 @@ function importSaveData(data, ask = true) {
   } catch (error) { storageError(error); setStorageNote('⚠️ 현재 진행을 보관하지 못해 불러오기를 취소했어요.'); return false; }
   try {
     // 유효한 마을로 실제 복원되는 것을 먼저 확인합니다. 여기까지 저장소에는 쓰지 않습니다.
-    build(candidate);
+    earnLog.length = 0; // 이전 마을의 수입 기록은 가져온 마을에 섞지 않습니다. 실패 시 원래 기록을 복원합니다.
+    trialBuild(candidate);
     if (localStorage.getItem(KEY)!==primary) throw new Error('Save changed during import');
     storageState.loadBlocked=false; storageState.conflict=false;
     storageState.pokerBaseline=storagePokerStamp(primary); storageState.lastGood=current;
@@ -328,7 +339,7 @@ function importSaveData(data, ask = true) {
       try { if (localStorage.getItem(key)!==value) { if (value===null) localStorage.removeItem(key); else localStorage.setItem(key,value); } }
       catch (restoreError) { restored=false; }
     }
-    restoreImportRuntime(old); Object.assign(storageState,metadata); updateStorageStatus();
+    Object.assign(storageState,metadata); restoreImportRuntime(old); updateStorageStatus();
     if (!restored) {
       storageState.failed=true; storageState.loadBlocked=true;
       storageState.error='불러오기 저장과 원본 복구에 실패했습니다. 현재 진행을 파일로 백업하고 저장 권한을 확인해 주세요.';
@@ -337,6 +348,26 @@ function importSaveData(data, ask = true) {
     setStorageNote(restored?'⚠️ 저장을 불러오지 못해 이전 진행으로 돌아왔어요. 원래 저장과 백업은 유지됩니다.':'⚠️ 현재 진행은 화면에 유지됩니다. 페이지를 닫기 전에 현재 진행을 백업하세요.');
     return false;
   }
+}
+// 복원이 불가능한 주 저장은 보존하고, 정상 이전 백업을 먼저 시도합니다.
+function bootRecover(error) {
+  let primary = null;
+  try { primary = localStorage.getItem(KEY); } catch (readError) { /* 저장 권한 안내는 아래에서 유지 */ }
+  try {
+    const raw = localStorage.getItem(STORAGE_BACKUP_KEY);
+    trialBuild(parseStoredGame(raw));
+    storageState.lastGood = raw;
+    storageState.pokerBaseline = storagePokerStamp(primary);
+    storageState.recovered = true; storageState.loadBlocked = false;
+    storageState.failed = false; storageState.conflict = false; storageState.error = '';
+    updateStorageStatus();
+    return 'backup';
+  } catch (backupError) { /* 정상 백업이 없으면 원본을 지우지 않고 복구 화면 제공 */ }
+  build(freshState());
+  storageState.loadBlocked = true; storageState.failed = true; storageState.conflict = false;
+  storageState.error = '저장된 진행을 열지 못해 새 게임으로 시작했습니다. 원래 저장은 지우지 않았어요. 저장 코드나 백업 파일로 불러오거나, "처음부터 다시"를 두 번 눌러 새로 시작하세요.';
+  updateStorageStatus();
+  return 'fresh';
 }
 function importSaveText(text, ask = true) {
   let data;

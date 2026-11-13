@@ -153,11 +153,13 @@ const HERO_PAIRS = [
 const _bp = new THREE.Vector3(), _bq = new THREE.Quaternion(), _bs = new THREE.Vector3();
 // 같은 재질의 작은 부품을 한 덩어리로 합쳐 그리기 횟수를 줄임 (모양·색은 그대로)
 const _mergeInv = new THREE.Matrix4(), _mergeRel = new THREE.Matrix4();
-function mergeByMaterial(group) {
+// 같은 재질의 정적 메시를 하나로 합쳐 그리기 호출을 줄입니다. skip에 든 물체(와 그 자식)는 움직이므로 건드리지 않습니다.
+function mergeByMaterial(group, skip = null) {
   group.updateMatrixWorld(true);
   _mergeInv.copy(group.matrixWorld).invert();
   const buckets = new Map();
-  group.traverse(o => { if (o.isMesh && !o.isSkinnedMesh && !o.material.map) { const k = o.material.uuid; if (!buckets.has(k)) buckets.set(k, []); buckets.get(k).push(o); } });
+  const moving = o => { if (!skip) return false; for (let p = o; p && p !== group; p = p.parent) if (skip.has(p)) return true; return false; };
+  group.traverse(o => { if (o.isMesh && !o.isSkinnedMesh && !o.isInstancedMesh && !o.material.map && !Array.isArray(o.material) && !moving(o)) { const k = o.material.uuid; if (!buckets.has(k)) buckets.set(k, []); buckets.get(k).push(o); } });
   for (const list of buckets.values()) {
     if (list.length < 2) continue;
     const parts = list.map(o => { const gm = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone(); gm.applyMatrix4(_mergeRel.multiplyMatrices(_mergeInv, o.matrixWorld)); return gm; });

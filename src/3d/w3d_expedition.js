@@ -39,9 +39,16 @@ function islandDef(i) { return ISLANDS[Math.max(1, Math.min(ISLANDS.length, i ||
  * 성공하면 자금과 '심해 진주'(판매가 +3%, 최대 10개)를 받고 다음 층이 열립니다. */
 const DEEP_PEARL_MAX = 10;
 const challengeMoney = t => 300 + 100 * t;
+// 층마다 바뀌는 변주(1층은 기본): 같은 수집·회피·귀환이 반복되지 않게 합니다.
+const DEEP_MODS = [
+  { id: 'whirl', name: '🌀 소용돌이', desc: '공격 예고가 한 번에 두 곳(내 위치 + 무작위)에 떨어집니다' },
+  { id: 'fog', name: '🌫 짙은 안개', desc: '선장 주변만 보입니다. 생존자와 상자 위치를 기억하세요' },
+  { id: 'swift', name: '⚡ 쾌속 포격', desc: '공격 예고가 짧아집니다(1.3초 → 0.85초)' },
+];
+const deepMod = tier => tier > 0 ? DEEP_MODS[(tier - 1) % DEEP_MODS.length] : null;
 function challengeIsland(tier) {
-  const base = ISLANDS[tier % ISLANDS.length];
-  return { ...base, name: `🌊 심해 ${tier + 1}층 · ${base.name}`, stars: 5, challenge: true, tier, baseIndex: tier % ISLANDS.length + 1,
+  const base = ISLANDS[tier % ISLANDS.length], mod = deepMod(tier);
+  return { ...base, name: `🌊 심해 ${tier + 1}층 · ${mod ? mod.name + ' · ' : ''}${base.name}`, stars: 5, challenge: true, tier, mod, baseIndex: tier % ISLANDS.length + 1,
     reward: 'pearl', rewardName: `심해 진주 (판매가 +3%, 최대 ${DEEP_PEARL_MAX}개)`,
     every: Math.max(0.8, Math.min(base.every, 1.5) * Math.pow(0.95, tier)), dmg: Math.round(30 * (1 + 0.12 * tier)),
     radius: Math.min(80, base.radius + 2 * tier), time: Math.max(-40, -20 - 4 * tier) };
@@ -67,17 +74,21 @@ function migrateExpeditionRun(e) {
   // 이미 떠난 원정은 새 회피 규칙으로 바꾸지 않습니다. 새 출항부터 유형을 저장합니다.
   if (!Number.isInteger(r.hazardVersion)) r.hazardVersion = 1;
 }
+// 출항 뒤에는 새 변주를 소급 적용하지 않습니다. 이미 저장된 위험의 남은 시간도 유지합니다.
+function expeditionRunMod(isl, r = null) { return r && r.deepModVersion !== 1 ? null : isl.mod; }
+function expeditionWarningSeconds(isl, r = null) { return expeditionRunMod(isl,r)?.id === 'swift' ? 0.85 : 1.3; }
+function expeditionModGuide(isl, r = null) { const mod=expeditionRunMod(isl,r); return mod ? `이번 층 변주 ${mod.name}: ${mod.desc}. ` : ''; }
 function expeditionPatternGuide(isl, r = null) {
   const pattern = r && r.hazardVersion < 2 ? 'circle' : isl.pattern;
   return ({circle:'원형 표적: 붉은 원 밖으로 이동하세요.', ring:'산호 파동: 초록 중심은 안전합니다. 중심에 머물거나 붉은 고리 밖으로 피하세요.',
     lane:'폭풍 띠: 붉은 가로·세로 띠를 가로질러 벗어나세요.', burst:'화산 분출: 원형 표적과 안전 중심이 있는 고리 공격이 번갈아 옵니다.',
     cross:'요새 교차 포격: 붉은 십자에서 대각선으로 벗어나 두 띠를 모두 피하세요.'})[pattern] || '원형 표적: 붉은 원 밖으로 이동하세요.';
 }
-function makeExpeditionHazard(r, isl) {
+function makeExpeditionHazard(r, isl, x = r.x, y = r.y) {
   const serial = r.hazardSerial || 0; r.hazardSerial = serial + 1;
   let kind = r.hazardVersion >= 2 ? isl.pattern : 'circle';
   if (kind === 'burst') kind = serial % 2 ? 'ring' : 'circle';
-  const h = {x:r.x,y:r.y,radius:isl.radius,t:1.3,hit:false,kind};
+  const h = {x,y,radius:isl.radius,t:expeditionWarningSeconds(isl,r),hit:false,kind};
   if (kind === 'lane') {h.axis=serial % 2 ? 'y' : 'x';h.width=Math.min(36,26+(isl.radius-48)*.25);}
   if (kind === 'cross') h.width=Math.min(28,21+(isl.radius-48)*.18);
   if (kind === 'ring') h.innerRadius=Math.max(22,isl.radius*.45);
@@ -171,7 +182,7 @@ function expeditionRenderPanel() {
   const isl=currentIsland(e),cleared=islandsCleared(e);
   const deepBtn=deepUnlocked(e)?`<button class="islandPick" data-n="deep" aria-pressed="${!!isl.challenge}" style="${isl.challenge?'background:#9fdcff;font-weight:bold':''}">🌊 심해 도전 ${(e.tier||0)+1}층 · 진주 ${e.pearls||0}/${DEEP_PEARL_MAX}</button>`:'';
   const islandMap=ISLANDS.map((d,i)=>{const n=i+1,open=n<=cleared+1;return `<button class="islandPick" data-n="${n}" ${open?'':'disabled'} aria-pressed="${n===islandIndex(e)&&!isl.challenge}" style="${n===islandIndex(e)&&!isl.challenge?'background:#ffd56a;font-weight:bold':''}">${open?(n<=cleared?'✅':'🏝'):'🔒'} ${n}. ${d.name} ${'★'.repeat(d.stars)}</button>`;}).join('')+deepBtn;
-  expeditionPanel.innerHTML=`<div id="expeditionContent"><h2>🗺 섬 지도 · ${isl.challenge?'':islandIndex(e)+'. '}${isl.name} ${'★'.repeat(isl.stars)}</h2><div class="expRow" id="islandMap">${islandMap}</div><p>정복 ${cleared}/${ISLANDS.length} · 이 섬: 구조 ${isl.survivors.length}명 · 자원 ${isl.crates.length}개 · 공격 간격 ${isl.every}초 · 피해 ${isl.dmg}${isl.time?` · 활동 시간 ${isl.time}초`:''} · 첫 정복 보상: ${isl.rewardName}${e.rewards[isl.reward]?' (획득 완료)':''}</p><p id="expeditionPattern">${expeditionPatternGuide(isl)} 모든 공격은 1.3초 먼저 표시됩니다.</p><p>식량과 물을 준비해 첫 원정을 떠나자! 마을을 확장하고 해적을 5회 막으면 안전 항로가 열립니다.</p><p id="expeditionRequirements">${unlocked.has('expand1')?'✅':'⬜'} 첫 뗏목 확장 · ${unlocked.has('water')?'✅':'⬜'} 정수기 건설 · 방어 ${Math.min(5,G.defended||0)}/5 ${G.expeditionWon?'(항로 보상 $200 획득)':''}</p><p>출항 시 선장과 동행 선원은 마을을 떠납니다. 준비 화면과 원정 동안 마을 생산·손님 거래·수금·수리·모집·훈련·급여·습격 시계는 모두 정지합니다. 복귀 후 같은 시점부터 재개하며 습격 중에는 떠날 수 없습니다.</p><label>식량 꾸러미 · 개당 $20<select id="expeditionFood">${options(3,e.draft.food)}</select></label><label>물통 · 개당 $15<select id="expeditionWater">${options(3,e.draft.water)}</select></label><label>동행 선원 · 보급비 $10/명<select id="expeditionCrew">${options(maxCrew,e.draft.crew,0)}</select></label><p id="expeditionCost"></p><p>동행 1명마다 구조·회수 범위 +12, 위험 피해 -3. 최소 2명은 마을에 남깁니다. 원정 실패에도 선원은 모두 돌아오며 마을은 유지됩니다.</p>${isl.challenge&&e.pearls>=DEEP_PEARL_MAX?`<label>진주 완성 후 지원<select id="expeditionDeepReward"><option value="trade" ${e.deepReward==='trade'?'selected':''}>교역 지원 · 추가 $200</option><option value="supplies" ${e.deepReward==='supplies'?'selected':''}>마을 정비 · 생존 아군 회복 + 보존식 5</option></select></label>`:''}<p id="expeditionRewardGuide">${expeditionRewardGuide()}</p>${e.rewards.medic?`<button id="expeditionMedic">${e.medicEnabled===false?'의무병 배치 (생산 1명 감소)':'의무병 생산 복귀'}</button>`:''}<div class="expRow"><button id="expeditionDepart">출항</button><button id="expeditionClose">마을로</button></div><p id="expeditionNotice" role="status"></p></div>`;
+  expeditionPanel.innerHTML=`<div id="expeditionContent"><h2>🗺 섬 지도 · ${isl.challenge?'':islandIndex(e)+'. '}${isl.name} ${'★'.repeat(isl.stars)}</h2><div class="expRow" id="islandMap">${islandMap}</div><p>정복 ${cleared}/${ISLANDS.length} · 이 섬: 구조 ${isl.survivors.length}명 · 자원 ${isl.crates.length}개 · 공격 간격 ${isl.every}초 · 피해 ${isl.dmg}${isl.time?` · 활동 시간 ${isl.time}초`:''} · 첫 정복 보상: ${isl.rewardName}${e.rewards[isl.reward]?' (획득 완료)':''}</p><p id="expeditionPattern">${expeditionModGuide(isl)}${expeditionPatternGuide(isl)} 공격은 ${expeditionWarningSeconds(isl)}초 먼저 표시됩니다.</p><p>식량과 물을 준비해 첫 원정을 떠나자! 마을을 확장하고 해적을 5회 막으면 안전 항로가 열립니다.</p><p id="expeditionRequirements">${unlocked.has('expand1')?'✅':'⬜'} 첫 뗏목 확장 · ${unlocked.has('water')?'✅':'⬜'} 정수기 건설 · 방어 ${Math.min(5,G.defended||0)}/5 ${G.expeditionWon?'(항로 보상 $200 획득)':''}</p><p>출항 시 선장과 동행 선원은 마을을 떠납니다. 준비 화면과 원정 동안 마을 생산·손님 거래·수금·수리·모집·훈련·급여·습격 시계는 모두 정지합니다. 복귀 후 같은 시점부터 재개하며 습격 중에는 떠날 수 없습니다.</p><label>식량 꾸러미 · 개당 $20<select id="expeditionFood">${options(3,e.draft.food)}</select></label><label>물통 · 개당 $15<select id="expeditionWater">${options(3,e.draft.water)}</select></label><label>동행 선원 · 보급비 $10/명<select id="expeditionCrew">${options(maxCrew,e.draft.crew,0)}</select></label><p id="expeditionCost"></p><p>동행 1명마다 구조·회수 범위 +12, 위험 피해 -3. 최소 2명은 마을에 남깁니다. 원정 실패에도 선원은 모두 돌아오며 마을은 유지됩니다.</p>${isl.challenge&&e.pearls>=DEEP_PEARL_MAX?`<label>진주 완성 후 지원<select id="expeditionDeepReward"><option value="trade" ${e.deepReward==='trade'?'selected':''}>교역 지원 · 추가 $200</option><option value="supplies" ${e.deepReward==='supplies'?'selected':''}>마을 정비 · 생존 아군 회복 + 보존식 5</option></select></label>`:''}<p id="expeditionRewardGuide">${expeditionRewardGuide()}</p>${e.rewards.medic?`<button id="expeditionMedic">${e.medicEnabled===false?'의무병 배치 (생산 1명 감소)':'의무병 생산 복귀'}</button>`:''}<div class="expRow"><button id="expeditionDepart">출항</button><button id="expeditionClose">마을로</button></div><p id="expeditionNotice" role="status"></p></div>`;
   const refresh=()=>{
     e.draft={food:+document.getElementById('expeditionFood').value,water:+document.getElementById('expeditionWater').value,crew:+document.getElementById('expeditionCrew').value};
     document.getElementById('expeditionCost').textContent=`비용 $${e.draft.food*20+e.draft.water*15+e.draft.crew*10} / 보유 $${Math.floor(G.money)} · 남는 선원 ${workers.length-e.draft.crew}명 · 원정 체력 ${60+e.draft.food*20} · 활동 시간 ${expeditionDuration(e.draft,isl)}초`;
@@ -192,7 +203,7 @@ function expeditionRewardGuide(){
    const choice=r?r.deepReward:(e.pearls>=DEEP_PEARL_MAX?e.deepReward:null);
    const money=challengeMoney(isl.tier)+(choice==='trade'?200:0);
    const support=choice==='trade'?' + 교역 지원 추가 $200 (합계에 포함)':choice==='supplies'?' + 마을 정비: 생존 일꾼·해군·선장 체력 완전 회복과 보존식 5개(최대 20개, 부활 없음)':'';
-   return `심해 도전 성공 보상: $${money} + 심해 진주 1개 (판매가 +3%씩, 최대 ${DEEP_PEARL_MAX}개 · 지금 ${e.pearls||0}개)${support}. 성공할 때마다 다음 층이 더 어려워집니다.`;
+   return `${expeditionModGuide(isl,r)}심해 도전 성공 보상: $${money} + 심해 진주 1개 (판매가 +3%씩, 최대 ${DEEP_PEARL_MAX}개 · 지금 ${e.pearls||0}개)${support}. 성공할 때마다 다음 층이 더 어려워집니다.`;
  }
  const n=r?(r.rewardIsland||r.island||1):islandIndex(e),money=islandMoney(n);
  return `이번 섬 성공 보상: ${e.rewards[isl.reward]?`다시 도전 보상 $${money}${e.rewards.kelp?'·보존식 5개':''}`:isl.rewardName+' + $'+money}. ${e.rewards.shell?'거북 방패로 일꾼 최대 체력 +25%. ':''}${e.rewards.anchor?'황금 닻으로 판매가 +25%. ':''} ${e.rewards.kelp?`보존식 ${e.specialty}/20개 · 생선+물 각 1개로 12초에 1개 제조, 생선 가게·식당 손님이 함께 구매하면 $18 추가 수금. `:''}${e.rewards.medic?(e.medicEnabled===false?'의무병 비활성 · 전원 생산 중. ':'첫 생존 일꾼이 의무병: 생산·운반·수금 1명 감소, 전투 참가, 비전투 중 전원 초당 1 추가 회복. ')+ '준비 화면에서 생산 복귀/재배치 가능. ':''}${e.rewards.compass?'나침반으로 선장 공격력 +20%.':''}`;
@@ -201,7 +212,7 @@ function expeditionDepart(){
  const e=expeditionState(),d=e.draft,cost=d.food*20+d.water*15+d.crew*10;
  if(e.phase!=='idle'||workers.length<2||!expeditionReady()||raidOn||!isHeroAvailable()||![d.food,d.water,d.crew].every(Number.isInteger)||d.food<1||d.food>3||d.water<1||d.water>3||d.crew<0||d.crew>3||G.money<cost||d.crew>Math.max(0,workers.length-2))return false;
  const before=JSON.parse(JSON.stringify(e)),money=G.money,party=workers.splice(workers.length-d.crew,d.crew);
- G.money-=cost;e.phase='exploring';const isl=currentIsland(e);e.run={id:(e.sequence||0)+1,island:isl.challenge?isl.baseIndex:islandIndex(e),challenge:isl.challenge?isl.tier:null,rewardIsland:isl.challenge?isl.baseIndex:islandIndex(e),hazardVersion:2,deepReward:isl.challenge&&e.pearls>=DEEP_PEARL_MAX?e.deepReward:null,x:50,y:450,hp:60+d.food*20,maxHp:60+d.food*20,time:expeditionDuration(d,isl),party:party.map(w=>({...w,job:null})),rescued:[],collected:[],hazards:[],nextHazard:2,elapsed:0,seed:0};e.sequence=e.run.id;e.result=null;
+ G.money-=cost;e.phase='exploring';const isl=currentIsland(e);e.run={id:(e.sequence||0)+1,island:isl.challenge?isl.baseIndex:islandIndex(e),challenge:isl.challenge?isl.tier:null,rewardIsland:isl.challenge?isl.baseIndex:islandIndex(e),hazardVersion:2,deepModVersion:1,deepReward:isl.challenge&&e.pearls>=DEEP_PEARL_MAX?e.deepReward:null,x:50,y:450,hp:60+d.food*20,maxHp:60+d.food*20,time:expeditionDuration(d,isl),party:party.map(w=>({...w,job:null})),rescued:[],collected:[],hazards:[],nextHazard:2,elapsed:0,seed:0};e.sequence=e.run.id;e.result=null;
  if(!save()){workers.push(...party);G.money=money;G.expedition=before;expeditionRenderPanel();document.getElementById('expeditionNotice').textContent='저장 실패로 출항을 취소했습니다. 메뉴에서 저장을 복구하세요.';return false;}
  expeditionKeys.clear();expeditionPointer=null;expeditionRenderExplore();return true;
 }
@@ -209,7 +220,7 @@ const EXP_SURVIVORS=[{x:125,y:130},{x:385,y:110}];
 const EXP_CRATES=[{x:110,y:300},{x:285,y:240},{x:405,y:365}];
 function expeditionRenderExplore(){
  const isl=runIsland(G.expedition.run);
- expeditionPanel.innerHTML='<div id="expeditionContent"><h2>🏝 '+isl.name+' '+'★'.repeat(isl.stars)+'</h2><p>드래그 또는 방향키/WASD로 이동 · 생존자 '+isl.survivors.length+'명과 자원 '+isl.crates.length+'개에 다가가 구조·회수하고 왼쪽 아래 배로 귀환하세요. '+expeditionPatternGuide(isl,G.expedition.run)+' 공격은 1.3초 먼저 표시됩니다.</p><p id="expeditionStatus" role="status"></p><canvas id="expeditionCanvas" width="500" height="500" tabindex="0" aria-label="섬 탐험 이동 영역"></canvas><div class="expRow"><button id="expeditionRetreat">즉시 철수 (보상 없음)</button><button id="expeditionSave">진행 저장</button><button id="expeditionBackup">진행 백업</button></div><p id="expeditionSaveStatus" role="status">마을 시계 정지 · 원정 진행은 자동 저장됩니다.</p></div>';
+ expeditionPanel.innerHTML='<div id="expeditionContent"><h2>🏝 '+isl.name+' '+'★'.repeat(isl.stars)+'</h2><p>드래그 또는 방향키/WASD로 이동 · 생존자 '+isl.survivors.length+'명과 자원 '+isl.crates.length+'개에 다가가 구조·회수하고 왼쪽 아래 배로 귀환하세요. '+expeditionPatternGuide(isl,G.expedition.run)+' '+expeditionModGuide(isl,G.expedition.run)+'공격은 '+expeditionWarningSeconds(isl,G.expedition.run)+'초 먼저 표시됩니다.</p><p id="expeditionStatus" role="status"></p><canvas id="expeditionCanvas" width="500" height="500" tabindex="0" aria-label="섬 탐험 이동 영역"></canvas><div class="expRow"><button id="expeditionRetreat">즉시 철수 (보상 없음)</button><button id="expeditionSave">진행 저장</button><button id="expeditionBackup">진행 백업</button></div><p id="expeditionSaveStatus" role="status">마을 시계 정지 · 원정 진행은 자동 저장됩니다.</p></div>';
  const canvas=document.getElementById('expeditionCanvas');
  canvas.onpointerdown=ev=>{ev.preventDefault();canvas.setPointerCapture(ev.pointerId);expeditionPointer={sx:ev.clientX,sy:ev.clientY,x:ev.clientX,y:ev.clientY};canvas.focus();};
  canvas.onpointermove=ev=>{if(expeditionPointer){expeditionPointer.x=ev.clientX;expeditionPointer.y=ev.clientY;}};
@@ -267,7 +278,10 @@ function expeditionUpdate(dt){
  isl.survivors.forEach((p,i)=>{if(!r.rescued.includes(i)&&Math.hypot(r.x-p.x,r.y-p.y)<reach)r.rescued.push(i);});
  isl.crates.forEach((p,i)=>{if(!r.collected.includes(i)&&Math.hypot(r.x-p.x,r.y-p.y)<reach)r.collected.push(i);});
  r.time-=dt;r.elapsed+=dt;r.nextHazard-=dt;
- if(r.nextHazard<=0){r.nextHazard=isl.every;r.hazards.push(makeExpeditionHazard(r,isl));}
+ if(r.nextHazard<=0){
+  r.nextHazard=isl.every;r.hazards.push(makeExpeditionHazard(r,isl));
+  if(expeditionRunMod(isl,r)?.id==='whirl')r.hazards.push(makeExpeditionHazard(r,isl,60+Math.random()*380,60+Math.random()*380));
+ }
  for(const h of r.hazards){h.t-=dt;if(h.t<=0&&!h.hit){h.hit=true;if(expeditionHazardHits(h,r.x,r.y))r.hp-=Math.max(6,isl.dmg-r.party.length*3);}}
  r.hazards=r.hazards.filter(h=>h.t>-.35);
  if(r.hp<=0||r.time<=0){expeditionFinish('failure');return true;}
@@ -306,6 +320,7 @@ function expeditionDraw(){
  for(const h of r.hazards)drawExpeditionHazard(c,h);
  r.party.forEach((_,i)=>{c.font='20px sans-serif';c.fillText('👷',r.x-18-i*13,r.y+20);});c.fillStyle='#f8f5c1';c.beginPath();c.ellipse(r.x,r.y+12,13,5,0,0,Math.PI*2);c.fill();c.font='30px sans-serif';c.fillText('🧑‍✈️',r.x,r.y);
  if(isl.fog){c.fillStyle='rgba(255,255,255,.16)';c.fillRect(0,0,500,500);}
+ if(expeditionRunMod(isl,r)?.id==='fog'){c.save();c.fillStyle='rgba(18,32,44,.86)';c.beginPath();c.rect(0,0,500,500);c.moveTo(r.x+125,r.y);c.arc(r.x,r.y,125,0,Math.PI*2,true);c.fill('evenodd');c.restore();text('귀환선',52,487);}
  document.getElementById('expeditionStatus').textContent=`체력 ${Math.max(0,Math.ceil(r.hp))}/${r.maxHp} · ${Math.max(0,Math.ceil(r.time))}초 · 구조 ${r.rescued.length}/${isl.survivors.length} · 자원 ${r.collected.length}/${isl.crates.length}${r.rescued.length===isl.survivors.length&&r.collected.length===isl.crates.length?' · 왼쪽 아래 배로 귀환!':''}`;
 }
 window.addEventListener('keydown',ev=>{if(!expeditionPanel.hidden && !ev.ctrlKey && !ev.metaKey){if(ev.key==='Tab'&&!expeditionPanel.contains(document.activeElement)){ev.preventDefault();ev.stopImmediatePropagation();expeditionPanel.querySelector('button:not(:disabled),select,canvas')?.focus();return;}if(ev.key!=='Tab')ev.stopImmediatePropagation();if(ev.key==='Escape'&&expeditionState().phase==='idle'){expeditionClose();return;}}if(G?.expedition?.phase==='exploring'&&['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d'].includes(ev.key.toLowerCase())){ev.preventDefault();ev.stopImmediatePropagation();expeditionKeys.add(ev.key.toLowerCase());}},true);

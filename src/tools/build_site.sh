@@ -6,5 +6,5 @@ set -e
 rm -rf _site
 mkdir -p _site
 cp index.html raft-village-3d.html manifest.webmanifest sw.js _site/
-cp -R models assets vendor _site/
+cp -R models assets vendor fonts _site/
 echo "_site ready: $(find _site -type f | wc -l) files"

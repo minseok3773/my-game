@@ -11,7 +11,7 @@ from playwright.sync_api import sync_playwright
 ROOT = Path(__file__).resolve().parents[1]
 HOOK = r'''
 window.transferTest = {
-  key:KEY, backupKey:STORAGE_BACKUP_KEY, save, load, serialize, build,
+  key:KEY, backupKey:STORAGE_BACKUP_KEY, save, load, serialize, build, recover:bootRecover,
   code:saveCode, parse:parseSaveCode, importText:importSaveText, importData:importSaveData,
   get G(){return G}, get workers(){return workers}, get status(){return {...storageState}},
   reset(){resetStorageState();const d=freshState();d.money=4321;d.unlocked.push('tent1');build(d);paused=true;save();G.money=4322;save();},
@@ -136,6 +136,25 @@ def main():
             assert result == {'money':2222,'recovered':True,'blocked':False}, result
             assert not errors, errors
             print('PASS structurally invalid primary recovers valid prior backup without startup corruption', flush=True)
+
+            # Upstream startup fallback must use our strong validation without erasing bad originals.
+            result = page.evaluate('''() => {
+              const t=transferTest,primary=localStorage.getItem(t.key),backup=localStorage.getItem(t.backupKey);
+              const mode=t.recover(new Error('startup restoration failed'));
+              return {mode,money:t.G.money,recovered:t.status.recovered,blocked:t.status.loadBlocked,
+                originalsKept:localStorage.getItem(t.key)===primary&&localStorage.getItem(t.backupKey)===backup};
+            }''')
+            assert result == {'mode':'backup','money':2222,'recovered':True,'blocked':False,'originalsKept':True}, result
+            result = page.evaluate('''() => {
+              const t=transferTest,primary=localStorage.getItem(t.key);
+              localStorage.setItem(t.backupKey,'{broken backup');
+              const backup=localStorage.getItem(t.backupKey),mode=t.recover(new Error('both checkpoints rejected'));
+              return {mode,money:t.G.money,blocked:t.status.loadBlocked,saved:t.save(),
+                originalsKept:localStorage.getItem(t.key)===primary&&localStorage.getItem(t.backupKey)===backup};
+            }''')
+            assert result == {'mode':'fresh','money':0,'blocked':True,'saved':False,'originalsKept':True}, result
+            assert not errors, errors
+            print('PASS startup fallback restores a good backup or blocks fresh autosave while preserving bad originals', flush=True)
             browser.close()
     finally:
         server.shutdown();server.server_close();thread.join(timeout=5)

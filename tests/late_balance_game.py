@@ -1,4 +1,4 @@
-"""Crew growth slows after level50 without taking earned stats from older saves.
+"""Later pirates grow faster without taking earned ally stats from older saves.
 
 Uses the actual previous committed game to produce a wounded high-level save,
 then loads the current generated game in the same isolated browser profile.
@@ -31,13 +31,12 @@ window.lateBalanceTest = {
     player.hp=heroMaxHp()-11;save();return this.stats();
   },
   newGame(){resetStorageState();build(freshState());paused=true;raidOn=false;
-    G.unlocked.push('tent1');unlocked.add('tent1');applyUnlock('tent1');return G.allyGrowthVersion;},
+    G.unlocked.push('tent1');unlocked.add('tent1');applyUnlock('tent1');return true;},
   advance(level){G.wave=level;initializePirateProgression();return {level,
-    multiplier:typeof crewAllyMultiplier==='function'?crewAllyMultiplier(level):allyMultiplier(level),
-    curve:typeof crewGrowthMultiplier==='function'?crewGrowthMultiplier(level):allyMultiplier(level),
+    multiplier:allyMultiplier(level),pirateMultiplier:pirateMultiplier(level),
     crewAttack:crewAttack(),crewMax:crewHpMax(),pirateHp:normalPirateHp(),pirateAttack:normalPirateAttack(),
     hero50Attack:heroBaseAttack(50),hero50Hp:heroBaseHp(50)};},
-  floor(){return G.crewGrowthFloor},bossDue:bossDueNextRaid,
+  bossDue:bossDueNextRaid,
 };
 '''
 
@@ -50,7 +49,7 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
 def main():
     previous = subprocess.check_output(['git','show',PREVIOUS_GAME],cwd=ROOT,text=True)
     current = (ROOT/'raft-village-3d.html').read_text()
-    assert 'crewAllyMultiplier' in current, 'Reassemble the current game before running this test'
+    assert 'PIRATE_LATE_GROWTH' in current and 'crewAllyMultiplier' not in current, 'Reassemble the merged growth rules before running this test'
     handler=functools.partial(QuietHandler,directory=str(ROOT))
     server=http.server.ThreadingHTTPServer(('127.0.0.1',0),handler)
     thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
@@ -74,36 +73,30 @@ def main():
             page.reload(wait_until='networkidle');page.wait_for_function('!!window.lateBalanceTest',polling=100)
             restored=page.evaluate('lateBalanceTest.stats()')
             assert restored==earned, (earned,restored)
-            old_floor=math.pow(1.06,99)
-            assert math.isclose(page.evaluate('lateBalanceTest.floor()'),old_floor,rel_tol=1e-12)
-            assert page.evaluate('lateBalanceTest.G.allyGrowthVersion')==1
             print('PASS genuine old Lv100 save retains crew/captain stats, wounded HP, cards, training, cargo and money',flush=True)
 
             for _ in range(3):
                 assert page.evaluate('lateBalanceTest.save()')
                 page.reload(wait_until='networkidle');page.wait_for_function('!!window.lateBalanceTest',polling=100)
                 assert page.evaluate('lateBalanceTest.stats()')==earned
-                assert math.isclose(page.evaluate('lateBalanceTest.floor()'),old_floor,rel_tol=1e-12)
             first=page.evaluate('lateBalanceTest.advance(100)')
             next_level=page.evaluate('lateBalanceTest.advance(101)')
-            assert first['multiplier']==next_level['multiplier']
+            assert math.isclose(next_level['multiplier']/first['multiplier'],1.06,rel_tol=1e-12)
+            assert math.isclose(next_level['pirateMultiplier']/first['pirateMultiplier'],1.07,rel_tol=1e-12)
             assert next_level['crewAttack']>first['crewAttack']
             assert next_level['crewAttack']/next_level['pirateHp'] < first['crewAttack']/first['pirateHp']
-            print('PASS migration applies once through three real reloads; future old-save growth no longer compounds at6%',flush=True)
+            print('PASS three real reloads preserve earned ally stats; later pirate growth exceeds ally growth',flush=True)
 
-            assert page.evaluate('lateBalanceTest.newGame()')==1
-            assert page.evaluate('lateBalanceTest.floor()')==1
-            rows=[page.evaluate('(n)=>lateBalanceTest.advance(n)',n) for n in [1,25,50,51,100,150]]
-            for row in rows[:3]:
+            assert page.evaluate('lateBalanceTest.newGame()')
+            rows=[page.evaluate('(n)=>lateBalanceTest.advance(n)',n) for n in [1,14,15,16,25,50,100,150]]
+            for row in rows:
                 assert math.isclose(row['multiplier'],math.pow(1.06,row['level']-1),rel_tol=1e-12)
-            at50=rows[2]
-            assert math.isclose(rows[3]['multiplier'],at50['multiplier']*1.02,rel_tol=1e-12)
-            assert math.isclose(rows[4]['multiplier'],at50['multiplier']*2,rel_tol=1e-12)
-            assert math.isclose(rows[5]['multiplier'],at50['multiplier']*3,rel_tol=1e-12)
-            assert rows[5]['crewAttack']<rows[5]['pirateHp']/10
-            assert rows[4]['crewAttack']/rows[4]['pirateHp']>rows[5]['crewAttack']/rows[5]['pirateHp']
-            assert all(row['hero50Attack']==at50['hero50Attack'] and row['hero50Hp']==at50['hero50Hp'] for row in rows)
-            print('PASS new-game crew growth is unchanged through50 and linear afterwards; captain50 remains unchanged',flush=True)
+                expected=math.pow(1.03,min(row['level'],15)-1)*math.pow(1.07,max(0,row['level']-15))
+                assert math.isclose(row['pirateMultiplier'],expected,rel_tol=1e-12)
+            assert rows[-1]['crewAttack']/rows[-1]['pirateHp'] < rows[-2]['crewAttack']/rows[-2]['pirateHp']
+            assert rows[-2]['crewAttack']/rows[-2]['pirateHp'] < rows[-3]['crewAttack']/rows[-3]['pirateHp']
+            assert all(row['hero50Attack']==rows[0]['hero50Attack'] and row['hero50Hp']==rows[0]['hero50Hp'] for row in rows)
+            print('PASS allies retain6% growth, pirates transition3%to7% after15, and late relative crew dominance declines',flush=True)
             print('Growth table:',[(r['level'],r['crewMax'],round(r['crewAttack'],2),r['pirateHp'],round(r['pirateAttack'],2)) for r in rows],flush=True)
             assert not errors,errors
             browser.close()

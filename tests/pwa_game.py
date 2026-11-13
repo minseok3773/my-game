@@ -156,8 +156,8 @@ def page_for(browser, origin):
     context = browser.new_context(viewport={'width':390, 'height':844}, is_mobile=True, has_touch=True)
     context.add_init_script("""requestAnimationFrame=()=>0;
       window.openPwaTestCache=async()=>{
-        const meta=await caches.open('raft-village-v2-meta'),p=await meta.match('__pwa_active__');
-        return caches.open(p?await p.text():'raft-village-v2');
+        const meta=await caches.open('raft-village-v4-meta'),p=await meta.match('__pwa_active__');
+        return caches.open(p?await p.text():'raft-village-v4');
       };""")
     context.route('https://**', lambda route: route.abort())
     page = context.new_page()
@@ -184,7 +184,7 @@ def test_current(browser, redirect):
     try:
         context, page, errors = page_for(browser, origin)
         state = cache_info(page)
-        assert state['count'] == 22 and state['redirected'] is False and state['status'] == 200, state
+        assert state['count'] == 23 and state['redirected'] is False and state['status'] == 200, state
         manifest = json.loads((ROOT / 'manifest.webmanifest').read_text())
         start = '/' + manifest['start_url'].removeprefix('./')
         offline_start(context, page, origin, start)
@@ -228,15 +228,15 @@ def test_upgrade(browser, failed=False):
         if failed:
             assert result == 'redundant', result
             names = page.evaluate('caches.keys()')
-            assert 'raft-village-v1' in names and 'raft-village-v2' not in names, names
+            assert 'raft-village-v1' in names and 'raft-village-v4' not in names, names
             print('PASS incomplete new-worker install keeps old offline cache and active worker', flush=True)
         else:
-            wait_for(page, "(async()=>{const n=await caches.keys();return n.some(k=>k.startsWith('raft-village-v2-gen-'))&&!n.includes('raft-village-v1');})()")
+            wait_for(page, "(async()=>{const n=await caches.keys();return n.some(k=>k.startsWith('raft-village-v4-gen-'))&&!n.includes('raft-village-v1');})()")
             state = cache_info(page)
-            assert state['redirected'] is False and state['count'] == 22, state
+            assert state['redirected'] is False and state['count'] == 23, state
             offline_start(context, page, origin, '/raft-village-3d.html?source=app')
             assert not errors, errors
-            print('PASS old redirected v1 cache upgrades to normalized v2 and offline app starts', flush=True)
+            print('PASS old redirected v1 cache upgrades to normalized v4 and offline app starts', flush=True)
         context.close()
     finally:
         server.shutdown(); server.server_close(); thread.join(timeout=5)
@@ -257,7 +257,7 @@ def test_same_cache_failed_upgrade(browser):
         }''')
         assert result == 'redundant', result
         state = cache_info(page)
-        assert state['count'] == 22 and state['redirected'] is False, state
+        assert state['count'] == 23 and state['redirected'] is False, state
         assert not any(n.endswith('-install') for n in state['names']), state
         offline_start(context, page, origin, '/raft-village-3d.html?source=app')
         assert page.locator('meta[name="pwa-test-version"]').get_attribute('content') == 'one'
@@ -274,7 +274,7 @@ def test_generation_publish_failure(browser):
     try:
         context, page, errors = page_for(browser, origin)
         before = page.evaluate('''async()=>{
-          const m=await caches.open('raft-village-v2-meta'),p=await m.match('__pwa_active__');
+          const m=await caches.open('raft-village-v4-meta'),p=await m.match('__pwa_active__');
           return await p.text();
         }''')
         server.revision = 'two'
@@ -284,7 +284,7 @@ def test_generation_publish_failure(browser):
 const originalOpen = caches.open.bind(caches);
 caches.open = async function(name) {
   const cache = await originalOpen(name);
-  if (name === 'raft-village-v2-meta') {
+  if (name === 'raft-village-v4-meta') {
     const put = cache.put.bind(cache);
     cache.put = async function(key, response) {
       if (String(key.url || key).endsWith('/__pwa_active__')) {
@@ -303,13 +303,13 @@ caches.open = async function(name) {
         }''')
         assert result == 'redundant', result
         after = page.evaluate('''async()=>{
-          const m=await caches.open('raft-village-v2-meta'),p=await m.match('__pwa_active__');
+          const m=await caches.open('raft-village-v4-meta'),p=await m.match('__pwa_active__');
           const active=await p.text(),names=await caches.keys();
-          return {active,generations:names.filter(n=>n.startsWith('raft-village-v2-gen-'))};
+          return {active,generations:names.filter(n=>n.startsWith('raft-village-v4-gen-'))};
         }''')
         assert after == {'active':before,'generations':[before]}, after
         state=cache_info(page)
-        assert state['count']==22 and state['redirected'] is False, state
+        assert state['count']==23 and state['redirected'] is False, state
         offline_start(context,page,origin,'/raft-village-3d.html?source=app')
         assert page.locator('meta[name="pwa-test-version"]').get_attribute('content') == 'one'
         assert not errors, errors

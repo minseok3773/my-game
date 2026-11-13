@@ -2,7 +2,7 @@
  * HTML은 최신본 우선, 엔진·모형은 저장본 우선으로 실행합니다.
  * Cloudflare의 .html → 확장자 없는 주소 리디렉션도 오프라인에서 재사용합니다.
  */
-const CACHE = 'raft-village-v2';
+const CACHE = 'raft-village-v4';
 const META_CACHE = CACHE + '-meta';
 const ACTIVE_KEY = new URL('__pwa_active__', self.registration.scope).href;
 const GENERATION_PREFIX = CACHE + '-gen-';
@@ -12,6 +12,7 @@ const CORE = [
   'index.html',
   'raft-village-3d.html',
   'manifest.webmanifest',
+  'fonts/fonts.css', // 같은 출처 글꼴 파일은 사용 시 저장합니다.
   'assets/icon-192.png',
   'assets/icon-512.png',
   'assets/icon-maskable-512.png',
@@ -62,7 +63,7 @@ async function activeCacheName() {
     const name = await pointer.text();
     if (name.startsWith(GENERATION_PREFIX) && (await caches.keys()).includes(name)) return name;
   }
-  return CACHE; // 이전 v2 작업자의 저장본도 이어받을 수 있습니다.
+  return CACHE; // 포인터가 없는 기존 이름의 캐시는 그대로 읽습니다.
 }
 let activeCachePromise;
 function openActiveCache() {
