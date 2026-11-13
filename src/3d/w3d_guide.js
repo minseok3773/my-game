@@ -84,10 +84,12 @@ function guideCameraTarget(dt) {
 const UI_STEPS = [
   { id: 'level', show: () => unlocked.has('tent1') || raidOn || (G.wave || 0) > 0, note: '⚔️ 선장 체력·공격력 창이 열렸어요' },
   { id: 'assignmentBtn', show: () => workers.length > 0 || (G.woundedCrew || []).length > 0, note: '👷 일꾼이 생겼어요 · "일꾼 배정"으로 일을 맡길 수 있어요' },
+  { id: 'chapterBtn', show: () => (unlocked.has('tent1') || (G.chapter || 1) > 1) && !raidOn, note: '🏝 섬 미션이 열렸어요 · 미션을 끝내고 섬의 주인을 이기면 다음 섬으로 갈 수 있어요' },
   { id: 'expeditionBtn', show: () => unlocked.has('expand1') && !raidOn, note: '🏝 섬 원정 목표가 열렸어요 · 오른쪽 버튼을 눌러 보세요', noteWhen: () => unlocked.has('expand1') },
 ];
 function onboardingHud() {
   if (!G) return;
+  if (typeof chapterHud === 'function') chapterHud();
   if (!G.uiSeen || typeof G.uiSeen !== 'object') G.uiSeen = {};
   for (const step of UI_STEPS) {
     const el = document.getElementById(step.id); if (!el) continue;

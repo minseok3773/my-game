@@ -336,7 +336,7 @@ function build(data) {
   G = data;
   G.tactic = G.tactic || null;
   G.level = G.level || 1; G.xp = G.xp || 0; G.strike = false;
-  initializeTrainingState(); initializeHeroState(); initializeBuildingState(); restoreRaidSchedule();
+  initializeTrainingState(); initializeHeroState(); initializeBuildingState(); initializeChapterState(); restoreRaidSchedule();
   if (!G.ws) { G.px *= 1.25; G.py *= 1.25; G.ws = 1; } // 넓어진 뗏목 좌표로 변환
   G.stats = G.stats || {}; G.qi = G.qi || 0; if (!G.qBase) G.qBase = {};
   G.slv = G.slv || {}; G.st.base = G.st.base || { food: 0 };
@@ -387,7 +387,7 @@ const lv = () => G.level || 1;
 const levelNeed = n => Math.round(25 * Math.pow(n, 1.6));
 const slv = id => G.slv[id] || 1;
 const maxPile = id => MAXP + (lv() - 1) * 3 + (id ? (slv(id) - 1) * 5 : 0);
-const priceOf = d => Math.round((G.expedition?.rewards?.anchor ? 1.25 : 1) * (1 + 0.03 * Math.min(10, G.expedition?.pearls || 0)) * strategySale() * d.price * 2 * (1 + 0.15 * (lv() - 1)) * (1 + 0.3 * (slv(d.id) - 1)));
+const priceOf = d => Math.round((G.expedition?.rewards?.anchor ? 1.25 : 1) * (1 + 0.03 * Math.min(10, G.expedition?.pearls || 0)) * chapterSaleMul() * strategySale() * d.price * 2 * (1 + 0.15 * (lv() - 1)) * (1 + 0.3 * (slv(d.id) - 1)));
 const fishPerCatch = () => 1 + Math.floor((lv() - 1) / 2);
 function visiblePads() {
   const list = PADS.filter(p => !unlocked.has(p.id) && p.after.every(a => unlocked.has(a)));
@@ -1301,6 +1301,8 @@ function drawPad(p, full) {
 const keys = new Set(), joy = { on: false, ox: 0, oy: 0, dx: 0, dy: 0, id: null };
 window.addEventListener('keydown', e => { keys.add(e.key.toLowerCase()); });
 window.addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
+// 아이폰에서 마을 드래그가 스크롤·확대 제스처로 넘어가 끊기지 않게 막습니다.
+for (const type of ['touchstart', 'touchmove']) cv.addEventListener(type, e => { if (e.cancelable) e.preventDefault(); }, { passive: false });
 cv.addEventListener('pointerdown', e => { joy.on = true; joy.id = e.pointerId; joy.ox = e.clientX; joy.oy = e.clientY; joy.dx = joy.dy = 0; cv.setPointerCapture(e.pointerId); });
 cv.addEventListener('pointermove', e => { if (!joy.on || e.pointerId !== joy.id) return; joy.dx = e.clientX - joy.ox; joy.dy = e.clientY - joy.oy; });
 const endJoy = e => { if (e.pointerId === joy.id) { joy.on = false; joy.dx = joy.dy = 0; } };

@@ -119,7 +119,7 @@ let skillLayoutKey = '';
 function positionSkillButton() {
   const width = document.documentElement.clientWidth || innerWidth;
   const height = document.documentElement.clientHeight || innerHeight;
-  const protectedIds = ['quest','money','level','goal','assignmentBtn','expeditionBtn','defense','bag','menuBtn','strategyBtn','bossBar','recruitHint'];
+  const protectedIds = ['quest','money','level','goal','assignmentBtn','expeditionBtn','chapterBtn','defense','bag','menuBtn','strategyBtn','bossBar','recruitHint'];
   const boxes = protectedIds.map(id => document.getElementById(id)).filter(e => e && !e.hidden).map(e => e.getBoundingClientRect()).filter(r => r.width > 0 && r.height > 0);
   const key = [width,height,...boxes.flatMap(r => [r.left,r.top,r.right,r.bottom].map(Math.round))].join('|');
   if (key === skillLayoutKey) return;

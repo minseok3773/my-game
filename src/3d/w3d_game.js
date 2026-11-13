@@ -135,7 +135,7 @@ function updateBoarder(e, dt) { updateSwordBoarder(e, dt); }
 // 해적 Lv.5·10·15마다 보스선에서 상어 대장이 직접 상륙합니다.
 function spawnBoss() {
   // 정찰선은 정규 보스·출현 기록·지연 경고를 만들지 않습니다.
-  if (G.scoutRaid || !bossDueNextRaid(G.wave)) return false;
+  if (G.scoutRaid || G.chapterBossRaid || !bossDueNextRaid(G.wave)) return false; // 섬의 주인 도전 중에는 일반 보스를 미룸
   const level = pirateLevel();
   // 정찰로 미뤄진 5단계 보스가 여러 명이면 정규 습격마다 오래된 단계부터 처리합니다.
   const milestone = Math.min(Math.floor(level / 5) * 5, (Math.floor((G.lastBossLevel || 0) / 5) + 1) * 5);
@@ -156,11 +156,12 @@ function spawnBossBoarder(ship) {
   if (!ship?.boss || ship.kind === 'boarder' || ship.bossBoarded || G.bossBoardedWave === G.wave) return;
   ship.bossBoarded = true; G.bossBoardedWave = G.wave;
   const level = ship.level || pirateLevel();
-  const p = shorePoint(ship.x, ship.y), hp = normalPirateHp(level) * BOSS_POWER_MULTIPLIER;
-  enemies.push({ kind:'boarder', boss:true, champion:true, type:'boss', x:p.x, y:p.y,
+  // 섬의 주인(챕터 보스)은 섬마다 정한 배율만큼 더 강합니다(w3d_chapter.js).
+  const power = ship.bossPower || 1, p = shorePoint(ship.x, ship.y), hp = Math.round(normalPirateHp(level) * BOSS_POWER_MULTIPLIER * power);
+  enemies.push({ kind:'boarder', boss:true, champion:true, type:'boss', x:p.x, y:p.y, bossPower:power, bossName:ship.bossName, chapterBoss:!!ship.chapterBoss,
     hp, max:hp, level, attackMul:BOSS_POWER_MULTIPLIER, state:'walk', atkT:1.1, bob:0, vx:0, vy:0, sinkT:0,
     ang:0, ph:0.1, home:{x:p.x,y:p.y}, goal:{x:p.x,y:p.y} });
-  dust(p.x,p.y,14); toast('☠️ 상어 대장 상륙! 선장과 선원이 함께 맞서 싸우세요');
+  dust(p.x,p.y,14); toast(`☠️ ${ship.bossName || '상어 대장'} 상륙! 선장과 선원이 함께 맞서 싸우세요`);
 }
 function bossTick(e, dt) {
   // 보스도 포격·약탈 대신 상륙 병력을 보내 갑판 전투를 벌입니다.
@@ -170,6 +171,6 @@ function bossHud() {
   const b = enemies.find(e => e.champion && alive(e)) || enemies.find(e => e.boss && !e.bossBoarded && alive(e));
   bossBar.hidden = !b; document.body.classList.toggle('has-boss', !!b);
   if (!b) return;
-  bossBar.querySelector('.nm').textContent = `☠️ ${b.champion ? '상어 대장' : '보스선 접근 중'} Lv.${b.level || pirateLevel()} · ${Math.ceil(b.hp)}/${b.max}`;
+  bossBar.querySelector('.nm').textContent = `☠️ ${b.champion ? (b.bossName || '상어 대장') : (b.bossName ? b.bossName + ' 접근 중' : '보스선 접근 중')} Lv.${b.level || pirateLevel()} · ${Math.ceil(b.hp)}/${b.max}`;
   bossBar.querySelector('.fill').style.width = `${Math.max(0, b.hp / b.max) * 100}%`;
 }

@@ -169,7 +169,7 @@ for c in chunks:
         out.append("function dockRect(id) { return customerDockRect(id); }\n"); continue
     if c.startswith("/* ---------- HUD ---------- */"):
         out.append(B('w3d_storage.js')); out.append(B('w3d_expedition.js')); out.append(B('w3d_tavern.js'))
-        out.append(B('w3d_world.js')); out.append(B('w3d_chars.js')); out.append(B('w3d_game.js')); out.append(B('w3d_progression.js')); out.append(B('w3d_melee.js')); out.append(B('w3d_hero.js')); out.append(B('w3d_crew.js')); out.append(B('w3d_training.js')); out.append(B('w3d_customers.js')); out.append(B('w3d_fx.js')); out.append(B('w3d_scenery.js')); out.append(B('w3d_defense.js')); out.append(B('w3d_events.js')); out.append(B('w3d_logistics.js')); out.append(B('w3d_guide.js')); out.append(overlay); out.append(c); continue
+        out.append(B('w3d_world.js')); out.append(B('w3d_chars.js')); out.append(B('w3d_game.js')); out.append(B('w3d_progression.js')); out.append(B('w3d_melee.js')); out.append(B('w3d_hero.js')); out.append(B('w3d_crew.js')); out.append(B('w3d_training.js')); out.append(B('w3d_customers.js')); out.append(B('w3d_fx.js')); out.append(B('w3d_scenery.js')); out.append(B('w3d_defense.js')); out.append(B('w3d_events.js')); out.append(B('w3d_logistics.js')); out.append(B('w3d_guide.js')); out.append(B('w3d_chapter.js')); out.append(overlay); out.append(c); continue
     if c.startswith("/* ---------- 루프 ---------- */") or c.startswith("let last = performance.now()"):
         continue
     if keep(c): out.append(c)
@@ -226,7 +226,7 @@ R4 = [
     ("dust(p.x, p.y, 8); floatText(p.x, p.y, '해적 상륙!', '#ffb0a0');", "setupBoarder(enemies[enemies.length - 1]); dust(p.x, p.y, 8); floatText(p.x, p.y, '해적 상륙!', '#ffb0a0');"),
     ("if (e.kind === 'boarder') { updateBoarder(e, dt); continue; }", "if (e.kind === 'boarder') { updateBoarder(e, dt); continue; }\n    if (e.boss && e.state === 'attack') bossTick(e, dt);"),
     ("  raidIntro = { t: 0, n };", "  if (bossDueNextRaid(G.wave)) spawnBoss();\n  raidIntro = { t: 0, n };"),
-    ("G.raidT = 60; if (!looted) toast('해적을 격퇴했습니다'); finishStrategyRaid(looted); looted = false;", "G.raidT = 60; if (!looted) { toast('해적을 격퇴했습니다'); offerCards(); } reviveWoundedCrew(looted); finishStrategyRaid(looted); looted = false;"),
+    ("G.raidT = 60; if (!looted) toast('해적을 격퇴했습니다'); finishStrategyRaid(looted); looted = false;", "G.raidT = 60; if (!looted) { toast('해적을 격퇴했습니다'); offerCards(); } reviveWoundedCrew(looted); chapterRaidEnded(looted); finishStrategyRaid(looted); looted = false;"),
     ("e.hp / e.max, '#ff4d3d', 26, G.wave);", "e.hp / e.max, ({ bomber: '#ff9a2e', thief: '#c9a2ff', sniper: '#5ec8ff' })[e.type] || '#ff4d3d', 26, G.wave);"),
     ("else hpBar(e.x, e.y, e.big ? 120 : 90,", "else if (!e.boss) hpBar(e.x, e.y, e.big ? 120 : 90,"),
 ]

@@ -222,8 +222,12 @@ function expeditionRenderExplore(){
  const isl=runIsland(G.expedition.run);
  expeditionPanel.innerHTML='<div id="expeditionContent"><h2>🏝 '+isl.name+' '+'★'.repeat(isl.stars)+'</h2><p>드래그 또는 방향키/WASD로 이동 · 생존자 '+isl.survivors.length+'명과 자원 '+isl.crates.length+'개에 다가가 구조·회수하고 왼쪽 아래 배로 귀환하세요. '+expeditionPatternGuide(isl,G.expedition.run)+' '+expeditionModGuide(isl,G.expedition.run)+'공격은 '+expeditionWarningSeconds(isl,G.expedition.run)+'초 먼저 표시됩니다.</p><p id="expeditionStatus" role="status"></p><canvas id="expeditionCanvas" width="500" height="500" tabindex="0" aria-label="섬 탐험 이동 영역"></canvas><div class="expRow"><button id="expeditionRetreat">즉시 철수 (보상 없음)</button><button id="expeditionSave">진행 저장</button><button id="expeditionBackup">진행 백업</button></div><p id="expeditionSaveStatus" role="status">마을 시계 정지 · 원정 진행은 자동 저장됩니다.</p></div>';
  const canvas=document.getElementById('expeditionCanvas');
- canvas.onpointerdown=ev=>{ev.preventDefault();canvas.setPointerCapture(ev.pointerId);expeditionPointer={sx:ev.clientX,sy:ev.clientY,x:ev.clientX,y:ev.clientY};canvas.focus();};
- canvas.onpointermove=ev=>{if(expeditionPointer){expeditionPointer.x=ev.clientX;expeditionPointer.y=ev.clientY;}};
+ // 아이폰 사파리: 원정 화면이 길어져 스크롤이 생기면 지도 위 드래그를 페이지 스크롤로 가져가 이동이 끊겼습니다(pointercancel).
+ // 지도 위 터치는 스크롤·확대로 쓰지 않게 막고, 지도를 누를 때 화면이 지도 쪽으로 튀지 않게 합니다(preventScroll).
+ const keepTouch=ev=>{if(ev.cancelable)ev.preventDefault();};
+ for(const type of ['touchstart','touchmove','touchend']) canvas.addEventListener(type,keepTouch,{passive:false});
+ canvas.onpointerdown=ev=>{ev.preventDefault();try{canvas.setPointerCapture(ev.pointerId);}catch(error){}expeditionPointer={sx:ev.clientX,sy:ev.clientY,x:ev.clientX,y:ev.clientY,id:ev.pointerId};canvas.focus({preventScroll:true});};
+ canvas.onpointermove=ev=>{if(expeditionPointer&&(expeditionPointer.id===undefined||ev.pointerId===expeditionPointer.id)){expeditionPointer.x=ev.clientX;expeditionPointer.y=ev.clientY;}};
  canvas.onpointerup=canvas.onpointercancel=()=>{expeditionPointer=null;};
  document.getElementById('expeditionBackup').onclick=exportSave;
  document.getElementById('expeditionRetreat').onclick=()=>expeditionFinish('retreat');canvas.focus();
@@ -272,7 +276,8 @@ function expeditionUpdate(dt){
  if(e.phase==='result')return true;
  const r=e.run;if(!r)return true;
  let x=(expeditionKeys.has('arrowright')||expeditionKeys.has('d')?1:0)-(expeditionKeys.has('arrowleft')||expeditionKeys.has('a')?1:0),y=(expeditionKeys.has('arrowdown')||expeditionKeys.has('s')?1:0)-(expeditionKeys.has('arrowup')||expeditionKeys.has('w')?1:0);
- if(expeditionPointer){x=(expeditionPointer.x-expeditionPointer.sx)/45;y=(expeditionPointer.y-expeditionPointer.sy)/45;}
+ // 드래그 조이스틱: 누른 곳에서 손가락을 민 방향으로 이동. 28px만 밀어도 최고 속도(예전 45px), 4px 이하는 떨림으로 무시.
+ if(expeditionPointer){const dx=expeditionPointer.x-expeditionPointer.sx,dy=expeditionPointer.y-expeditionPointer.sy;if(Math.hypot(dx,dy)>4){x=dx/28;y=dy/28;}}
  const len=Math.hypot(x,y);if(len>0){r.x=Math.max(24,Math.min(476,r.x+x/Math.max(1,len)*135*dt));r.y=Math.max(24,Math.min(476,r.y+y/Math.max(1,len)*135*dt));}
  const reach=25+r.party.length*12,isl=runIsland(r);
  isl.survivors.forEach((p,i)=>{if(!r.rescued.includes(i)&&Math.hypot(r.x-p.x,r.y-p.y)<reach)r.rescued.push(i);});
@@ -321,6 +326,8 @@ function expeditionDraw(){
  r.party.forEach((_,i)=>{c.font='20px sans-serif';c.fillText('👷',r.x-18-i*13,r.y+20);});c.fillStyle='#f8f5c1';c.beginPath();c.ellipse(r.x,r.y+12,13,5,0,0,Math.PI*2);c.fill();c.font='30px sans-serif';c.fillText('🧑‍✈️',r.x,r.y);
  if(isl.fog){c.fillStyle='rgba(255,255,255,.16)';c.fillRect(0,0,500,500);}
  if(expeditionRunMod(isl,r)?.id==='fog'){c.save();c.fillStyle='rgba(18,32,44,.86)';c.beginPath();c.rect(0,0,500,500);c.moveTo(r.x+125,r.y);c.arc(r.x,r.y,125,0,Math.PI*2,true);c.fill('evenodd');c.restore();text('귀환선',52,487);}
+ // 드래그 중에는 누른 자리와 손가락 위치를 조이스틱처럼 보여 줍니다.
+ if(expeditionPointer){const b=canvas.getBoundingClientRect(),k=500/(b.width||500),sx=(expeditionPointer.sx-b.left)*k,sy=(expeditionPointer.sy-b.top)*k;let dx=(expeditionPointer.x-expeditionPointer.sx)*k,dy=(expeditionPointer.y-expeditionPointer.sy)*k;const m=Math.hypot(dx,dy),lim=40;if(m>lim){dx*=lim/m;dy*=lim/m;}c.save();c.globalAlpha=.55;c.fillStyle='#ffffff';c.strokeStyle='#234b4b';c.lineWidth=3;c.beginPath();c.arc(sx,sy,44,0,Math.PI*2);c.fill();c.stroke();c.globalAlpha=.9;c.beginPath();c.arc(sx+dx,sy+dy,20,0,Math.PI*2);c.fill();c.stroke();c.restore();}
  document.getElementById('expeditionStatus').textContent=`체력 ${Math.max(0,Math.ceil(r.hp))}/${r.maxHp} · ${Math.max(0,Math.ceil(r.time))}초 · 구조 ${r.rescued.length}/${isl.survivors.length} · 자원 ${r.collected.length}/${isl.crates.length}${r.rescued.length===isl.survivors.length&&r.collected.length===isl.crates.length?' · 왼쪽 아래 배로 귀환!':''}`;
 }
 window.addEventListener('keydown',ev=>{if(!expeditionPanel.hidden && !ev.ctrlKey && !ev.metaKey){if(ev.key==='Tab'&&!expeditionPanel.contains(document.activeElement)){ev.preventDefault();ev.stopImmediatePropagation();expeditionPanel.querySelector('button:not(:disabled),select,canvas')?.focus();return;}if(ev.key!=='Tab')ev.stopImmediatePropagation();if(ev.key==='Escape'&&expeditionState().phase==='idle'){expeditionClose();return;}}if(G?.expedition?.phase==='exploring'&&['arrowup','arrowdown','arrowleft','arrowright','w','a','s','d'].includes(ev.key.toLowerCase())){ev.preventDefault();ev.stopImmediatePropagation();expeditionKeys.add(ev.key.toLowerCase());}},true);
