@@ -97,7 +97,7 @@ def main():
             file_game['note'] = '파일로 불러온 마을'
             page.on('dialog', lambda dialog: dialog.accept())
             page.locator('#storageFile').set_input_files({'name':'village.json','mimeType':'application/json','buffer':json.dumps(file_game,ensure_ascii=False).encode()})
-            page.wait_for_function('transferTest.G.money===9001')
+            page.wait_for_function('transferTest.G.money===9001', polling=100)  # 화면 프레임을 멈춘 검사라 시간 간격으로 확인
             assert '✅' in page.locator('#storageNote').inner_text()
             assert page.evaluate('JSON.parse(localStorage.getItem(transferTest.backupKey)).money') == 6789
             print('PASS actual JSON file import confirms and preserves the previous checkpoint', flush=True)
