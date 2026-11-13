@@ -11,8 +11,10 @@ const CHAPTER_ISLANDS = [
   { name: '화산 거북섬', icon: '🌋', boss: '거북섬의 주인 · 용암 상어', power: 1.8, sky: 0xe3b79a, water: 0x2f8a9a },
   { name: '해적 요새섬', icon: '🏴‍☠️', boss: '해적왕 · 강철 상어', power: 2.2, sky: 0xa9b6d6, water: 0x245f8c },
 ];
-const CHAPTER_CARRY_SHARE = 0.3, CHAPTER_CARRY_MAX = 3000;
-const chapterNo = () => Math.max(1, Math.floor(G?.chapter || 1));
+const CHAPTER_CARRY_SHARE = 0.3, CHAPTER_CARRY_MAX = 3000, CHAPTER_BOSS_ESCORTS = 2;
+// 섬 번호는 1~999 정수만 씁니다(잘못된 저장·가져온 코드로 판매가가 폭주하지 않게).
+const CHAPTER_MAX = 999, ARRIVAL_GRACE_RAIDS = 2;
+const chapterNo = () => { const n = Math.floor(Number(G?.chapter)); return Number.isFinite(n) ? Math.max(1, Math.min(CHAPTER_MAX, n)) : 1; };
 function chapterIsland(n = chapterNo()) {
   if (n <= CHAPTER_ISLANDS.length) return CHAPTER_ISLANDS[n - 1];
   const loop = n - CHAPTER_ISLANDS.length, base = CHAPTER_ISLANDS[(loop - 1) % CHAPTER_ISLANDS.length];
@@ -47,13 +49,15 @@ function applyChapterTheme() {
 }
 function initializeChapterState() {
   G.chapter = chapterNo();
-  if (!G.chapterBase || typeof G.chapterBase !== 'object') G.chapterBase = { defended: G.defended || 0, sold: G.stats?.sold || 0 };
+  const num = v => Number.isFinite(Number(v)) ? Number(v) : null, base = G.chapterBase && typeof G.chapterBase === 'object' ? G.chapterBase : {};
+  G.chapterBase = { defended: num(base.defended) ?? (G.defended || 0), sold: num(base.sold) ?? (G.stats?.sold || 0) };
+  G.arrivalGrace = Math.max(0, Math.min(ARRIVAL_GRACE_RAIDS, Math.floor(num(G.arrivalGrace) || 0)));
   G.chapterBossDone = !!G.chapterBossDone;
   G.chapterBossRaid = !!G.chapterBossRaid && !!G.combat?.raidOn;
   applyChapterTheme();
 }
-// 판매가: 뒤 섬일수록 조금씩 비싸게 팔려 처음부터 다시 짓는 속도를 돕습니다(섬마다 +10%).
-const chapterSaleMul = () => 1 + 0.1 * (chapterNo() - 1);
+// 판매가: 뒤 섬일수록 조금씩 비싸게 팔려 처음부터 다시 짓는 속도를 돕습니다(섬마다 +10%, 최대 +50%).
+const chapterSaleMul = () => Math.min(1.5, 1 + 0.1 * (chapterNo() - 1)); // 최대 +50%
 
 // ---------- 섬의 주인(최종 보스) ----------
 function chapterBossReady() { return !G.chapterBossDone && chapterMissionsDone(); }
@@ -61,7 +65,11 @@ function startChapterBoss() {
   if (!chapterBossReady() || raidOn || !isHeroAvailable() || expeditionBusy()) return false;
   const isl = chapterIsland();
   G.chapterBossRaid = true; G.scoutRaid = false;
+  const before = enemies.length;
   startRaid(); raidOn = true;
+  // 섬의 주인 싸움에 집중하도록 호위선은 2척(각 2명 상륙)만 남깁니다. 일반 습격 전체가 함께 오면 이길 수 없었습니다.
+  enemies.splice(before + CHAPTER_BOSS_ESCORTS);
+  for (const e of enemies.slice(before)) Object.assign(e, { big: false, landingBudget: 2 });
   const level = pirateLevel(), a = rnd(0, 6.28), r = raftC.r + 16;
   const hp = Math.round(normalPirateShipHp(level) * BOSS_POWER_MULTIPLIER * isl.power);
   enemies.push({ x: raftC.x + Math.cos(a) * r, y: raftC.y + Math.sin(a) * r, hp, max: hp, level, big: true, boss: true,
@@ -72,13 +80,25 @@ function startChapterBoss() {
 }
 // 습격이 끝날 때(assemble3d.py에서 연결): 섬의 주인 습격이었다면 승패를 정리합니다.
 function chapterRaidEnded(wasLooted) {
-  if (!G.chapterBossRaid) return;
+  if (!G.chapterBossRaid) {
+    // 새 섬 도착 직후 2번의 습격은 해적이 적게 옵니다(포탑·해군 없이 다시 시작하므로).
+    if (G.arrivalGrace > 0) { G.arrivalGrace--; if (!G.arrivalGrace) toast('⚓ 도착 적응 기간이 끝났어요 · 이제 해적이 제대로 몰려와요'); }
+    return;
+  }
   G.chapterBossRaid = false;
   if (wasLooted) { toast(`💥 ${chapterIsland().boss}에게 밀렸어요 · 정비하고 섬 미션 창에서 다시 도전하세요`, 3); return; }
   G.chapterBossDone = true;
   G.money += 300 * chapterNo();
   toast(`🏆 ${chapterIsland().boss} 격파! 보상 $${300 * chapterNo()} · 섬 미션 창에서 다음 섬으로 출항하세요`, 3);
   save();
+}
+
+// 도착 적응 기간의 습격: 해적선은 최대 3척만 옵니다(습격이 시작된 직후 한 번 정리).
+function tickArrivalGrace() {
+  if (!raidOn || !(G.arrivalGrace > 0) || G.chapterBossRaid || G.scoutRaid || G.graceWave === G.wave) return;
+  G.graceWave = G.wave;
+  const ships = enemies.filter(e => e.kind !== 'boarder' && !e.boss);
+  for (const s of ships.slice(3)) enemies.splice(enemies.indexOf(s), 1);
 }
 
 // ---------- 다음 섬으로 출항 ----------
@@ -92,12 +112,12 @@ function sailToNextIsland() {
   for (const k of keep) if (G[k] !== undefined) d[k] = JSON.parse(JSON.stringify(G[k]));
   d.money = carry + 150 * next;
   d.chapter = next; d.chapterBase = { defended: G.defended || 0, sold: G.stats?.sold || 0 }; d.chapterBossDone = false; d.chapterBossRaid = false;
-  d.raidT = RAID_INTERVAL;
+  d.raidT = RAID_INTERVAL; d.arrivalGrace = ARRIVAL_GRACE_RAIDS;
   if (d.expedition) { d.expedition.phase = 'idle'; d.expedition.run = null; d.expedition.result = null; }
   build(d);
   paused = false; document.getElementById('helpPanel').hidden = true;
   closeChapterPanel(); save();
-  toast(`${chapterIsland().icon} ${chapterIsland().name} 도착! 새 섬에서 마을을 다시 일구세요`, 3);
+  toast(`${chapterIsland().icon} ${chapterIsland().name} 도착! 처음 습격 2번은 해적이 적게 와요 · 마을을 다시 일구세요`, 3);
   return true;
 }
 
@@ -154,4 +174,14 @@ function renderChapterPanel() {
 function openChapterPanel() { clearMovementInput(); renderChapterPanel(); chapterPanel.hidden = false; chapterPanel.querySelector('button:not(:disabled)')?.focus(); }
 function closeChapterPanel() { chapterPanel.hidden = true; chapterButton.focus({ preventScroll: true }); }
 chapterButton.onclick = openChapterPanel;
-window.addEventListener('keydown', ev => { if (!chapterPanel.hidden && ev.key === 'Escape') { ev.preventDefault(); closeChapterPanel(); } });
+window.addEventListener('keydown', ev => {
+  if (chapterPanel.hidden) return;
+  if (ev.key === 'Escape') { ev.preventDefault(); closeChapterPanel(); return; }
+  if (ev.key !== 'Tab') return;
+  // 키보드 포커스가 창 밖(게임 화면)으로 빠지지 않게 창 안에서 돕니다.
+  const list = [...chapterPanel.querySelectorAll('button:not(:disabled)')];
+  if (!list.length) return;
+  const i = list.indexOf(document.activeElement);
+  ev.preventDefault();
+  list[(i + (ev.shiftKey ? -1 : 1) + list.length) % list.length].focus();
+}, true);

@@ -135,7 +135,7 @@ function updateBoarder(e, dt) { updateSwordBoarder(e, dt); }
 // 해적 Lv.5·10·15마다 보스선에서 상어 대장이 직접 상륙합니다.
 function spawnBoss() {
   // 정찰선은 정규 보스·출현 기록·지연 경고를 만들지 않습니다.
-  if (G.scoutRaid || G.chapterBossRaid || !bossDueNextRaid(G.wave)) return false; // 섬의 주인 도전 중에는 일반 보스를 미룸
+  if (G.scoutRaid || G.chapterBossRaid || G.arrivalGrace > 0 || !bossDueNextRaid(G.wave)) return false; // 섬의 주인 도전 중·새 섬 도착 직후에는 일반 보스를 미룸
   const level = pirateLevel();
   // 정찰로 미뤄진 5단계 보스가 여러 명이면 정규 습격마다 오래된 단계부터 처리합니다.
   const milestone = Math.min(Math.floor(level / 5) * 5, (Math.floor((G.lastBossLevel || 0) / 5) + 1) * 5);
@@ -165,7 +165,8 @@ function spawnBossBoarder(ship) {
 }
 function bossTick(e, dt) {
   // 보스도 포격·약탈 대신 상륙 병력을 보내 갑판 전투를 벌입니다.
-  e.landingBudget = Math.ceil(8 * pirateCrewMultiplier());
+  // 섬의 주인은 호위 해적 4명만 데리고 옵니다(보스와의 싸움이 중심이 되게, w3d_chapter.js).
+  e.landingBudget = e.chapterBoss ? 4 : Math.ceil(8 * pirateCrewMultiplier());
 }
 function bossHud() {
   const b = enemies.find(e => e.champion && alive(e)) || enemies.find(e => e.boss && !e.bossBoarded && alive(e));

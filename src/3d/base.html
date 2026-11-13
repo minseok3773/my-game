@@ -1930,7 +1930,7 @@ function update(dt) {
   for (const w of workers) if (expeditionWorkerAvailable(w)) updateWorker(w, dt);
   separateWorkers(dt);
   updateSea(dt);
-  updateMilitary(dt); tickTrainingInteraction(dt); tickRepairs(dt); tickRaidEvents(dt); tickScout(dt); tickWoundedCrew();
+  updateMilitary(dt); tickTrainingInteraction(dt); tickRepairs(dt); tickRaidEvents(dt); tickScout(dt); tickWoundedCrew(); tickArrivalGrace();
   // 상호작용
   player.timer -= dt;
   if (isHeroAvailable() && player.timer <= 0) {
