@@ -563,7 +563,27 @@ function makeSkelCrew(v) {
   const sk = makeSkull(v); sk.position.y = 0.62; sk.scale.setScalar(0.95); g.add(sk);
   return g;
 }
+// 해적선은 종류(보통·큰 배·보스)마다 한 번만 만들고, 움직이지 않는 부품을 재질별로 합친 원본을 복제해 씁니다.
+// 같은 도형을 공유하므로 배가 많아도 그리기 호출·메모리가 크게 늘지 않습니다. 배는 물 위라 그림자를 드리우지 않습니다.
+const shipTemplates = new Map();
 function makeShip3(big, boss) {
+  const key = `${!!big}|${!!boss}`;
+  let t = shipTemplates.get(key);
+  if (!t) {
+    t = buildShip3(big, boss); scene.remove(t);
+    const flags = t.userData.flags || []; flags.forEach(f => { f.name = 'ship-flag'; });
+    const crew = t.children.filter(c => c.userData.shipCrew);
+    t.userData = {}; // 복제 시 userData는 JSON으로 복사되므로 메시 참조를 남기지 않습니다.
+    mergeByMaterial(t, new Set([...flags, ...crew]));
+    t.traverse(o => { if (o.isMesh) o.castShadow = false; });
+    shipTemplates.set(key, t);
+  }
+  const g = t.clone(true);
+  g.userData = { flags: [] }; g.traverse(o => { if (o.name === 'ship-flag') g.userData.flags.push(o); if (o.userData.shipCrew) scaledCharacterRoots.add(o); });
+  scene.add(g);
+  return g;
+}
+function buildShip3(big, boss) {
   const g = new THREE.Group(), wood = mat(0x9a5a2c, { roughness: 0.75 }), woodL = mat(0xb87a40, { roughness: 0.7 }), iron = mat(0x3a3a40, { metalness: 0.5, roughness: 0.45 });
   // 둥근 선체: 아래 반구를 길게 늘이고 나무판 줄무늬
   const hull = mk(sphG(1, 26, 16, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), new THREE.MeshStandardMaterial({ map: plankTex(), roughness: 0.75, side: THREE.DoubleSide }), true, 0, 0.42, 0);
@@ -596,10 +616,10 @@ function makeShip3(big, boss) {
     flag.rotation.y = Math.PI; g.add(flag); (g.userData.flags = g.userData.flags || []).push(flag);
   }
   // 해골 선원
-  const c1 = makeSkelCrew(1); c1.position.set(-0.5, 0.63, 0.05); c1.scale.setScalar(0.55); applyCharacterScale({ root: c1 }); g.add(c1);
-  if (big) { const c2 = makeSkelCrew(2); c2.position.set(0.2, 0.37, 0.2); c2.scale.setScalar(0.5); applyCharacterScale({ root: c2 }); g.add(c2); }
+  const c1 = makeSkelCrew(1); c1.userData.shipCrew = true; c1.position.set(-0.5, 0.63, 0.05); c1.scale.setScalar(0.55); applyCharacterScale({ root: c1 }); g.add(c1);
+  if (big) { const c2 = makeSkelCrew(2); c2.userData.shipCrew = true; c2.position.set(0.2, 0.37, 0.2); c2.scale.setScalar(0.5); applyCharacterScale({ root: c2 }); g.add(c2); }
   if (boss) { // 보스: 금관 쓴 해골 선장 + 금빛 테두리
-    const cap = makeSkelCrew(2); cap.position.set(-0.5, 0.63, -0.15); cap.scale.setScalar(0.75); applyCharacterScale({ root: cap }); g.add(cap);
+    const cap = makeSkelCrew(2); cap.userData.shipCrew = true; cap.position.set(-0.5, 0.63, -0.15); cap.scale.setScalar(0.75); applyCharacterScale({ root: cap }); g.add(cap);
     for (let i = 0; i < 5; i++) { const a = (i / 5) * Math.PI * 2; cap.add(mk(coneG(0.04, 0.12, 4), mat(0xf2c240, { metalness: 0.7, roughness: 0.3 }), false, Math.cos(a) * 0.17, 1.12, Math.sin(a) * 0.17)); }
     const trim = mk(new THREE.TorusGeometry(1, 0.035, 6, 30), mat(0xf2c240, { metalness: 0.7, roughness: 0.3 }), false, 0, 0.47, 0); trim.rotation.x = Math.PI / 2; trim.scale.set(0.8, 0.44, 1); g.add(trim);
   }
@@ -664,9 +684,15 @@ function sync3D(dt) {
       syncStack(m.carry, c.carry || []); m.root.visible = c.alpha > 0.15;
     }
   }
+  // 상륙 해적이 12명을 넘으면 해적 그림자를 끕니다(그림자 패스가 그리기 양을 두 배로 만듦). 줄어들면 다시 켭니다.
+  const crowdShadowOff = enemies.filter(e => e.kind === 'boarder' && alive(e)).length > 12;
   for (const e of enemies) {
     if (e.kind !== 'boarder') continue;
     const m = charModel(e, () => mkChar('boarder', e));
+    if (m.shadowOff !== crowdShadowOff) {
+      m.root.traverse(o => { if (!o.isMesh) return; if (o.userData.cast === undefined) o.userData.cast = o.castShadow; o.castShadow = crowdShadowOff ? false : o.userData.cast; });
+      m.shadowOff = crowdShadowOff;
+    }
     animChar(m, e, dt, { fighting: e.fighting && alive(e), dead: e.state === 'sink' });
     if (e.champion) {
       if (!m.bossRing) { m.bossRing = ringMesh(0.48,0.58,0xffd34d,0.9); m.root.add(m.bossRing); }

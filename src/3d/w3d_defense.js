@@ -147,3 +147,38 @@ function launchScoutRaid() {
   raidIntro = { t: 0, n: 1 };
   toast('🔭 정찰선 접근! 일꾼이 6명이 안 돼도 오래 머물면 해적이 살피러 와요', 3);
 }
+
+// ---------- 일꾼 기절: 습격 중 쓰러진 일꾼은 영구 사망 대신 기절합니다 ----------
+// 습격을 막아내면 체력 40%로 텐트 앞에서 깨어나고, 약탈당하면(선장 3회 쓰러짐·마을 함락) 절반이 해적에게 끌려갑니다.
+const WOUNDED_REVIVE_HP = 0.4;
+function woundCrew(c) {
+  if (!c || !c.tent) return false;
+  if (!Array.isArray(G.woundedCrew)) G.woundedCrew = [];
+  const { dead, fighting, swingT, deathT, hurtT, foe, job, moving, vx, vy, ...rest } = c;
+  G.woundedCrew.push({ ...rest, carry: [...(c.carry || [])] });
+  return true;
+}
+function reviveWoundedCrew(lost) {
+  const list = Array.isArray(G.woundedCrew) ? G.woundedCrew : [];
+  G.woundedCrew = [];
+  if (!list.length) return 0;
+  // 약탈당하면 기절한 일꾼의 절반(올림)만 끌려가고 나머지는 깨어납니다. 한 번에 모두 잃지 않게 합니다.
+  const taken = lost ? Math.ceil(list.length / 2) : 0;
+  let back = 0;
+  for (const r of list.slice(taken)) {
+    const d = DEFS[r.tent];
+    if (!d || !unlocked.has(r.tent) || workers.filter(w => w.tent === r.tent && w.hp > 0).length >= tentCapacity(r.tent)) continue;
+    workers.push({ ...r, dead: false, job: null, moving: false, vx: 0, vy: 0, fighting: false, swingT: 0,
+      x: d.x + 0.9 + back * 0.2, y: d.y + 0.9, hp: Math.max(1, Math.round(crewHpMax() * WOUNDED_REVIVE_HP)), carry: [...(r.carry || [])] });
+    back++;
+  }
+  if (taken) toast(`🏴‍☠️ 기절했던 일꾼 ${taken}명이 해적에게 끌려갔어요${back ? ` · ${back}명은 깨어났어요` : ''} · 텐트 앞 칸에서 다시 모으세요`, 3);
+  else if (back) toast(`💫 기절했던 일꾼 ${back}명이 깨어났어요`);
+  if (back && typeof balanceAssignments === 'function') balanceAssignments();
+  save();
+  return back;
+}
+// 저장을 습격이 끝난 뒤 불러온 경우 등: 습격이 없는데 기절한 일꾼이 남아 있으면 깨웁니다.
+function tickWoundedCrew() {
+  if (!raidOn && Array.isArray(G.woundedCrew) && G.woundedCrew.length) reviveWoundedCrew(false);
+}

@@ -1,6 +1,7 @@
 /* ---------- 텐트별 유료 일꾼 충원·명부 저장 ---------- */
 const tentCapacity = id => DEFS[id]?.type === 'tent' ? DEFS[id].workers + (slv(id) - 1) * 2 : 0;
-const crewCount = id => workers.filter(w => w.tent === id && w.hp > 0).length;
+// 기절한 일꾼(습격 뒤 복귀 예정)도 텐트 자리를 차지합니다.
+const crewCount = id => workers.filter(w => w.tent === id && w.hp > 0).length + (G.woundedCrew || []).filter(w => w.tent === id).length;
 const recruitmentCost = () => 30;
 // 긴급 충원: 일꾼이 한 명도 없고 돈이 $30 미만이면 (습격 중 아닐 때) 무료
 const recruitPrice = () => (!raidOn && !workers.some(w => w.hp > 0 && !w.dead) && G.money < 30) ? 0 : 30;

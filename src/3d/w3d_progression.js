@@ -8,7 +8,9 @@ function pirateLevel(wave = G.wave) {
 }
 const PIRATE_GROWTH = 1.03; // 해적: 레벨마다 체력·공격력 3%
 const ALLY_GROWTH = 1.06;    // 선장·선원: 단계별 6% (후반에 해적보다 지나치게 강해지지 않게)
-const PIRATE_CREW_MULTIPLIER = 3; // 상륙 인원 3배
+const PIRATE_CREW_MULTIPLIER = 3; // 상륙 인원 3배 (해적 Lv.10부터)
+// 초반 완화: 해적 Lv.1~5는 1.5배, Lv.6~9는 2배로 상륙합니다. 첫 습격들에서 일꾼이 한꺼번에 쓰러지지 않게 합니다.
+function pirateCrewMultiplier(level = pirateLevel()) { return level <= 5 ? 1.5 : level <= 9 ? 2 : PIRATE_CREW_MULTIPLIER; }
 // 갑판에 동시에 있을 수 있는 해적 수: 휴대폰(터치 화면)은 30명, 그 외 48명. 총 상륙 인원은 같고 나눠서 올라옴
 const MAX_LIVE_PIRATES = (typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches) ? 30 : 48;
 // 후반(Lv.15~)에는 해적이 7%씩 자라 선원 성장(6%, 선장 Lv.50 상한)을 따라잡습니다. 방어가 다시 자동화되지 않게 합니다.

@@ -16,6 +16,10 @@ function initializeTrainingState() {
   const old = G.training || {};
   const level = value => Number.isFinite(Number(value)) ? Math.min(TRAINING_MAX_LEVEL, Math.max(0, Math.floor(Number(value)))) : 0;
   G.training = { hero: level(old.hero), crew: level(old.crew) };
+  // 훈련 % 규칙(2) 이전 저장: 이미 올린 단계는 고정 보너스로 남깁니다. 새 게임은 0단계라 모두 % 규칙입니다.
+  if (G.trainingRule !== 2) { G.trainingLegacy = { hero: G.training.hero, crew: G.training.crew }; G.trainingRule = 2; }
+  const legacy = G.trainingLegacy || {};
+  G.trainingLegacy = { hero: Math.min(G.training.hero, level(legacy.hero)), crew: Math.min(G.training.crew, level(legacy.crew)) };
   const paid = G.trainPaid || {}, money = v => Number.isFinite(Number(v)) ? Math.max(0, Number(v)) : 0;
   G.trainPaid = { hero: money(paid.hero), crew: money(paid.crew) }; // 강화 칸에 넣어 둔 돈 (게이지)
 }
@@ -136,8 +140,8 @@ function refreshTrainingPanel() {
     row.append(name, values); stats.appendChild(row);
   }
   trainingPanel.querySelector('.description').textContent = f.kind === 'hero'
-    ? '전투 레벨과 함께 적용됩니다. 단계마다 공격력 +3 · 최대 체력 +10.'
-    : '현재 일꾼과 앞으로 모집할 일꾼 모두 적용됩니다. 단계마다 공격력 +1 · 최대 체력 +5. 해군은 별도입니다.';
+    ? `전투 레벨과 함께 적용됩니다. 단계마다 공격력·최대 체력 +2% (지금 +${level * 2}%).`
+    : `현재 일꾼과 앞으로 모집할 일꾼 모두 적용됩니다. 단계마다 공격력·최대 체력 +2% (지금 +${level * 2}%). 해군은 별도입니다.`;
   trainingPanel.querySelector('.status').textContent = maxed ? '최고 단계까지 강화했습니다.'
     : !usable ? '시설 앞 칸에 살아 있는 영웅이 있어야 강화할 수 있습니다.'
     : G.money < cost ? `강화 비용 $${fmt(cost)} · 자금이 부족합니다.`

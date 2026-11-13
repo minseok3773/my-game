@@ -149,7 +149,8 @@ function positionSkillButton() {
   skillBtn.classList.toggle('compact', chosen.size < 76);
 }
 function raidEventHud() {
-  expeditionButton.hidden = raidOn; // 전투 중에는 보스·전투 조작 공간을 우선하고, 종료 후 원정 안내를 다시 표시합니다.
+  // 원정 버튼은 첫 확장 뒤에 나타나고, 전투 중에는 보스·전투 조작 공간을 위해 숨깁니다(w3d_guide.js의 단계별 공개).
+  onboardingHud();
   const show = raidOn && isHeroAvailable() && !paused && !(typeof expeditionBusy === 'function' && expeditionBusy());
   skillBtn.hidden = !show;
   if (show) {

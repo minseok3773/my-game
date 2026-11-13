@@ -4,8 +4,15 @@ const heroLevel = () => G.hero?.level || 1;
 const heroXpNeed = (level = heroLevel()) => 20 + 10 * (level - 1);
 const heroBaseAttack = level => (4 + 2 * (level - 1)) * allyMultiplier(level);
 const heroBaseHp = level => (40 + 6 * (level - 1)) * allyMultiplier(level);
-const heroAttack = () => (heroBaseAttack(heroLevel()) + (G.hero?.legacyAttackBonus || 0) + 2 * ck('playerGun') + 3 * trainingLevel('hero')) * expeditionHeroBonus();
-const heroMaxHp = () => heroBaseHp(heroLevel()) + (G.hero?.legacyHpBonus || 0) + 10 * trainingLevel('hero');
+// 훈련소: 단계마다 +2% (50단계 +100%). 고정값이면 초반엔 너무 세고 후반엔 의미가 없어서 비율로 바꿨습니다.
+// 이 규칙 이전 저장에서 이미 올린 단계(trainingLegacy)는 예전 고정 보너스를 그대로 유지해 얻은 능력치를 보존합니다.
+function trainingSplit(kind) {
+  const level = G?.training?.[kind] || 0, old = Math.min(level, G?.trainingLegacy?.[kind] || 0);
+  return { old, extra: level - old };
+}
+function trainingBoost(kind) { return 1 + 0.02 * trainingSplit(kind).extra; }
+const heroAttack = () => (heroBaseAttack(heroLevel()) + (G.hero?.legacyAttackBonus || 0) + 2 * ck('playerGun') + 3 * trainingSplit('hero').old) * trainingBoost('hero') * expeditionHeroBonus();
+const heroMaxHp = () => (heroBaseHp(heroLevel()) + (G.hero?.legacyHpBonus || 0) + 10 * trainingSplit('hero').old) * trainingBoost('hero');
 const isHeroAvailable = () => !!player && !player.dead && player.hp > 0 && !(G.hero?.downT > 0);
 function initializeHeroState() {
   const old = G.hero || {};

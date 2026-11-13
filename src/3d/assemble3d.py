@@ -226,7 +226,7 @@ R4 = [
     ("dust(p.x, p.y, 8); floatText(p.x, p.y, '해적 상륙!', '#ffb0a0');", "setupBoarder(enemies[enemies.length - 1]); dust(p.x, p.y, 8); floatText(p.x, p.y, '해적 상륙!', '#ffb0a0');"),
     ("if (e.kind === 'boarder') { updateBoarder(e, dt); continue; }", "if (e.kind === 'boarder') { updateBoarder(e, dt); continue; }\n    if (e.boss && e.state === 'attack') bossTick(e, dt);"),
     ("  raidIntro = { t: 0, n };", "  if (bossDueNextRaid(G.wave)) spawnBoss();\n  raidIntro = { t: 0, n };"),
-    ("G.raidT = 60; if (!looted) toast('해적을 격퇴했습니다'); finishStrategyRaid(looted); looted = false;", "G.raidT = 60; if (!looted) { toast('해적을 격퇴했습니다'); offerCards(); } finishStrategyRaid(looted); looted = false;"),
+    ("G.raidT = 60; if (!looted) toast('해적을 격퇴했습니다'); finishStrategyRaid(looted); looted = false;", "G.raidT = 60; if (!looted) { toast('해적을 격퇴했습니다'); offerCards(); } reviveWoundedCrew(looted); finishStrategyRaid(looted); looted = false;"),
     ("e.hp / e.max, '#ff4d3d', 26, G.wave);", "e.hp / e.max, ({ bomber: '#ff9a2e', thief: '#c9a2ff', sniper: '#5ec8ff' })[e.type] || '#ff4d3d', 26, G.wave);"),
     ("else hpBar(e.x, e.y, e.big ? 120 : 90,", "else if (!e.boss) hpBar(e.x, e.y, e.big ? 120 : 90,"),
 ]
@@ -247,10 +247,10 @@ assert js.count(old_board) == 1
 js = js.replace(old_board, """      if (e.boardT <= 0) {
         e.boardT = rnd(4, 6) * raidPlan(G.wave).boarding;
         if (e.boss) spawnBossBoarder(e);
-        const budget = e.landingBudget || (e.boss ? 8 : e.big ? 4 : 2) * PIRATE_CREW_MULTIPLIER;
-        const burst = (e.boarded ? 1 : e.big ? 3 : 2) * PIRATE_CREW_MULTIPLIER;
+        const budget = e.landingBudget || Math.ceil((e.boss ? 8 : e.big ? 4 : 2) * pirateCrewMultiplier());
+        const burst = Math.ceil((e.boarded ? 1 : e.big ? 3 : 2) * pirateCrewMultiplier());
         for (let k = 0; k < burst && (e.boarded || 0) < budget; k++) {
-          if (enemies.filter(b => b.kind === 'boarder' && alive(b)).length >= Math.min(MAX_LIVE_PIRATES, (4 + pirateLevel() * 2) * PIRATE_CREW_MULTIPLIER)) break;
+          if (enemies.filter(b => b.kind === 'boarder' && alive(b)).length >= Math.min(MAX_LIVE_PIRATES, Math.ceil((4 + pirateLevel() * 2) * pirateCrewMultiplier()))) break;
           spawnBoarder(e); e.boarded = (e.boarded || 0) + 1;
         }
         if ((e.boarded || 0) >= budget) e.state = 'flee';

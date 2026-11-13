@@ -25,7 +25,7 @@ window.updateTest={
  route:assignmentRoute,pickJob, sourceInfo,destInfo,workerSlot,separateWorkers,
  carry(){G.stack=['fish','tomato'];workers[0].carry=['water','grilled'];sync3D(.016);const pm=charModel(player,()=>mkChar('player',player)),wm=charModel(workers[0],()=>mkChar('worker',workers[0]));return [pm,wm].map(m=>({height:m.carry.position.y,depth:m.carry.position.z,scales:m.carry.children.map(c=>c.scale.x),ys:m.carry.children.map(c=>c.position.y)}));},
  legacy(){this.reset(24);const d=serialize();d.pirateProgressVersion=1;d.hero.level=38;d.hero.hp=100;d.training={hero:23,crew:19};d.cards={crewHp:3,crewPower:4,villageHp:2,playerGun:2};d.crewRoster[0].hp=31;build(d);return this.state();},
- legacy51(){this.reset(51);G.training.hero=11;G.cards={...G.cards,playerGun:2};G.hero.level=51;delete G.hero.legacyAttackBonus;delete G.hero.legacyHpBonus;const attack=(4+2*50)*Math.pow(ALLY_GROWTH,50)+4+3*11;const maxHp=(40+6*50)*Math.pow(ALLY_GROWTH,50)+10*11;player.hp=maxHp-17;save();return {attack,maxHp,hp:player.hp};},
+ legacy51(){this.reset(51);G.training.hero=11;delete G.trainingRule;delete G.trainingLegacy;/* 훈련 % 규칙 이전 저장 */G.cards={...G.cards,playerGun:2};G.hero.level=51;delete G.hero.legacyAttackBonus;delete G.hero.legacyHpBonus;const attack=(4+2*50)*Math.pow(ALLY_GROWTH,50)+4+3*11;const maxHp=(40+6*50)*Math.pow(ALLY_GROWTH,50)+10*11;player.hp=maxHp-17;save();return {attack,maxHp,hp:player.hp};},
  resume(){paused=false;assignmentPanel.hidden=true;},get ready(){return GL.ready},
  move(){player.x=5;player.y=4;return {x:player.x,y:player.y};},pos(){return {x:player.x,y:player.y};},step(){for(let i=0;i<15;i++)update(.05);},
 };

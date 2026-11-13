@@ -78,3 +78,22 @@ function guideCameraTarget(dt) {
   goal.title = '눌러서 목표 위치 보기';
   goal.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); startGuidePeek(); });
 })();
+
+// ---------- 처음 몇 분: 기능을 하나씩 공개 ----------
+// 시작 화면에는 퀘스트·돈·목표 안내·가방·메뉴만 보이고, 필요해지는 순간에 버튼이 나타나며 한 번 안내합니다.
+const UI_STEPS = [
+  { id: 'level', show: () => unlocked.has('tent1') || raidOn || (G.wave || 0) > 0, note: '⚔️ 선장 체력·공격력 창이 열렸어요' },
+  { id: 'assignmentBtn', show: () => workers.length > 0 || (G.woundedCrew || []).length > 0, note: '👷 일꾼이 생겼어요 · "일꾼 배정"으로 일을 맡길 수 있어요' },
+  { id: 'expeditionBtn', show: () => unlocked.has('expand1') && !raidOn, note: '🏝 섬 원정 목표가 열렸어요 · 오른쪽 버튼을 눌러 보세요', noteWhen: () => unlocked.has('expand1') },
+];
+function onboardingHud() {
+  if (!G) return;
+  if (!G.uiSeen || typeof G.uiSeen !== 'object') G.uiSeen = {};
+  for (const step of UI_STEPS) {
+    const el = document.getElementById(step.id); if (!el) continue;
+    const on = !!step.show();
+    if (el.hidden === !on) continue;
+    el.hidden = !on;
+    if (on && !G.uiSeen[step.id] && (!step.noteWhen || step.noteWhen())) { G.uiSeen[step.id] = true; if ((G.t || 0) > 3) toast(step.note); }
+  }
+}

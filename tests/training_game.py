@@ -288,14 +288,16 @@ def main():
         hero = page.evaluate("trainingTest.upgradeHero()")
         assert hero["bought"] and hero["after"]["training"]["hero"] == 1, hero
         same(hero["before"]["money"] - hero["after"]["money"], hero["cost"], "hero payment")
-        same(hero["after"]["hero"]["max"] - hero["before"]["hero"]["max"], 10, "hero max HP")
-        same(hero["after"]["hero"]["hp"] - hero["before"]["hero"]["hp"], 10, "wounded hero missing HP preserved")
-        same(hero["actualDamage"], hero["before"]["hero"]["attack"] + 3, "trained hero real sword hit")
+        # 훈련은 단계마다 +2% (새 게임 기준)
+        same(hero["after"]["hero"]["max"], hero["before"]["hero"]["max"] * 1.02, "hero max HP +2%")
+        same(hero["after"]["hero"]["hp"] - hero["before"]["hero"]["hp"], hero["after"]["hero"]["max"] - hero["before"]["hero"]["max"], "wounded hero missing HP preserved")
+        same(hero["actualDamage"], hero["before"]["hero"]["attack"] * 1.02, "trained hero real sword hit")
         crew = page.evaluate("trainingTest.upgradeCrew()")
         assert crew["bought"] and crew["after"]["training"]["crew"] == 1, crew
         same(crew["before"]["money"] - crew["after"]["money"], crew["cost"], "crew payment")
-        same(crew["actualDamage"], crew["firstDamage"] + 1, "trained worker real sword hit")
-        assert crew["after"]["crew"]["hp"] == [hp + 5 for hp in crew["before"]["crew"]["hp"]], crew
+        same(crew["actualDamage"], crew["firstDamage"] * 1.02, "trained worker real sword hit")
+        gained = crew["after"]["crew"]["max"] - crew["before"]["crew"]["max"]
+        assert gained > 0 and crew["after"]["crew"]["hp"] == [hp + gained for hp in crew["before"]["crew"]["hp"]], crew
         assert crew["after"]["navy"] == crew["before"]["navy"] == [9], crew
         same(crew["recruitHp"], crew["after"]["crew"]["max"], "new worker inherits training")
         same(crew["navyDamage"], 4.5, "navy attack unchanged")

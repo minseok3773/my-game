@@ -392,7 +392,7 @@ const fishPerCatch = () => 1 + Math.floor((lv() - 1) / 2);
 function visiblePads() {
   const list = PADS.filter(p => !unlocked.has(p.id) && p.after.every(a => unlocked.has(a)));
   for (const id in UPG) {
-    const isT = DEFS[id] && DEFS[id].type === 'tent', l = slv(id); if (!unlocked.has(UPG[id].req || id) || l >= (isT ? 10 : 5)) continue;
+    const isT = DEFS[id] && DEFS[id].type === 'tent', l = slv(id); if (!unlocked.has(UPG[id].req || id) || l >= upgradeMaxLevel(id)) continue;
     const u = UPG[id];
     list.push({ id: 'up:' + id, up: id, lv: l, cost: Math.round(u.base * Math.pow(isT ? 1.45 : 2.2, l - 1)), x: u.x, y: u.y, icon: u.icon || '⬆️' });
   }
@@ -1476,6 +1476,8 @@ const SOLDIER_LOOKS = ['#f6d2b5', '#8d5a3b', '#e8b88f', '#6b4026'].map(skin => (
 let soldiers = [], enemies = [], shots = [], booms = [], raidOn = false, looted = false, trainT = 0, shake = 0;
 const towerSt = {};
 const blv = () => slv('base');
+// 시설은 ★10까지(★6부터 후반 자금 사용처). 선원 신발·가방은 이동·운반이 지나치게 빨라지지 않게 ★5까지.
+function upgradeMaxLevel(id) { return ['crewShoes', 'crewBag'].includes(id) ? 5 : 10; }
 const soldierCap = () => 6 + (blv() - 1) * 3;
 const hpMax = () => 100 + (blv() - 1) * 25;
 const formation = i => ({ x: 19.4 + (i % 6) * 0.55, y: 14.1 + Math.floor(i / 6) * 0.55 });
@@ -1529,9 +1531,11 @@ function killCrew(c) {
   if (soldiers.includes(c)) return killSoldier(c);
   const i = workers.indexOf(c); if (i < 0) return;
   workers.splice(i, 1);
-  floatText(c.x, c.y, '선원 쓰러짐', '#ffb0a0'); dust(c.x, c.y, 10);
+  // 습격 중 쓰러진 일꾼은 기절: 습격을 막아내면 깨어나고, 약탈당하면 해적에게 끌려갑니다(w3d_defense.js).
+  const wounded = raidOn && woundCrew(c);
+  floatText(c.x, c.y, wounded ? '💫 기절' : '선원 쓰러짐', '#ffb0a0'); dust(c.x, c.y, 10);
   c.dead = true; c.fighting = false; c.swingT = 0; c.deathT = 0; fallenCrew.push(c);
-  toast('⛺ 일꾼 전사 · 텐트 앞 칸에 서서 $30씩 자동 충원하세요'); save();
+  toast(wounded ? '💫 일꾼 기절 · 습격을 막아내면 깨어나요 (약탈당하면 절반이 끌려가요)' : '⛺ 일꾼 전사 · 텐트 앞 칸에 서서 $30씩 자동 충원하세요'); save();
 }
 function killSoldier(s) {
   const i = soldiers.indexOf(s); if (i < 0) return;
@@ -1924,7 +1928,7 @@ function update(dt) {
   for (const w of workers) if (expeditionWorkerAvailable(w)) updateWorker(w, dt);
   separateWorkers(dt);
   updateSea(dt);
-  updateMilitary(dt); tickTrainingInteraction(dt); tickRepairs(dt); tickRaidEvents(dt); tickScout(dt);
+  updateMilitary(dt); tickTrainingInteraction(dt); tickRepairs(dt); tickRaidEvents(dt); tickScout(dt); tickWoundedCrew();
   // 상호작용
   player.timer -= dt;
   if (isHeroAvailable() && player.timer <= 0) {

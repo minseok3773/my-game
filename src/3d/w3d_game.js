@@ -41,9 +41,13 @@ const CARDS = [
 ];
 function ck(id) { return (G && G.cards && G.cards[id]) || 0; }
 const lootMul = () => 1 + 0.5 * ck('loot');
-const crewHpMax = () => Math.round((15 + 6 * (pirateLevel() - 1)) * allyMultiplier(pirateLevel()) * (1 + 0.5 * ck('crewHp')) * (G.expedition?.rewards?.shell ? 1.25 : 1)) + 10 * ck('villageHp') + 5 * trainingLevel('crew');
+// 훈련 % 강화는 초반 작은 체력에서도 단계마다 최소 +1이 되게 합니다.
+const crewHpMax = () => {
+  const raw = (15 + 6 * (pirateLevel() - 1)) * allyMultiplier(pirateLevel()) * (1 + 0.5 * ck('crewHp')) * (G.expedition?.rewards?.shell ? 1.25 : 1);
+  return Math.max(Math.round(raw * trainingBoost('crew')), Math.round(raw) + trainingSplit('crew').extra) + 10 * ck('villageHp') + 5 * trainingSplit('crew').old;
+};
 const crewMul = () => 1 + 0.4 * ck('crewPower');
-const crewAttack = () => 3 * (1 + 0.1 * (Math.max(lv(), pirateLevel()) - 1)) * allyMultiplier(pirateLevel()) * crewMul() + trainingLevel('crew');
+const crewAttack = () => 3 * (1 + 0.1 * (Math.max(lv(), pirateLevel()) - 1)) * allyMultiplier(pirateLevel()) * crewMul() * trainingBoost('crew') + trainingSplit('crew').old;
 
 const cardStyle = document.createElement('style');
 cardStyle.textContent = `
@@ -160,7 +164,7 @@ function spawnBossBoarder(ship) {
 }
 function bossTick(e, dt) {
   // 보스도 포격·약탈 대신 상륙 병력을 보내 갑판 전투를 벌입니다.
-  e.landingBudget = 8 * PIRATE_CREW_MULTIPLIER;
+  e.landingBudget = Math.ceil(8 * pirateCrewMultiplier());
 }
 function bossHud() {
   const b = enemies.find(e => e.champion && alive(e)) || enemies.find(e => e.boss && !e.bossBoarded && alive(e));
