@@ -783,9 +783,23 @@ window.addEventListener('keydown', e => { keys.add(e.key.toLowerCase()); });
 window.addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 // 아이폰에서 마을 드래그가 스크롤·확대 제스처로 넘어가 끊기지 않게 막습니다.
 for (const type of ['touchstart', 'touchmove']) cv.addEventListener(type, e => { if (e.cancelable) e.preventDefault(); }, { passive: false });
-cv.addEventListener('pointerdown', e => { joy.on = true; joy.id = e.pointerId; joy.ox = e.clientX; joy.oy = e.clientY; joy.dx = joy.dy = 0; cv.setPointerCapture(e.pointerId); });
+// 터치 예비 경로: 기기가 포인터 입력을 중간에 취소(pointercancel)해도 손가락이 화면에 있는 동안은 터치 좌표로 계속 움직입니다.
+const joyTouch = { id: null, x: 0, y: 0 };
+cv.addEventListener('touchstart', e => { const t = e.changedTouches[0]; if (t && joyTouch.id === null) { joyTouch.id = t.identifier; joyTouch.x = t.clientX; joyTouch.y = t.clientY; } }, { passive: false });
+cv.addEventListener('touchmove', e => {
+  const t = [...e.changedTouches].find(x => x.identifier === joyTouch.id); if (!t) return;
+  if (!joy.on) { joy.on = true; joy.id = 'touch'; joy.ox = joyTouch.x; joy.oy = joyTouch.y; } // 포인터가 취소됐으면 터치로 이어받음
+  if (joy.id === 'touch') { joy.dx = t.clientX - joy.ox; joy.dy = t.clientY - joy.oy; }
+}, { passive: false });
+const endTouch = e => { if (![...e.changedTouches].some(x => x.identifier === joyTouch.id)) return; joyTouch.id = null; if (joy.id === 'touch') { joy.on = false; joy.id = null; joy.dx = joy.dy = 0; } };
+cv.addEventListener('touchend', endTouch); cv.addEventListener('touchcancel', endTouch);
+cv.addEventListener('pointerdown', e => { joy.on = true; joy.id = e.pointerId; joy.ox = e.clientX; joy.oy = e.clientY; joy.dx = joy.dy = 0; try { cv.setPointerCapture(e.pointerId); } catch (error) {} });
 cv.addEventListener('pointermove', e => { if (!joy.on || e.pointerId !== joy.id) return; joy.dx = e.clientX - joy.ox; joy.dy = e.clientY - joy.oy; });
-const endJoy = e => { if (e.pointerId === joy.id) { joy.on = false; joy.dx = joy.dy = 0; } };
+const endJoy = e => {
+  if (e.pointerId !== joy.id) return;
+  if (e.type === 'pointercancel' && joyTouch.id !== null) { joy.id = 'touch'; return; } // 손가락이 아직 있으면 터치로 계속
+  joy.on = false; joy.dx = joy.dy = 0;
+};
 cv.addEventListener('pointerup', endJoy); cv.addEventListener('pointercancel', endJoy);
 function clearMovementInput() {
   keys.clear();
@@ -2036,9 +2050,16 @@ function expeditionRenderExplore(){
  // 지도 위 터치는 스크롤·확대로 쓰지 않게 막고, 지도를 누를 때 화면이 지도 쪽으로 튀지 않게 합니다(preventScroll).
  const keepTouch=ev=>{if(ev.cancelable)ev.preventDefault();};
  for(const type of ['touchstart','touchmove','touchend']) canvas.addEventListener(type,keepTouch,{passive:false});
+ // 터치 예비 경로: 포인터가 취소돼도(pointercancel) 손가락이 있는 동안은 터치 좌표로 계속 움직입니다.
+ let mapTouch=null;
+ canvas.addEventListener('touchstart',ev=>{const t=ev.changedTouches[0];if(t&&mapTouch===null){mapTouch=t.identifier;if(!expeditionPointer)expeditionPointer={sx:t.clientX,sy:t.clientY,x:t.clientX,y:t.clientY,id:'touch'};}},{passive:false});
+ canvas.addEventListener('touchmove',ev=>{const t=[...ev.changedTouches].find(x=>x.identifier===mapTouch);if(!t)return;if(!expeditionPointer)expeditionPointer={sx:t.clientX,sy:t.clientY,x:t.clientX,y:t.clientY,id:'touch'};if(expeditionPointer.id==='touch'){expeditionPointer.x=t.clientX;expeditionPointer.y=t.clientY;}},{passive:false});
+ const endMapTouch=ev=>{if(![...ev.changedTouches].some(x=>x.identifier===mapTouch))return;mapTouch=null;if(expeditionPointer?.id==='touch')expeditionPointer=null;};
+ canvas.addEventListener('touchend',endMapTouch);canvas.addEventListener('touchcancel',endMapTouch);
  canvas.onpointerdown=ev=>{ev.preventDefault();try{canvas.setPointerCapture(ev.pointerId);}catch(error){}expeditionPointer={sx:ev.clientX,sy:ev.clientY,x:ev.clientX,y:ev.clientY,id:ev.pointerId};canvas.focus({preventScroll:true});};
  canvas.onpointermove=ev=>{if(expeditionPointer&&(expeditionPointer.id===undefined||ev.pointerId===expeditionPointer.id)){expeditionPointer.x=ev.clientX;expeditionPointer.y=ev.clientY;}};
- canvas.onpointerup=canvas.onpointercancel=()=>{expeditionPointer=null;};
+ canvas.onpointerup=()=>{if(expeditionPointer?.id!=='touch')expeditionPointer=null;};
+ canvas.onpointercancel=()=>{if(expeditionPointer){if(mapTouch!==null)expeditionPointer.id='touch';else expeditionPointer=null;}};
  document.getElementById('expeditionBackup').onclick=exportSave;
  document.getElementById('expeditionRetreat').onclick=()=>expeditionFinish('retreat');canvas.focus();
  document.getElementById('expeditionSave').onclick=()=>{document.getElementById('expeditionSaveStatus').textContent=save()?'원정 진행을 저장했습니다.':'저장 실패 · 페이지를 닫지 말고 다시 시도하거나 마을 메뉴에서 백업하세요.';};
@@ -5551,10 +5572,10 @@ function onboardingHud() {
  */
 const CHAPTER_ISLANDS = [
   { name: '잊힌 해초섬', icon: '🌿', boss: '해초섬의 주인 · 늪지 상어', power: 1.0, sky: 0x8fd8ef, water: 0x28aacd },
-  { name: '안개 산호섬', icon: '🪸', boss: '산호섬의 주인 · 안개 상어', power: 1.25, sky: 0xb7d6e2, water: 0x2f9fb4 },
-  { name: '폭풍 바위섬', icon: '⛈', boss: '바위섬의 주인 · 폭풍 상어', power: 1.5, sky: 0x98b4c8, water: 0x2d7fa0 },
-  { name: '화산 거북섬', icon: '🌋', boss: '거북섬의 주인 · 용암 상어', power: 1.8, sky: 0xe3b79a, water: 0x2f8a9a },
-  { name: '해적 요새섬', icon: '🏴‍☠️', boss: '해적왕 · 강철 상어', power: 2.2, sky: 0xa9b6d6, water: 0x245f8c },
+  { name: '안개 산호섬', icon: '🪸', boss: '산호섬의 주인 · 안개 상어', power: 1.5, sky: 0xb7d6e2, water: 0x2f9fb4 },
+  { name: '폭풍 바위섬', icon: '⛈', boss: '바위섬의 주인 · 폭풍 상어', power: 2.3, sky: 0x98b4c8, water: 0x2d7fa0 },
+  { name: '화산 거북섬', icon: '🌋', boss: '거북섬의 주인 · 용암 상어', power: 3.4, sky: 0xe3b79a, water: 0x2f8a9a },
+  { name: '해적 요새섬', icon: '🏴‍☠️', boss: '해적왕 · 강철 상어', power: 4.8, sky: 0xa9b6d6, water: 0x245f8c },
 ];
 const CHAPTER_CARRY_SHARE = 0.3, CHAPTER_CARRY_MAX = 3000, CHAPTER_BOSS_ESCORTS = 2;
 // 섬 번호는 1~999 정수만 씁니다(잘못된 저장·가져온 코드로 판매가가 폭주하지 않게).
@@ -5563,7 +5584,7 @@ const chapterNo = () => { const n = Math.floor(Number(G?.chapter)); return Numbe
 function chapterIsland(n = chapterNo()) {
   if (n <= CHAPTER_ISLANDS.length) return CHAPTER_ISLANDS[n - 1];
   const loop = n - CHAPTER_ISLANDS.length, base = CHAPTER_ISLANDS[(loop - 1) % CHAPTER_ISLANDS.length];
-  return { ...base, name: `끝없는 바다 ${loop} · ${base.name}`, icon: '🌊', boss: `심연의 ${base.boss}`, power: 2.2 + 0.4 * loop };
+  return { ...base, name: `끝없는 바다 ${loop} · ${base.name}`, icon: '🌊', boss: `심연의 ${base.boss}`, power: 4.8 + 0.8 * loop };
 }
 // 섬마다 미션(현재 섬에 도착한 뒤 기준). 뒤 섬일수록 목표가 커집니다.
 function chapterMissions(n = chapterNo()) {

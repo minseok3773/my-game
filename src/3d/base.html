@@ -1303,9 +1303,23 @@ window.addEventListener('keydown', e => { keys.add(e.key.toLowerCase()); });
 window.addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 // 아이폰에서 마을 드래그가 스크롤·확대 제스처로 넘어가 끊기지 않게 막습니다.
 for (const type of ['touchstart', 'touchmove']) cv.addEventListener(type, e => { if (e.cancelable) e.preventDefault(); }, { passive: false });
-cv.addEventListener('pointerdown', e => { joy.on = true; joy.id = e.pointerId; joy.ox = e.clientX; joy.oy = e.clientY; joy.dx = joy.dy = 0; cv.setPointerCapture(e.pointerId); });
+// 터치 예비 경로: 기기가 포인터 입력을 중간에 취소(pointercancel)해도 손가락이 화면에 있는 동안은 터치 좌표로 계속 움직입니다.
+const joyTouch = { id: null, x: 0, y: 0 };
+cv.addEventListener('touchstart', e => { const t = e.changedTouches[0]; if (t && joyTouch.id === null) { joyTouch.id = t.identifier; joyTouch.x = t.clientX; joyTouch.y = t.clientY; } }, { passive: false });
+cv.addEventListener('touchmove', e => {
+  const t = [...e.changedTouches].find(x => x.identifier === joyTouch.id); if (!t) return;
+  if (!joy.on) { joy.on = true; joy.id = 'touch'; joy.ox = joyTouch.x; joy.oy = joyTouch.y; } // 포인터가 취소됐으면 터치로 이어받음
+  if (joy.id === 'touch') { joy.dx = t.clientX - joy.ox; joy.dy = t.clientY - joy.oy; }
+}, { passive: false });
+const endTouch = e => { if (![...e.changedTouches].some(x => x.identifier === joyTouch.id)) return; joyTouch.id = null; if (joy.id === 'touch') { joy.on = false; joy.id = null; joy.dx = joy.dy = 0; } };
+cv.addEventListener('touchend', endTouch); cv.addEventListener('touchcancel', endTouch);
+cv.addEventListener('pointerdown', e => { joy.on = true; joy.id = e.pointerId; joy.ox = e.clientX; joy.oy = e.clientY; joy.dx = joy.dy = 0; try { cv.setPointerCapture(e.pointerId); } catch (error) {} });
 cv.addEventListener('pointermove', e => { if (!joy.on || e.pointerId !== joy.id) return; joy.dx = e.clientX - joy.ox; joy.dy = e.clientY - joy.oy; });
-const endJoy = e => { if (e.pointerId === joy.id) { joy.on = false; joy.dx = joy.dy = 0; } };
+const endJoy = e => {
+  if (e.pointerId !== joy.id) return;
+  if (e.type === 'pointercancel' && joyTouch.id !== null) { joy.id = 'touch'; return; } // 손가락이 아직 있으면 터치로 계속
+  joy.on = false; joy.dx = joy.dy = 0;
+};
 cv.addEventListener('pointerup', endJoy); cv.addEventListener('pointercancel', endJoy);
 function clearMovementInput() {
   keys.clear();

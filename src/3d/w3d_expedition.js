@@ -226,9 +226,16 @@ function expeditionRenderExplore(){
  // 지도 위 터치는 스크롤·확대로 쓰지 않게 막고, 지도를 누를 때 화면이 지도 쪽으로 튀지 않게 합니다(preventScroll).
  const keepTouch=ev=>{if(ev.cancelable)ev.preventDefault();};
  for(const type of ['touchstart','touchmove','touchend']) canvas.addEventListener(type,keepTouch,{passive:false});
+ // 터치 예비 경로: 포인터가 취소돼도(pointercancel) 손가락이 있는 동안은 터치 좌표로 계속 움직입니다.
+ let mapTouch=null;
+ canvas.addEventListener('touchstart',ev=>{const t=ev.changedTouches[0];if(t&&mapTouch===null){mapTouch=t.identifier;if(!expeditionPointer)expeditionPointer={sx:t.clientX,sy:t.clientY,x:t.clientX,y:t.clientY,id:'touch'};}},{passive:false});
+ canvas.addEventListener('touchmove',ev=>{const t=[...ev.changedTouches].find(x=>x.identifier===mapTouch);if(!t)return;if(!expeditionPointer)expeditionPointer={sx:t.clientX,sy:t.clientY,x:t.clientX,y:t.clientY,id:'touch'};if(expeditionPointer.id==='touch'){expeditionPointer.x=t.clientX;expeditionPointer.y=t.clientY;}},{passive:false});
+ const endMapTouch=ev=>{if(![...ev.changedTouches].some(x=>x.identifier===mapTouch))return;mapTouch=null;if(expeditionPointer?.id==='touch')expeditionPointer=null;};
+ canvas.addEventListener('touchend',endMapTouch);canvas.addEventListener('touchcancel',endMapTouch);
  canvas.onpointerdown=ev=>{ev.preventDefault();try{canvas.setPointerCapture(ev.pointerId);}catch(error){}expeditionPointer={sx:ev.clientX,sy:ev.clientY,x:ev.clientX,y:ev.clientY,id:ev.pointerId};canvas.focus({preventScroll:true});};
  canvas.onpointermove=ev=>{if(expeditionPointer&&(expeditionPointer.id===undefined||ev.pointerId===expeditionPointer.id)){expeditionPointer.x=ev.clientX;expeditionPointer.y=ev.clientY;}};
- canvas.onpointerup=canvas.onpointercancel=()=>{expeditionPointer=null;};
+ canvas.onpointerup=()=>{if(expeditionPointer?.id!=='touch')expeditionPointer=null;};
+ canvas.onpointercancel=()=>{if(expeditionPointer){if(mapTouch!==null)expeditionPointer.id='touch';else expeditionPointer=null;}};
  document.getElementById('expeditionBackup').onclick=exportSave;
  document.getElementById('expeditionRetreat').onclick=()=>expeditionFinish('retreat');canvas.focus();
  document.getElementById('expeditionSave').onclick=()=>{document.getElementById('expeditionSaveStatus').textContent=save()?'원정 진행을 저장했습니다.':'저장 실패 · 페이지를 닫지 말고 다시 시도하거나 마을 메뉴에서 백업하세요.';};

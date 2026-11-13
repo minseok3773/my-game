@@ -6,10 +6,10 @@
  */
 const CHAPTER_ISLANDS = [
   { name: '잊힌 해초섬', icon: '🌿', boss: '해초섬의 주인 · 늪지 상어', power: 1.0, sky: 0x8fd8ef, water: 0x28aacd },
-  { name: '안개 산호섬', icon: '🪸', boss: '산호섬의 주인 · 안개 상어', power: 1.25, sky: 0xb7d6e2, water: 0x2f9fb4 },
-  { name: '폭풍 바위섬', icon: '⛈', boss: '바위섬의 주인 · 폭풍 상어', power: 1.5, sky: 0x98b4c8, water: 0x2d7fa0 },
-  { name: '화산 거북섬', icon: '🌋', boss: '거북섬의 주인 · 용암 상어', power: 1.8, sky: 0xe3b79a, water: 0x2f8a9a },
-  { name: '해적 요새섬', icon: '🏴‍☠️', boss: '해적왕 · 강철 상어', power: 2.2, sky: 0xa9b6d6, water: 0x245f8c },
+  { name: '안개 산호섬', icon: '🪸', boss: '산호섬의 주인 · 안개 상어', power: 1.5, sky: 0xb7d6e2, water: 0x2f9fb4 },
+  { name: '폭풍 바위섬', icon: '⛈', boss: '바위섬의 주인 · 폭풍 상어', power: 2.3, sky: 0x98b4c8, water: 0x2d7fa0 },
+  { name: '화산 거북섬', icon: '🌋', boss: '거북섬의 주인 · 용암 상어', power: 3.4, sky: 0xe3b79a, water: 0x2f8a9a },
+  { name: '해적 요새섬', icon: '🏴‍☠️', boss: '해적왕 · 강철 상어', power: 4.8, sky: 0xa9b6d6, water: 0x245f8c },
 ];
 const CHAPTER_CARRY_SHARE = 0.3, CHAPTER_CARRY_MAX = 3000, CHAPTER_BOSS_ESCORTS = 2;
 // 섬 번호는 1~999 정수만 씁니다(잘못된 저장·가져온 코드로 판매가가 폭주하지 않게).
@@ -18,7 +18,7 @@ const chapterNo = () => { const n = Math.floor(Number(G?.chapter)); return Numbe
 function chapterIsland(n = chapterNo()) {
   if (n <= CHAPTER_ISLANDS.length) return CHAPTER_ISLANDS[n - 1];
   const loop = n - CHAPTER_ISLANDS.length, base = CHAPTER_ISLANDS[(loop - 1) % CHAPTER_ISLANDS.length];
-  return { ...base, name: `끝없는 바다 ${loop} · ${base.name}`, icon: '🌊', boss: `심연의 ${base.boss}`, power: 2.2 + 0.4 * loop };
+  return { ...base, name: `끝없는 바다 ${loop} · ${base.name}`, icon: '🌊', boss: `심연의 ${base.boss}`, power: 4.8 + 0.8 * loop };
 }
 // 섬마다 미션(현재 섬에 도착한 뒤 기준). 뒤 섬일수록 목표가 커집니다.
 function chapterMissions(n = chapterNo()) {
